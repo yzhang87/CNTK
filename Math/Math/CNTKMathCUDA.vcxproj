@@ -188,6 +188,7 @@
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 7.0.targets" />
   </ImportGroup>
+  <Target Name="Build" Condition="'$(Device)'!='CPU'" Outputs="$(TargetPath)" DependsOnTargets="$(BuildDependsOn)" />
   <Target Name="CheckDependencies">
     <Error Condition="!Exists('$(CUB_PATH)')"
       Text="CNTK requires NVIDIA CUB library v1.4.1 to build. Please download the library from https://nvlabs.github.io/cub/ and set CUB_PATH environment variable to CUB root path (e.g. c:\src\cub-1.4.1)." />
