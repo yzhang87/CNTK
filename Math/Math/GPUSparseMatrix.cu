@@ -14,7 +14,6 @@
 #include <cuda_runtime.h>
 #include <cusparse_v2.h>
 #include "cublas_v2.h"
-//#include "GPUMatrixCUDAKernels.cu"
 #include "GPUMatrixCUDAKernels.cuh"
 #include <functional>
 #include "CommonMatrix.h"
