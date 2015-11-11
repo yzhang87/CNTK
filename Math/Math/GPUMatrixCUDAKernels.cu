@@ -4,44 +4,11 @@
 // </copyright>
 //
 
-#include "BestGpu.h"
-
 #ifndef CPUONLY
 
-#include <float.h>
-#include <cuda_runtime.h>
-#include "CommonMatrix.h"
-#include "device_functions.h"
-#include <assert.h>
-
-// REVIEW alexeyk: disable warnings properly for GCC/clang
-#ifdef _MSC_VER
-#pragma warning (push)
-#pragma warning (disable: 4100)
-#pragma warning (disable: 4127)
-#pragma warning (disable: 4201)
-#pragma warning (disable: 4515)
-#endif
-#include <cub/cub.cuh>
-#ifdef _MSC_VER
-#pragma warning (pop)
-#endif
-
-// We would like to use 64-bit integer to support large matrices. However, CUDA seems to support only 32-bit integer
-// For now, use int32_t to ensure that both Linux and Windows see this as 32 bit integer type.
-
-#ifndef CUDA_LONG
-#define CUDA_LONG int32_t
-#endif
+#include "GPUMatrixCUDAKernels.cuh"
 
 #define IDX2C(i,j,ld) (((j)*(ld))+(i)) // 0 based indexing
-#define threadsPerBlock 512
-
-#ifdef __GNUC__
-#define UNUSED_FUNCTION_ATTRIBUTE __attribute__ ((unused))
-#else
-#define UNUSED_FUNCTION_ATTRIBUTE
-#endif
 
 // Predefine this for later.
 static __inline__ __device__ double atomicAdd(double* address, double val) UNUSED_FUNCTION_ATTRIBUTE;
@@ -3781,7 +3748,7 @@ __global__ void _reductionSum2(
     const ElemType* data,
     ElemType *sum,
     CUDA_LONG N, 
-    bool takeSqrt=false)
+    bool takeSqrt)
 {
 
     __shared__ ElemType partialSums[1024];

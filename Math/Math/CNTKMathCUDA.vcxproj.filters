@@ -80,6 +80,9 @@
     <ClInclude Include="latticefunctionskernels.h">
       <Filter>GPU\SequenceTraining</Filter>
     </ClInclude>
+    <ClInclude Include="GPUMatrixCUDAKernels.cuh">
+      <Filter>GPU</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GPUMatrix.h">

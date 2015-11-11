@@ -133,6 +133,7 @@
     <ClInclude Include="cudalatticeops.cu.h" />
     <ClInclude Include="cudalatticeops.h" />
     <ClInclude Include="cudalib.h" />
+    <ClInclude Include="GPUMatrixCUDAKernels.cuh" />
     <ClInclude Include="latticefunctionskernels.h" />
     <ClInclude Include="ValueQuantizer.h" />
     <None Include="GPUWatcher.h">
@@ -162,7 +163,8 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\Common\DebugUtil.cpp">
-      <PrecompiledHeader></PrecompiledHeader>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
     </ClCompile>
     <CudaCompile Include="MatrixQuantizerGPU.cu">
       <FileType>CppCode</FileType>
@@ -179,6 +181,7 @@
     <CudaCompile Include="GPUMatrixCUDAKernels.cu">
       <ExcludedFromBuild>true</ExcludedFromBuild>
       <FileType>CppCode</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
@@ -189,7 +192,6 @@
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 7.0.targets" />
   </ImportGroup>
   <Target Name="CheckDependencies">
-    <Error Condition="!Exists('$(CUB_PATH)')"
-      Text="CNTK requires NVIDIA CUB library v1.4.1 to build. Please download the library from https://nvlabs.github.io/cub/ and set CUB_PATH environment variable to CUB root path (e.g. c:\src\cub-1.4.1)." />
+    <Error Condition="!Exists('$(CUB_PATH)')" Text="CNTK requires NVIDIA CUB library v1.4.1 to build. Please download the library from https://nvlabs.github.io/cub/ and set CUB_PATH environment variable to CUB root path (e.g. c:\src\cub-1.4.1)." />
   </Target>
 </Project>
