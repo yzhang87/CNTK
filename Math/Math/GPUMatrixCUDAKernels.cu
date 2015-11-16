@@ -4,7 +4,8 @@
 // </copyright>
 //
 
-#pragma once
+#ifndef __GPU_MATRIX_CUDA_KERNELS_CU__
+#define __GPU_MATRIX_CUDA_KERNELS_CU__
 
 #include "BestGpu.h"
 
@@ -4776,3 +4777,4 @@ __global__ void _maskColumnsValue(ElemType *a, const char *columnsMask, CUDA_LON
 }
 
 #endif // !CPUONLY
+#endif //__GPU_MATRIX_CUDA_KERNELS_CU__
