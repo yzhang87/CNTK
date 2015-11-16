@@ -177,7 +177,6 @@
       <FileType>CppCode</FileType>
     </CudaCompile>
     <CudaCompile Include="GPUMatrixCUDAKernels.cu">
-      <ExcludedFromBuild>true</ExcludedFromBuild>
       <FileType>CppCode</FileType>
     </CudaCompile>
   </ItemGroup>

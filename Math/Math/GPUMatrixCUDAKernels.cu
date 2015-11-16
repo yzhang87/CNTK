@@ -4,6 +4,8 @@
 // </copyright>
 //
 
+#pragma once
+
 #include "BestGpu.h"
 
 #ifndef CPUONLY
