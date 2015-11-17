@@ -55,7 +55,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void HTKMLFReader<ElemType>::Init(const ConfigParameters& readerConfig)
         {
             m_truncated = readerConfig("Truncated", "false");
-            m_convertLabelsToTargets = false;
 
             ConfigArray numberOfuttsPerMinibatchForAllEpochs = readerConfig("nbruttsineachrecurrentiter", "1");
             m_numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;

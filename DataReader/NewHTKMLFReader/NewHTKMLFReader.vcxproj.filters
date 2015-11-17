@@ -17,6 +17,15 @@
     <ClCompile Include="..\..\Common\TimerUtility.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="Packers\BpttPacker.cpp">
+      <Filter>Packers</Filter>
+    </ClCompile>
+    <ClCompile Include="Packers\NormalPacker.cpp">
+      <Filter>Packers</Filter>
+    </ClCompile>
+    <ClCompile Include="Packers\Packer.cpp">
+      <Filter>Packers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
@@ -91,6 +100,15 @@
     <ClInclude Include="interfaces\Data.h">
       <Filter>interfaces</Filter>
     </ClInclude>
+    <ClInclude Include="Packers\BpttPacker.h">
+      <Filter>Packers</Filter>
+    </ClInclude>
+    <ClInclude Include="Packers\NormalPacker.h">
+      <Filter>Packers</Filter>
+    </ClInclude>
+    <ClInclude Include="Packers\Packer.h">
+      <Filter>Packers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -122,6 +140,9 @@
     </Filter>
     <Filter Include="Utils">
       <UniqueIdentifier>{5583c5c6-f518-4317-b15a-b32488e78f62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Packers">
+      <UniqueIdentifier>{2cf67e1b-1b6d-4252-9265-5c1243b41854}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

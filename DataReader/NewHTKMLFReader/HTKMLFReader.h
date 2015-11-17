@@ -78,7 +78,6 @@ private:
 
     // for writing outputs to files (standard single input/output network) - deprecate eventually
     bool m_checkDictionaryKeys;
-    bool m_convertLabelsToTargets;
     std::vector <bool> m_convertLabelsToTargetsMultiIO;
     std::vector<std::vector<std::wstring>> m_inputFilesMultiIO;
  
