@@ -46,6 +46,51 @@
     <ClInclude Include="..\..\Common\Include\DataWriter.h">
       <Filter>Common\Include</Filter>
     </ClInclude>
+    <ClInclude Include="interfaces\IBlockReader.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\IMemoryProvider.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\IPacker.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\IRandomizer.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\ISequencer.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\ISource.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Randomizers\BlockRandomizer.h">
+      <Filter>Randomizers</Filter>
+    </ClInclude>
+    <ClInclude Include="Randomizers\RollingWindowRandomizer.h">
+      <Filter>Randomizers</Filter>
+    </ClInclude>
+    <ClInclude Include="Sources\HtkMlfSource.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="Transformations\AugmentingSequencer.h">
+      <Filter>Transformations</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\frame.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\sequence.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\ProcessingUnit.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\Timeline.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="interfaces\Data.h">
+      <Filter>interfaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -59,6 +104,24 @@
     </Filter>
     <Filter Include="Common\Include">
       <UniqueIdentifier>{812d1247-04eb-4693-a0d2-5399a94e6235}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="interfaces">
+      <UniqueIdentifier>{62f674db-70f9-400a-ba6f-dc7443e93bec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BlockReaders">
+      <UniqueIdentifier>{f8e900e9-de5b-406b-bf4e-0b0afdeaa9ef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Randomizers">
+      <UniqueIdentifier>{3e0e3473-6070-4cda-a355-c2932fa9b374}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sources">
+      <UniqueIdentifier>{785bee3b-7627-4a77-a837-fddcc4f99bd0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Transformations">
+      <UniqueIdentifier>{22e801bc-9861-49b4-98ee-1ddd171851a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utils">
+      <UniqueIdentifier>{5583c5c6-f518-4317-b15a-b32488e78f62}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

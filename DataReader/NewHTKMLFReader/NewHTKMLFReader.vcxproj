@@ -109,12 +109,27 @@
     <ClInclude Include="htkfeatio.h" />
     <ClInclude Include="HTKMLFReader.h" />
     <ClInclude Include="HTKMLFWriter.h" />
+    <ClInclude Include="interfaces\Data.h" />
+    <ClInclude Include="interfaces\IBlockReader.h" />
+    <ClInclude Include="interfaces\Frame.h" />
+    <ClInclude Include="interfaces\IMemoryProvider.h" />
+    <ClInclude Include="interfaces\IPacker.h" />
+    <ClInclude Include="interfaces\ProcessingUnit.h" />
+    <ClInclude Include="interfaces\IRandomizer.h" />
+    <ClInclude Include="interfaces\Sequence.h" />
+    <ClInclude Include="interfaces\ISequencer.h" />
+    <ClInclude Include="interfaces\ISource.h" />
+    <ClInclude Include="interfaces\Timeline.h" />
     <ClInclude Include="minibatchiterator.h" />
     <ClInclude Include="minibatchsourcehelpers.h" />
     <ClInclude Include="msra_mgram.h" />
+    <ClInclude Include="Randomizers\BlockRandomizer.h" />
+    <ClInclude Include="Randomizers\RollingWindowRandomizer.h" />
     <ClInclude Include="rollingwindowsource.h" />
+    <ClInclude Include="Sources\HtkMlfSource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Transformations\AugmentingSequencer.h" />
     <ClInclude Include="utterancesourcemulti.h" />
   </ItemGroup>
   <ItemGroup>
@@ -133,8 +148,10 @@
     </ClCompile>
     <ClCompile Include="fileutil.cpp" />
     <ClCompile Include="..\..\Common\DebugUtil.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"></PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'"></PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="HTKMLFReader.cpp" />
     <ClCompile Include="HTKMLFWriter.cpp" />
