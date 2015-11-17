@@ -1,4 +1,4 @@
-// Implements a transformation of a sequence, where a sequence is a set of frames.
+// Implements a transformation of a sequence, where a sequence is a vector of frames.
 
 #pragma once
 

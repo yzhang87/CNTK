@@ -1,4 +1,4 @@
-// Represents a single frame that can be either array of floats or doubles.
+// Represents a sequence, which is a vector of frames.
 
 #pragma once
 

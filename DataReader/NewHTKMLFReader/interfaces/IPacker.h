@@ -1,4 +1,4 @@
-// Main interface of the reader. Provides a sequence of intputs to the network.
+// Main interface of the reader. Provides a sequence of inputs (processing units) to the network.
 
 #pragma once
 

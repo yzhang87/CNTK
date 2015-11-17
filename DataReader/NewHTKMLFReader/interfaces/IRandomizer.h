@@ -1,4 +1,4 @@
-// All randomizers have to implment the following interface.
+// All randomizers have to implement the following interface.
 
 #pragma once
 
