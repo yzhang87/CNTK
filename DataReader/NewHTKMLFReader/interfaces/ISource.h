@@ -4,7 +4,10 @@
 
 #pragma once
 
+#include <vector>
+#include <map>
 #include "Timeline.h"
+#include "Sequence.h"
 
 namespace Microsoft
 {
@@ -17,7 +20,7 @@ namespace Microsoft
             public:
                 virtual Timeline& getTimeline() = 0;
                 virtual std::map<std::string, std::vector<sequence>> getSequenceById(std::vector<sequenceId> ids) = 0;
-                virtual ~ISource() = 0 {}
+                virtual ~ISource() {}
             };
         }
     }

@@ -26,6 +26,9 @@
     <ClCompile Include="Packers\Packer.cpp">
       <Filter>Packers</Filter>
     </ClCompile>
+    <ClCompile Include="Sources\HtkMlfSource.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />

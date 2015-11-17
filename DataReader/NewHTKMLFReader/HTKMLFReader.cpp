@@ -30,6 +30,8 @@
 #include <vld.h> // for memory leak detection
 #endif
 
+#include "Packers/NormalPacker.h"
+
 #ifdef __unix__
 #include <limits.h>
 typedef unsigned long DWORD;
@@ -54,6 +56,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     template<class ElemType>
         void HTKMLFReader<ElemType>::Init(const ConfigParameters& readerConfig)
         {
+
+            // eldak: move this out, compilation check.
+            NormalPacker<ElemType> p(readerConfig);
+            //
+
+
             m_truncated = readerConfig("Truncated", "false");
 
             ConfigArray numberOfuttsPerMinibatchForAllEpochs = readerConfig("nbruttsineachrecurrentiter", "1");
