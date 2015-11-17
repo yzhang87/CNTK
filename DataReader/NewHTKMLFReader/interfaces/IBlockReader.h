@@ -3,9 +3,18 @@
 
 #pragma once
 
-class IBlockReader 
+namespace Microsoft
 {
-public:
-    virtual char* get(size_t offset, size_t size) = 0;
-    virtual ~IBlockReader() = 0 {}
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class IBlockReader
+            {
+            public:
+                virtual char* get(size_t offset, size_t size) = 0;
+                virtual ~IBlockReader() = 0 {}
+            };
+        }
+    }
+}

@@ -6,14 +6,23 @@
 #include "ISource.h"
 #include <memory>
 
-class IRandomizer : ISequencer 
+namespace Microsoft
 {
-    std::shared_ptr<ISource> source_;
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class IRandomizer : ISequencer
+            {
+                std::shared_ptr<ISource> source_;
 
-public:
-    IRandomizer(std::shared_ptr<ISource> source)
-        : source_(source)
-    {}
+            public:
+                IRandomizer(std::shared_ptr<ISource> source)
+                    : source_(source)
+                {}
 
-    virtual ~IRandomizer() = 0 {}
-};
+                virtual ~IRandomizer() = 0 {}
+            };
+        }
+    }
+}

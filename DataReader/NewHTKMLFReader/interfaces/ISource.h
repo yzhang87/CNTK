@@ -6,10 +6,19 @@
 
 #include "Timeline.h"
 
-class ISource 
+namespace Microsoft
 {
-public:  
-    virtual Timeline& getTimeline() = 0;
-    virtual std::map<std::string, std::vector<sequence>> getSequenceById(std::vector<sequenceId> ids) = 0;
-    virtual ~ISource() = 0 {}
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class ISource
+            {
+            public:
+                virtual Timeline& getTimeline() = 0;
+                virtual std::map<std::string, std::vector<sequence>> getSequenceById(std::vector<sequenceId> ids) = 0;
+                virtual ~ISource() = 0 {}
+            };
+        }
+    }
+}

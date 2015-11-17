@@ -1,8 +1,17 @@
 // Represents a processing unit for all the inputs.
 #include "Data.h"
 
-class ProcessingUnit
+namespace Microsoft
 {
-public:
-    std::map<std::string, std::tuple<Data>> data;
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class ProcessingUnit
+            {
+            public:
+                std::map<std::string, std::tuple<Data>> data;
+            };
+        }
+    }
+}

@@ -2,13 +2,22 @@
 
 #pragma once
 
-class Metadata
-{};
-
-class Data
+namespace Microsoft
 {
-public:
-    char* data;
-    size_t size;
-    Metadata layout;
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class Metadata
+            {};
+
+            class Data
+            {
+            public:
+                char* data;
+                size_t size;
+                Metadata layout;
+            };
+        }
+    }
+}

@@ -6,9 +6,18 @@
 #include <vector>
 #include "sequence.h"
 
-class ISequencer
+namespace Microsoft
 {
-public:
-    virtual std::map<std::string, std::vector<sequence>> getNextSequences(size_t numberOfSequences) = 0;
-    virtual ~ISequencer() = 0 {}
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class ISequencer
+            {
+            public:
+                virtual std::map<std::string, std::vector<sequence>> getNextSequences(size_t numberOfSequences) = 0;
+                virtual ~ISequencer() = 0 {}
+            };
+        }
+    }
+}

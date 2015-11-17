@@ -2,13 +2,22 @@
 
 #include "../interfaces/IPacker.h"
 
-class Packer : public IPacker
+namespace Microsoft
 {
-protected:
-    Packer(std::shared_ptr<IMemoryProvider> provider, size_t minibatchSize, std::shared_ptr<ISequencer> source/*, PackerConfig inputs*/)
-        : IPacker(provider, minibatchSize, source)
-    {}
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class Packer : public IPacker
+            {
+            protected:
+                Packer(std::shared_ptr<IMemoryProvider> provider, size_t minibatchSize, std::shared_ptr<ISequencer> source/*, PackerConfig inputs*/)
+                    : IPacker(provider, minibatchSize, source)
+                {}
 
-public:
-    virtual ~Packer() = 0 {}
-};
+            public:
+                virtual ~Packer() = 0 {}
+            };
+        }
+    }
+}

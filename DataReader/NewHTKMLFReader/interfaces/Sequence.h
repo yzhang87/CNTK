@@ -5,7 +5,16 @@
 #include <vector>
 #include "frame.h"
 
-class sequence 
+namespace Microsoft
 {
-    std::vector<frame> frames;
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class sequence
+            {
+                std::vector<frame> frames;
+            };
+        }
+    }
+}

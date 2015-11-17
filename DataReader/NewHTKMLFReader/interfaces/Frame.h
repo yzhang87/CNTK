@@ -4,8 +4,17 @@
 
 #include <vector>
 
-class frame
+namespace Microsoft
 {
-public:
-    std::vector<char> features;
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class frame
+            {
+            public:
+                std::vector<char> features;
+            };
+        }
+    }
+}

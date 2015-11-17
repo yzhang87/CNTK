@@ -5,10 +5,19 @@
 #include <string>
 #include <vector>
 
-typedef std::string sequenceId;
-
-class Timeline 
+namespace Microsoft
 {
-public:
-    std::vector<std::tuple<sequenceId, size_t>> timeline;
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            typedef std::string sequenceId;
+
+            class Timeline
+            {
+            public:
+                std::vector<std::tuple<sequenceId, size_t>> timeline;
+            };
+        }
+    }
+}

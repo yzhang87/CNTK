@@ -2,9 +2,18 @@
 
 #include "../interfaces/ISource.h"
 
-class HTKMLFSource : public ISource 
+namespace Microsoft
 {
-public:
-    HTKMLFSource(/*IBlockReader[] readers, framemode, inputs, ... config*/) 
-    {}
-};
+    namespace MSR
+    {
+        namespace CNTK
+        {
+            class HTKMLFSource : public ISource
+            {
+            public:
+                HTKMLFSource(/*IBlockReader[] readers, framemode, inputs, ... config*/)
+                {}
+            };
+        }
+    }
+}
