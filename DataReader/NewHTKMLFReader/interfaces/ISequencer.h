@@ -9,6 +9,6 @@
 class ISequencer
 {
 public:
-	virtual std::map<std::string, std::vector<sequence>> getNextSequences(size_t numberOfSequences) = 0;
-	virtual ~ISequencer() = 0 {}
+    virtual std::map<std::string, std::vector<sequence>> getNextSequences(size_t numberOfSequences) = 0;
+    virtual ~ISequencer() = 0 {}
 };

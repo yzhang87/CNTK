@@ -7,5 +7,5 @@
 
 class sequence 
 {
-	std::vector<frame> frames;
+    std::vector<frame> frames;
 };

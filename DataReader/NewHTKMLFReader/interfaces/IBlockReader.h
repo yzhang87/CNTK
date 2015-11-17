@@ -7,5 +7,5 @@ class IBlockReader
 {
 public:
     virtual char* get(size_t offset, size_t size) = 0;
-	virtual ~IBlockReader() {}
+    virtual ~IBlockReader() {}
 };

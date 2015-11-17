@@ -268,7 +268,7 @@ size_t filesize (FILE * f)
     }
     return len;
 #else
-	// linux version 
+    // linux version 
     long curPos = ftell (f);
     if (curPos == -1L)
     {

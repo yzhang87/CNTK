@@ -43,7 +43,7 @@ public:
                            const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
                            std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
                            std::vector<shared_ptr<const latticesource::latticepair>> & lattices, std::vector<std::vector<size_t>> & sentendmark,
-						   std::vector<std::vector<size_t>> & phoneboundaries) = 0;
+                           std::vector<std::vector<size_t>> & phoneboundaries) = 0;
     // getbatch() overload to support subsetting of mini-batches for parallel training
     // Default implementation does not support subsetting and throws an exception on 
     // calling this overload with a numsubsets value other than 1.
@@ -52,7 +52,7 @@ public:
                           std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
                           std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
                           std::vector<shared_ptr<const latticesource::latticepair>> & lattices, std::vector<std::vector<size_t>> & sentendmark,
-						  std::vector<std::vector<size_t>> & phoneboundaries)
+                          std::vector<std::vector<size_t>> & phoneboundaries)
     {
         assert((subsetnum == 0) && (numsubsets == 1) && !supportsbatchsubsetting()); subsetnum; numsubsets;
         bool retVal = getbatch(globalts, framesrequested, feat, uids, transcripts, lattices,sentendmark, phoneboundaries);
@@ -102,8 +102,8 @@ class minibatchiterator
     std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> transcripts;    // buffer for storing current minibatch's word-level label sequences (if available and used; empty otherwise)
     std::vector<shared_ptr<const latticesource::latticepair>> lattices;     // lattices of the utterances in current minibatch (empty in frame mode)
 
-	std::vector<std::vector<size_t>> sentendmark;               // buffer for storing current minibatch's utterance end
-	std::vector<std::vector<size_t>> phoneboundaries;               // buffer for storing phone boundaries
+    std::vector<std::vector<size_t>> sentendmark;               // buffer for storing current minibatch's utterance end
+    std::vector<std::vector<size_t>> phoneboundaries;               // buffer for storing phone boundaries
     size_t mbstartframe;                    // current start frame into generalized time line (used for frame-wise mode and for diagnostic messages)
     size_t actualmbframes;                  // actual number of frames in current minibatch
     size_t mbframesadvanced;                // logical number of frames the current MB represents (to advance time; > featbuf.cols() possible, intended for the case of distributed data-parallel training)
@@ -245,13 +245,13 @@ public:
     /*const*/ std::vector<size_t> & labels() { checkhasdata(); assert(uids.size()==1);return uids[0]; }
     /*const*/ std::vector<size_t> & labels(size_t i) { checkhasdata(); assert(uids.size()>=i+1); return uids[i]; }
 
-	std::vector<size_t> & sentends() { checkhasdata(); assert(sentendmark.size() == 1); return sentendmark[0]; }
-	std::vector<size_t> & bounds() { checkhasdata(); assert(phoneboundaries.size() == 1); return phoneboundaries[0]; }
-	std::vector<size_t> & bounds(size_t i) { checkhasdata(); assert(phoneboundaries.size() >= i + 1); return phoneboundaries[i]; }
+    std::vector<size_t> & sentends() { checkhasdata(); assert(sentendmark.size() == 1); return sentendmark[0]; }
+    std::vector<size_t> & bounds() { checkhasdata(); assert(phoneboundaries.size() == 1); return phoneboundaries[0]; }
+    std::vector<size_t> & bounds(size_t i) { checkhasdata(); assert(phoneboundaries.size() >= i + 1); return phoneboundaries[i]; }
 
     // return a lattice for an utterance (caller should first get total through currentmblattices())
     shared_ptr<const msra::dbn::latticesource::latticepair> lattice(size_t uttindex) const { return lattices[uttindex]; }    // lattices making up the current 
-	bool haslattice() 	{ return	lattices.size() > 0 ? true : false; }
+    bool haslattice() { return lattices.size() > 0 ? true : false; }
     // return the reference transcript labels (words with alignments) for current minibatch (or empty if no transcripts requested)
     const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word> transcript (size_t uttindex) { return transcripts.empty() ? const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>() : transcripts[uttindex]; }
 };

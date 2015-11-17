@@ -10,5 +10,5 @@ typedef std::string sequenceId;
 class Timeline 
 {
 public:
-	std::vector<std::tuple<sequenceId, size_t>> timeline;
+    std::vector<std::tuple<sequenceId, size_t>> timeline;
 };

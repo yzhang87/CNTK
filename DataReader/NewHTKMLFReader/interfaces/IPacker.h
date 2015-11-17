@@ -10,17 +10,17 @@
 
 class IPacker 
 {
-	std::shared_ptr<IMemoryProvider> memoryProvider_;
-	std::shared_ptr<ISequencer> source_;
-	size_t minibatchSize_;
+    std::shared_ptr<IMemoryProvider> memoryProvider_;
+    std::shared_ptr<ISequencer> source_;
+    size_t minibatchSize_;
 
 public:
-	IPacker(std::shared_ptr<IMemoryProvider> provider, size_t minibatchSize, std::shared_ptr<ISequencer> source/*, PackerConfig inputs*/)
-		: memoryProvider_(provider)
-		, source_(source)
-		, minibatchSize_(minibatchSize)
-	{}
+    IPacker(std::shared_ptr<IMemoryProvider> provider, size_t minibatchSize, std::shared_ptr<ISequencer> source/*, PackerConfig inputs*/)
+        : memoryProvider_(provider)
+        , source_(source)
+        , minibatchSize_(minibatchSize)
+    {}
 
     virtual std::shared_ptr<ProcessingUnit>* getNextProcessingUnit() = 0;
-	virtual ~IPacker() = 0 {}
+    virtual ~IPacker() = 0 {}
 };

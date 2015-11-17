@@ -8,7 +8,7 @@ class Metadata
 class Data
 {
 public:
-	char* data;
-	size_t size;
-	Metadata layout;
+    char* data;
+    size_t size;
+    Metadata layout;
 };

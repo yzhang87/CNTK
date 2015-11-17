@@ -4,5 +4,5 @@
 class ProcessingUnit
 {
 public:
-	std::map<std::string, std::tuple<Data>> data;
+    std::map<std::string, std::tuple<Data>> data;
 };

@@ -8,12 +8,12 @@
 
 class IRandomizer : ISequencer 
 {
-	std::shared_ptr<ISource> source_;
+    std::shared_ptr<ISource> source_;
 
 public:
-	IRandomizer(std::shared_ptr<ISource> source)
-		: source_(source)
-	{}
+    IRandomizer(std::shared_ptr<ISource> source)
+        : source_(source)
+    {}
 
-	virtual ~IRandomizer() = 0 {}
+    virtual ~IRandomizer() = 0 {}
 };
