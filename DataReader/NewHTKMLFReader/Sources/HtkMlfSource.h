@@ -1,4 +1,10 @@
-class HTKMLFSource : ISource {
+#pragma once
 
-    HTKMLFSource(IBlockReader[] readers, framemode, inputs, ... config);
-}
+#include "../interfaces/ISource.h"
+
+class HTKMLFSource : public ISource 
+{
+public:
+    HTKMLFSource(/*IBlockReader[] readers, framemode, inputs, ... config*/) 
+	{}
+};
