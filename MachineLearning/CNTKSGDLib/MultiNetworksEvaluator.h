@@ -106,7 +106,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             size_t numMBsRun = 0;
             size_t actualMBSize = 0;
-            while (dataReader->GetMinibatch(inputMatrices))
+            MBLayoutPtr tmp(new MBLayout());
+            while (dataReader->GetMinibatch(inputMatrices, tmp))
             {
                 // TODO: we should use GetMinibatchIntoNetwork(), but it seems tricky. What is this for?
                 size_t nbrSamples = (size_t)(*inputMatrices[L"numberobs"])(0, 0);
@@ -250,13 +251,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             bool bContinueDecoding = true;
             while (bContinueDecoding)
             {
+                std::vector<MBLayoutPtr> tmp;
 
                 /// load data
                 auto pmat = inputMatrices.begin();
                 bool bNoMoreData = false;
                 for (auto ptr = dataReaders.begin(); ptr != dataReaders.end(); ptr++, pmat++)
                 {
-                    if ((*ptr)->GetMinibatch(*(*pmat)) == false)
+                    tmp.push_back(MBLayoutPtr(new MBLayout()));
+                    if ((*ptr)->GetMinibatch(*(*pmat), *(tmp.end() - 1)) == false)
                     {
                         bNoMoreData = true;
                         break;
@@ -272,12 +275,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 }
 
                 auto preader = dataReaders.begin();
-                for (auto ptr = nets.begin(); ptr != nets.end(); ptr++, preader++)
+                auto layouts = tmp.begin();
+                for (auto ptr = nets.begin(); ptr != nets.end(); ptr++, preader++, layouts++)
                 {
                     actualMBSize = (*ptr)->DetermineActualMBSizeFromFeatures();
                     if (actualMBSize == 0)
                         LogicError("decoderTrainSetDataReader read data but encoderNet reports no data read");
-                    (*preader)->CopyMBLayoutTo((*ptr)->GetMBLayoutPtr());
+
+                    (*ptr)->GetMBLayoutPtr()->CopyFrom(*layouts);
                     (*ptr)->VerifyActualNumParallelSequences((*preader)->GetNumParallelSequences());
 
                     const auto & pairs = (*ptr)->PairNodes();
@@ -290,7 +295,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 actualMBSize = decoderNet->DetermineActualMBSizeFromFeatures();
                 if (actualMBSize == 0)
                     LogicError("decoderTrainSetDataReader read data but decoderNet reports no data read");
-                decoderDataReader->CopyMBLayoutTo(decoderNet->GetMBLayoutPtr());
+                decoderNet->GetMBLayoutPtr()->CopyFrom(tmp[iNumNets - 1]);
                 decoderNet->VerifyActualNumParallelSequences(decoderDataReader->GetNumParallelSequences());
 
                 size_t i = 0;
@@ -410,7 +415,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
 
             ComputationNetwork* decoderNet = nets[iNumNets - 1];
-            IDataReader<ElemType>* encoderDataReader = readers[iNumNets - 2];
+            //IDataReader<ElemType>* encoderDataReader = readers[iNumNets - 2];
             IDataReader<ElemType>* decoderDataReader = readers[iNumNets - 1];
             vector<ComputationNodeBasePtr> & decoderFeatureNodes = decoderNet->FeatureNodes();
 
@@ -466,9 +471,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 bool noMoreData = false;
                 /// only get minibatch on the encoder parts of networks
                 size_t k = 0;
+                std::vector<MBLayoutPtr> returnLayout;
                 for (auto ptr = readers.begin(); ptr != readers.end() - 1; ptr++, k++)
                 {
-                    if ((*ptr)->GetMinibatch(inputMatrices) == false)
+                    returnLayout.push_back(MBLayoutPtr(new MBLayout()));
+                    if ((*ptr)->GetMinibatch(inputMatrices, *(returnLayout.end() - 1)) == false)
                     {
                         noMoreData = true;
                         break;
@@ -485,14 +492,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 }
 
                 auto ptrreader = readers.begin();
+                auto ptrlayout = returnLayout.begin();
                 size_t mNutt = 0;
-                for (auto ptr = nets.begin(); ptr != nets.end() - 1; ptr++, ptrreader++)
+                for (auto ptr = nets.begin(); ptr != nets.end() - 1; ptr++, ptrreader++, ptrlayout++)
                 {
                     /// evaluate on the encoder networks
                     actualMBSize = (*ptr)->DetermineActualMBSizeFromFeatures();
 
                     mNutt = (*ptrreader)->GetNumParallelSequences();
-                    (*ptrreader)->CopyMBLayoutTo((*ptr)->GetMBLayoutPtr());
+                    (*ptr)->GetMBLayoutPtr()->CopyFrom(*ptrlayout);
                     (*ptr)->VerifyActualNumParallelSequences(mNutt);
 
                     const auto & pairs = (*ptr)->PairNodes();
@@ -503,9 +511,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 /// not the sentence begining, because the initial hidden layer activity is from the encoder network
                 decoderNet->ResizeAllFeatureNodes(actualMBSize);
                 //decoderNet->SetActualMiniBatchSizeFromFeatures();
-                encoderDataReader->CopyMBLayoutTo(decoderNet->GetMBLayoutPtr());
+                decoderNet->GetMBLayoutPtr()->CopyFrom(returnLayout[iNumNets - 2]);
                 decoderNet->VerifyActualNumParallelSequences(mNutt);
 
+                // eldak layouts should be passed inside.
                 vector<size_t> best_path;
                 FindBestPathWithVariableLength(decoderNet, actualMBSize, decoderDataReader, dataWriter, outputNodes, writeNodes, decoderFeatureNodes, beam, &decoderInputMatrices, best_path);
 
@@ -675,6 +684,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 vector<size_t> best_path;
 
+                //eldak layouts should be passed inside.
                 FindBestPath(&m_net, dataReader,
                              dataWriter, outputNodes,
                              writeNodes, featureNodes,
@@ -731,7 +741,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             /// use reader to initialize evalnet's sentence start information to let it know that this
             /// is the begining of sentence
             size_t mbSize = evalnet->DetermineActualMBSizeFromFeatures();
-            dataReader->CopyMBLayoutTo(evalnet->GetMBLayoutPtr());
+            assert(false);
+            // eldak layouts should be passed inside
+            //dataReader->CopyMBLayoutTo(evalnet->GetMBLayoutPtr());
             evalnet->VerifyActualNumParallelSequences(dataReader->GetNumParallelSequences());
 
             size_t maxMbSize = 2 * mbSize;
@@ -763,7 +775,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // TODO: ^^ this is the same as ResizeAllFeatureNodes() if featureNodes == evalnet.FeatureNodes(). Is it?
             //evalnet->SetActualMiniBatchSizeFromFeatures();
 
-            dataReader->CopyMBLayoutTo(evalnet->GetMBLayoutPtr());  // TODO: should this be one column only?
+            //dataReader->CopyMBLayoutTo(evalnet->GetMBLayoutPtr());  // TODO: should this be one column only?
             /// need to set the sentence begining segmentation info
             evalnet->GetMBLayoutPtr()->GetM().SetValue(((int) MinibatchPackingFlags::SequenceStart));
 

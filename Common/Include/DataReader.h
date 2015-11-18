@@ -81,6 +81,7 @@ protected:
 
     virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize) = 0;
     virtual bool SupportsDistributedMBRead() const { return false; };
+    virtual void CopyMBLayoutTo(MBLayoutPtr) { NOT_IMPLEMENTED; }
 
 public:
     typedef std::string LabelType;
@@ -106,7 +107,7 @@ public:
     }
     virtual void Destroy() = 0;
 
-    virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices) = 0;
+    virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout) = 0;
     // virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & /*latticeinput*/, vector<size_t> &/*uids*/, vector<size_t> &/*boundaries*/, vector<size_t> &/*extrauttmap*/) { NOT_IMPLEMENTED; };
 
     // Should be passed as config.
@@ -128,7 +129,7 @@ public:
 
     //virtual bool RequireSentenceSeg() const { return false; }
 
-    virtual void CopyMBLayoutTo(MBLayoutPtr) { NOT_IMPLEMENTED; }
+    
 
     
     /*
@@ -244,7 +245,7 @@ public:
     // matrices - [in] a map with named matrix types (i.e. 'features', 'labels') mapped to the corresponing matrix, 
     //             [out] each matrix resized if necessary containing data. 
     // returns - true if there are more minibatches, false if no more minibatchs remain
-    virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices);
+    virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout);
 
     // eldak: this information should be taken inside the UpdateWithMinibatch function of the computation node.
     //virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, vector<size_t> &extrauttmap);

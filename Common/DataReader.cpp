@@ -174,7 +174,7 @@ void DataReader<ElemType>::StartDistributedMinibatchLoop(size_t mbSize, size_t e
 //             [out] each matrix resized if necessary containing data. 
 // returns - true if there are more minibatches, false if no more minibatchs remain
 template<class ElemType>
-bool DataReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
+bool DataReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout)
 {
     bool bRet = true;
     vector<size_t> vNbrSentences;
@@ -193,12 +193,16 @@ bool DataReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*
     {
         if (nbr > 0)
             m_dataReader[m_ioNames[i]]->SetNumParallelSequences(nbr);
-        bRet &= m_dataReader[m_ioNames[i]]->GetMinibatch(matrices);
+        MBLayoutPtr returnLayout(new MBLayout());
+        bRet &= m_dataReader[m_ioNames[i]]->GetMinibatch(matrices, returnLayout);
         thisNbr = m_dataReader[m_ioNames[i]]->GetNumParallelSequences();
         if (nbr > 0 && thisNbr != nbr)
             LogicError("DataReader<ElemType>::GetMinibatch: The specified number of utterances per minibatch is not consistent to the actual number of utterances per minibatch");
         nbr = thisNbr;
     }
+
+    // eldak: - there is a bug currently that takes only the last reader layout in this function it seems.
+    this->CopyMBLayoutTo(returnLayout);
     return bRet;
 }
 

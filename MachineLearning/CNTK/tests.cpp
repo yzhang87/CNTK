@@ -123,11 +123,12 @@ void TestReader(const ConfigParameters& configBase)
     auto start = std::chrono::system_clock::now();
     int epochs = config("maxEpochs");
     epochs *= 2;
+    MBLayoutPtr layout(new MBLayout);
     for (int epoch = 0; epoch < epochs; epoch++)
     {
         dataReader.StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, epochSize);
         int i = 0;
-        while (dataReader.GetMinibatch(matrices))
+        while (dataReader.GetMinibatch(matrices, layout))
         {
             Matrix<ElemType>& features = *matrices[featureNames[0]];
             Matrix<ElemType>& labels = *matrices[labelNames[0]];
@@ -185,11 +186,12 @@ void TestSequenceReader(const ConfigParameters& configBase)
         auto start = std::chrono::system_clock::now();
         int epochs = config("maxEpochs");
         epochs *= 2;
+        MBLayoutPtr layout(new MBLayout);
         for (int epoch = 0; epoch < epochs; epoch++)
         {
             dataReader.StartMinibatchLoop(mbSize, epoch, epochSize);
             int i = 0;
-            while (dataReader.GetMinibatch(matrices))
+            while (dataReader.GetMinibatch(matrices, layout))
             {
                 Matrix<ElemType>& features = *matrices[featureNames[0]];
                 Matrix<ElemType>& labels = *matrices[labelNames[1]];

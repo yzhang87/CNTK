@@ -125,14 +125,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // TODO: how is !wasDataRead semantically different from inputMatrices having zero columns?
             // TODO: The reader does not always resize the input matrices to zero when 
             // no data is read. When it does, 'wasDataRead' can be removed
-            bool wasDataRead = trainSetDataReader.GetMinibatch(inputMatrices);      // fill in the minibatch data into the Input nodes' buffers directly
+            MBLayoutPtr returnLayout(new MBLayout());
+            bool wasDataRead = trainSetDataReader.GetMinibatch(inputMatrices, returnLayout);      // fill in the minibatch data into the Input nodes' buffers directly
             // reader will have resized input node's m_functionValues directly. Nodes must be notified to do necessary internal state updates from that.
             net.NotifyInputNodesFunctionValuesMBSizeModified();
             size_t readMBSize = net.DetermineActualMBSizeFromFeatures();
             if (readMBSize == 0)
                 wasDataRead = false;
 
-            trainSetDataReader.CopyMBLayoutTo(pMBLayout);                           // and layout meta-data
+            // eldak
+            //trainSetDataReader.CopyMBLayoutTo(pMBLayout);                           // and layout meta-data
+            pMBLayout->CopyFrom(returnLayout);
 
             // verify some DataReader calls that are redundant since the MBLayout refactoring (keep verifying for a while for cosy feeling)
             net.VerifyActualNumParallelSequences(trainSetDataReader.GetNumParallelSequences()); // info already contained in MBLayout

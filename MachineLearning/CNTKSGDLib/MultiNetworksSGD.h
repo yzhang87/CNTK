@@ -863,14 +863,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             while (bContinueDecoding)
             {
                 size_t i = 0;
+                std::vector<MBLayoutPtr> layout;
                 for (auto ptr = dataReader.begin(); ptr != dataReader.end(); ptr++, i++)
                 {
+                    layout.push_back(MBLayoutPtr(new MBLayout()));
+
                     IDataReader<ElemType>* pptr = (*ptr);
                     pptr->SetRandomSeed(uSeedForDataReader);
                     if (i == 0)
-                        pptr->GetMinibatch(*(inputMatrices[i]));
+                        pptr->GetMinibatch(*(inputMatrices[i]), *(layout.end() - 1));
                     else
-                        if (pptr->GetMinibatch(*(inputMatrices[i])) == false)
+                        if (pptr->GetMinibatch(*(inputMatrices[i]), *(layout.end() - 1)) == false)
                         {
                             bContinueDecoding = false;
                             break;
@@ -900,6 +903,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 //                    decoderTrainSetDataReader->CopyMBLayoutTo(decoderNet->m_mbLayout.m_sentenceBoundaryFlags);
                 //                    decoderTrainSetDataReader->CopyMBLayoutTo(decoderNet->m_sentenceBegin);
 
+                // eldak: layouts should be passed inside, but for the prototype just ignore them.
                 if (m_doGradientCheck)
                 {
                     if (EncoderDecoderGradientCheck(nets,
@@ -916,10 +920,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     localEpochEvalErrors.SetValue(0);
                 }
 
-                EncoderDecoderWithHiddenStatesForwardPass(nets,
-                    dataReader, pairNodes, evaluationNodes,
-                    featureNodes, criterionNodes,
-                    localEpochCriterion, localEpochEvalErrors);
+                EncoderDecoderWithHiddenStatesForwardPass(
+                    nets,
+                    dataReader,
+                    pairNodes,
+                    evaluationNodes,
+                    featureNodes,
+                    criterionNodes,
+                    localEpochCriterion,
+                    localEpochEvalErrors);
 
                 EncoderDecoderWithHiddenStatesErrorProp(nets, pairNodes, criterionNodes);
 
@@ -1160,13 +1169,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             )
         {
             //encoderNet->SetActualMiniBatchSizeFromFeatures();
-            encoderTrainSetDataReader->CopyMBLayoutTo(encoderNet->GetMBLayoutPtr());
+            // eldak layouts should be passed inside, for now just ignore them.
+            assert(false);
+            //encoderTrainSetDataReader->CopyMBLayoutTo(encoderNet->GetMBLayoutPtr());
             encoderNet->VerifyActualNumParallelSequences(encoderTrainSetDataReader->GetNumParallelSequences());
 
             encoderNet->Evaluate(encoderEvaluationNodes[0]);
 
             //decoderNet->SetActualMiniBatchSizeFromFeatures();
-            decoderTrainSetDataReader->CopyMBLayoutTo(decoderNet->GetMBLayoutPtr());
+            // eldak layouts should be passed inside, for now just ignore them.
+            //decoderTrainSetDataReader->CopyMBLayoutTo(decoderNet->GetMBLayoutPtr());
             decoderNet->VerifyActualNumParallelSequences(decoderTrainSetDataReader->GetNumParallelSequences());
             /// not the sentence begining, because the initial hidden layer activity is from the encoder network
 

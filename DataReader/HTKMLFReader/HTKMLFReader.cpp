@@ -870,20 +870,23 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // returns - true if there are more minibatches, false if no more minibatchs remain
     // TODO: Why do we have two read functions? Is one not a superset of the other?
     template<class ElemType>
-        bool HTKMLFReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
+    bool HTKMLFReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout)
         {
             if (m_trainOrTest)
             {
-                return GetMinibatchToTrainOrTest(matrices);
+                auto tmp = GetMinibatchToTrainOrTest(matrices);
+                this->CopyMBLayoutTo(returnLayout);
+                return tmp;
             }
             else
             {
-                return GetMinibatchToWrite(matrices);
+                LogicError("We do not look into writers yet.");
+                //return GetMinibatchToWrite(matrices);
             }
         }
 
     template<class ElemType>
-        bool HTKMLFReader<ElemType>::GetMinibatchToTrainOrTest(std::map<std::wstring, Matrix<ElemType>*>& matrices)
+    bool HTKMLFReader<ElemType>::GetMinibatchToTrainOrTest(std::map<std::wstring, Matrix<ElemType>*>& matrices)
         {
             size_t id;
             size_t dim;

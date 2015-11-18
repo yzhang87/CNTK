@@ -113,7 +113,7 @@ public:
     // matrices - [in] a map with named matrix types (i.e. 'features', 'labels') mapped to the corresponing matrix, 
     //             [out] each matrix resized if necessary containing data. 
     // returns - true if there are more minibatches, false if no more minibatchs remain
-    virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
+    virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout)
     {
         // how many records are we reading this time
         size_t recordCount = min(m_mbSize, m_recordCount-m_currentRecord);
@@ -157,6 +157,8 @@ public:
         // increment our record pointer
         m_currentRecord += recordCount;
 
+        //eldak
+        this->CopyMBLayoutTo(returnLayout);
         // return true if we returned any data whatsoever
         return true;
     }

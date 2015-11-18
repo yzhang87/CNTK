@@ -435,7 +435,8 @@ void DoCreateLabelMap(const ConfigParameters& config)
 
         dataReader.StartDistributedMinibatchLoop(minibatchSize, 0, 0, 1, requestDataSize);
         int count = 0;
-        while (dataReader.GetMinibatch(matrices))
+        MBLayoutPtr tmp(new MBLayout());
+        while (dataReader.GetMinibatch(matrices, tmp))
         {
             Matrix<ElemType>& features = *matrices[featureNames[0]];
             count += features.GetNumCols();

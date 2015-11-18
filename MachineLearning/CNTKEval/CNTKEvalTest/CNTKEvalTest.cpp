@@ -50,7 +50,8 @@ void DoCommand(const ConfigParameters& configRoot)
     eval.LoadModel(modelPath);
     dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, epochSize);
     eval.StartEvaluateMinibatchLoop(outputName);
-    while (dataReader->GetMinibatch(inputMatrices))
+    MBLayoutPtr tmp(new MBLayout());
+    while (dataReader->GetMinibatch(inputMatrices, tmp))
     {
         void* data = (void*)arr->data();
         size_t dataSize = arr->size()*sizeof(ElemType);
