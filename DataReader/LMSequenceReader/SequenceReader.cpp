@@ -859,7 +859,7 @@ void SequenceReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, s
     // if we are reading from the cache, do so now and return
     if (m_cachingReader)
     {
-        m_cachingReader->StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
+        m_cachingReader->StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, requestedEpochSamples);
         return;
     } 
 
@@ -1580,7 +1580,7 @@ void BatchSequenceReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epo
     // if we are reading from the cache, do so now and return
     if (m_cachingReader)
     {
-        m_cachingReader->StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
+        m_cachingReader->StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, requestedEpochSamples);
         return;
     } 
 

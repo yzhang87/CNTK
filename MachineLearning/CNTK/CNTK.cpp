@@ -433,7 +433,7 @@ void DoCreateLabelMap(const ConfigParameters& config)
 
         DataReader<ElemType> dataReader(readerConfig);
 
-        dataReader.StartMinibatchLoop(minibatchSize, 0, requestDataSize);
+        dataReader.StartDistributedMinibatchLoop(minibatchSize, 0, 0, 1, requestDataSize);
         int count = 0;
         while (dataReader.GetMinibatch(matrices))
         {
@@ -442,7 +442,7 @@ void DoCreateLabelMap(const ConfigParameters& config)
             if (traceLevel > 1)
                 fprintf(stderr, "."); // progress meter
         }
-        dataReader.StartMinibatchLoop(minibatchSize, 1, requestDataSize);
+        dataReader.StartDistributedMinibatchLoop(minibatchSize, 1, 0, 1, requestDataSize);
 
         // print the results
         if (traceLevel > 0)

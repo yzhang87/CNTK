@@ -80,7 +80,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 inputMatrices[labelNodes[i]->NodeName()] = &dynamic_pointer_cast<ComputationNode<ElemType>>(labelNodes[i])->FunctionValues();
             inputMatrices[L"numberobs"] = new Matrix<ElemType>(1, 1, m_net.GetDeviceId());
 
-            dataReader->StartMinibatchLoop(mbSize, 0, testSize);
+            dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
             m_net.StartEvaluateMinibatchLoop(criterionNodes, evaluationNodes);
 
             double epochEvalError = 0;
@@ -242,7 +242,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             double evalResultsLastMBs = (double)0;
 
             for (auto ptr = dataReaders.begin(); ptr != dataReaders.end(); ptr++)
-                (*ptr)->StartMinibatchLoop(mbSize, 0, testSize);
+                (*ptr)->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
             // BUGBUG: Code below will fail because we now must call StartMinibatchLoop(), but I can't tell from below which nodes to call it for.
             //for (auto & ptr : nets)
             //    ptr->StartMinibatchLoop(xxx);
@@ -454,7 +454,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (auto ptr = readers.begin(); ptr != readers.end(); ptr++)
             {
-                (*ptr)->StartMinibatchLoop(mbSize, 0, testSize);
+                (*ptr)->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
                 (*ptr)->SetNumParallelSequences(1);
             }
 
@@ -661,7 +661,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t totalEpochSamples = 0;
             size_t actualMBSize = 0;
 
-            dataReader->StartMinibatchLoop(mbSize, 0, testSize);
+            dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
             dataReader->SetNumParallelSequences(1);
 
             startReadMBTime = clock();
@@ -744,7 +744,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             from_queue.push(Token<ElemType>(0., vector<size_t>(), state)); /// the first element in the priority queue saves the initial NN state
 
-            dataReader->InitProposals(inputMatrices);
+            assert(false);
+            // eldak: should be generalized
+            // dataReader->InitProposals(inputMatrices);
             size_t itdx = 0;
             size_t maxSize = min(maxMbSize, mbSize);
 
@@ -785,8 +787,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     /// update feature nodes once, as the observation is the same for all propsoals in labels
                     ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
 
+                    // eldak:
                     /// history is updated in the getproposalobs function
-                    dataReader->GetProposalObs(inputMatrices, itdx, history);
+                    //dataReader->GetProposalObs(inputMatrices, itdx, history);
 
                     /// get the nn state history and set nn state to the history
                     map<wstring, Matrix<ElemType>> hidden_history = from_token.state.hidden_activity;
@@ -910,12 +913,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             from_queue.push(Token<ElemType>(0., vector<size_t>(), state)); /// the first element in the priority queue saves the initial NN state
 
+            // eldak. not clear why is this in the reader. what kind of information is this? is it just associated with an input stream?
+            // this should be in the minibatch layout, not in the reader
+            assert(false);
             /// the end of sentence symbol in reader
-            int outputEOS = dataReader->GetSentenceEndIdFromOutputLabel();
+            int outputEOS = 0; // dataReader->GetSentenceEndIdFromOutputLabel();
             if (outputEOS < 0)
                 LogicError("Cannot find end of sentence symbol. Check ");
-
-            dataReader->InitProposals(inputMatrices);
+            /*
+            dataReader->InitProposals(inputMatrices);*/
 
             size_t itdx = 0;
 
@@ -955,8 +961,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     /// update feature nodes once, as the observation is the same for all propsoals in labels
                     ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
 
+                    // eldak - removing this - need to clarify why
                     /// history is updated in the getproposalobs function
-                    dataReader->GetProposalObs(inputMatrices, itdx, history);
+                    // dataReader->GetProposalObs(inputMatrices, itdx, history);
+                    //
 
                     /// get the nn state history and set nn state to the history
                     map<wstring, Matrix<ElemType>> hidden_history = from_token.state.hidden_activity;

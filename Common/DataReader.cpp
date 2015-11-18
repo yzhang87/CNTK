@@ -131,27 +131,28 @@ DataReader<ElemType>::~DataReader()
 // epoch - [in] epoch number for this loop
 // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
 template<class ElemType>
-void DataReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
+void DataReader<ElemType>::StartMinibatchLoop(size_t /*mbSize*/, size_t /*epoch*/, size_t /*requestedEpochSamples*/)
 {
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        m_dataReader[m_ioNames[i]]->StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
+    LogicError("Should not be called.");
+    /*for (size_t i = 0; i < m_ioNames.size(); i++)
+        m_dataReader[m_ioNames[i]]->StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);*/
 }
 
 //SupportsDistributedMBRead - Tells if the reader supports distributed minibatch reading for parallel training
-template<class ElemType>
-bool DataReader<ElemType>::SupportsDistributedMBRead() const
-{
-    bool supportsDistributedMBRead = true;
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-    {
-        auto currReaderIter = m_dataReader.find(m_ioNames[i]);
-        assert(currReaderIter != m_dataReader.end());
-
-        supportsDistributedMBRead &= currReaderIter->second->SupportsDistributedMBRead();
-    }
-
-    return supportsDistributedMBRead;
-}
+//template<class ElemType>
+//bool DataReader<ElemType>::SupportsDistributedMBRead() const
+//{
+//    bool supportsDistributedMBRead = true;
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//    {
+//        auto currReaderIter = m_dataReader.find(m_ioNames[i]);
+//        assert(currReaderIter != m_dataReader.end());
+//
+//        supportsDistributedMBRead &= currReaderIter->second->SupportsDistributedMBRead();
+//    }
+//
+//    return supportsDistributedMBRead;
+//}
 
 //StartDistributedMinibatchLoop - Startup a distributed minibatch loop for parallel training
 // mbSize - [in] size of the minibatch (number of frames, etc.)
@@ -246,40 +247,40 @@ size_t DataReader<ElemType>::GetNumParallelSequences()
     return nNbr;
 }
 
-template<class ElemType>
-bool DataReader<ElemType>::RequireSentenceSeg() const
-{
-    bool ans = false;
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        ans = ans || m_dataReader.find(m_ioNames[i])->second->RequireSentenceSeg();  // can't say m_dataReader[] since that is non-const...
-    return ans;
-}
+//template<class ElemType>
+//bool DataReader<ElemType>::RequireSentenceSeg() const
+//{
+//    bool ans = false;
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        ans = ans || m_dataReader.find(m_ioNames[i])->second->RequireSentenceSeg();  // can't say m_dataReader[] since that is non-const...
+//    return ans;
+//}
+//
+//template<class ElemType>
+//void DataReader<ElemType>::InitProposals(std::map<std::wstring, Matrix<ElemType>*>* matrices)
+//{
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        m_dataReader[m_ioNames[i]]->InitProposals(matrices);
+//}
 
-template<class ElemType>
-void DataReader<ElemType>::InitProposals(std::map<std::wstring, Matrix<ElemType>*>* matrices)
-{
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        m_dataReader[m_ioNames[i]]->InitProposals(matrices);
-}
+//template<class ElemType>
+//int DataReader<ElemType>::GetSentenceEndIdFromOutputLabel()
+//{
+//    int iRet = -1;
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        iRet = m_dataReader[m_ioNames[i]]->GetSentenceEndIdFromOutputLabel();
+//    return iRet;
+//}
 
-template<class ElemType>
-int DataReader<ElemType>::GetSentenceEndIdFromOutputLabel()
-{
-    int iRet = -1;
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        iRet = m_dataReader[m_ioNames[i]]->GetSentenceEndIdFromOutputLabel();
-    return iRet;
-}
-
-template<class ElemType>
-bool DataReader<ElemType>::GetProposalObs(std::map<std::wstring, Matrix<ElemType>*>* matrices, const size_t tidx, vector<size_t>& history)
-{
-    bool bRet = true;
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        bRet &= m_dataReader[m_ioNames[i]]->GetProposalObs(matrices, tidx, history);
-    return bRet;
-}
-
+//template<class ElemType>
+//bool DataReader<ElemType>::GetProposalObs(std::map<std::wstring, Matrix<ElemType>*>* matrices, const size_t tidx, vector<size_t>& history)
+//{
+//    bool bRet = true;
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        bRet &= m_dataReader[m_ioNames[i]]->GetProposalObs(matrices, tidx, history);
+//    return bRet;
+//}
+//
 template<class ElemType>
 void DataReader<ElemType>::CopyMBLayoutTo(MBLayoutPtr pMBLayout)
 {
@@ -295,47 +296,47 @@ void DataReader<ElemType>::SetRandomSeed(int seed)
         m_dataReader[m_ioNames[i]]->SetRandomSeed(seed);
 }
 
-template<class ElemType>
-bool DataReader<ElemType>::GetMinibatchCopy(
-    std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
-    std::map<std::wstring, Matrix<ElemType>*>& matrices,
-    MBLayoutPtr pMBLayout)
-{
-    bool ans = false;
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        ans = (m_dataReader[m_ioNames[i]]->GetMinibatchCopy(uttInfo, matrices, pMBLayout) || ans);
-    return ans;
-}
-
-template<class ElemType>
-bool DataReader<ElemType>::SetNetOutput(
-    const std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
-    const Matrix<ElemType>& outputs,
-    const MBLayoutPtr pMBLayout)
-{
-    bool ans = false;
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        ans = (m_dataReader[m_ioNames[i]]->SetNetOutput(uttInfo, outputs, pMBLayout) || ans);
-    return ans;
-}
-
+//template<class ElemType>
+//bool DataReader<ElemType>::GetMinibatchCopy(
+//    std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
+//    std::map<std::wstring, Matrix<ElemType>*>& matrices,
+//    MBLayoutPtr pMBLayout)
+//{
+//    bool ans = false;
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        ans = (m_dataReader[m_ioNames[i]]->GetMinibatchCopy(uttInfo, matrices, pMBLayout) || ans);
+//    return ans;
+//}
+//
+//template<class ElemType>
+//bool DataReader<ElemType>::SetNetOutput(
+//    const std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
+//    const Matrix<ElemType>& outputs,
+//    const MBLayoutPtr pMBLayout)
+//{
+//    bool ans = false;
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        ans = (m_dataReader[m_ioNames[i]]->SetNetOutput(uttInfo, outputs, pMBLayout) || ans);
+//    return ans;
+//}
+//
 // GetLabelMapping - Gets the label mapping from integer index to label type 
 // returns - a map from numeric datatype to native label type 
-template<class ElemType>
-const std::map<typename DataReader<ElemType>::LabelIdType, typename DataReader<ElemType>::LabelType>& DataReader<ElemType>::GetLabelMapping(const std::wstring& )
-{
-    NOT_IMPLEMENTED;
-}
+//template<class ElemType>
+//const std::map<typename DataReader<ElemType>::LabelIdType, typename DataReader<ElemType>::LabelType>& DataReader<ElemType>::GetLabelMapping(const std::wstring& )
+//{
+//    NOT_IMPLEMENTED;
+//}
 
 // SetLabelMapping - Sets the label mapping from integer index to label 
 // labelMapping - mapping table from label values to IDs (must be 0-n)
 // note: for tasks with labels, the mapping table must be the same between a training run and a testing run 
-template<class ElemType>
-void DataReader<ElemType>::SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping)
-{
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        m_dataReader[m_ioNames[i]]->SetLabelMapping(sectionName, labelMapping);
-}
+//template<class ElemType>
+//void DataReader<ElemType>::SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping)
+//{
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        m_dataReader[m_ioNames[i]]->SetLabelMapping(sectionName, labelMapping);
+//}
 
 // GetData - Gets metadata from the specified section (into CPU memory) 
 // sectionName - section name to retrieve data from
@@ -345,14 +346,14 @@ void DataReader<ElemType>::SetLabelMapping(const std::wstring& sectionName, cons
 //                  [out] size of buffer filled with data
 // recordStart - record to start reading from, defaults to zero (start of data)
 // returns: true if data remains to be read, false if the end of data was reached
-template<class ElemType>
-bool DataReader<ElemType>::GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart)
-{
-    bool bRet = true; 
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        bRet &= m_dataReader[m_ioNames[i]]->GetData(sectionName, numRecords, data, dataBufferSize, recordStart);
-    return bRet;
-}
+//template<class ElemType>
+//bool DataReader<ElemType>::GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart)
+//{
+//    bool bRet = true; 
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        bRet &= m_dataReader[m_ioNames[i]]->GetData(sectionName, numRecords, data, dataBufferSize, recordStart);
+//    return bRet;
+//}
 
 template<class ElemType>
 bool DataReader<ElemType>::DataEnd(EndDataType endDataType)

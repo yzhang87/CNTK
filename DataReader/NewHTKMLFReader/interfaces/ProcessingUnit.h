@@ -1,5 +1,8 @@
 // Represents a processing unit for all the inputs.
-#include "Data.h"
+
+#pragma once
+
+#include <memory>
 
 namespace Microsoft
 {
@@ -7,10 +10,21 @@ namespace Microsoft
     {
         namespace CNTK
         {
+            class Metadata
+            {};
+
+            class Data
+            {
+            public:
+                char* data;
+                size_t size;
+                Metadata layout;
+            };
+
             class ProcessingUnit
             {
             public:
-                std::map<std::string, std::tuple<Data>> data;
+                std::map<std::string, std::shared_ptr<Data>> data;
             };
         }
     }

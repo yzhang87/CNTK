@@ -94,7 +94,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             for (int i = 0; i < evalResults.size(); i++)
                 evalResultsLastMBs.push_back((ElemType)0);
 
-            dataReader->StartMinibatchLoop(mbSize, 0, testSize);
+            dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
             m_net.StartEvaluateMinibatchLoop(evalNodes);
 
             while (DataReaderHelpers::GetMinibatchIntoNetwork(*dataReader, m_net, nullptr, false, false, inputMatrices, actualMBSize))

@@ -1234,9 +1234,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // [1/12/2015 erw] to support large dataset, we usually partition whole dataset into several epoch's,
         // so we need to use all the data to do precomputing
         if (m_useAllDataForPreComputedNode)     // using all the data
-            trainSetDataReader->StartMinibatchLoop(m_mbSize[0], 0);
+            trainSetDataReader->StartDistributedMinibatchLoop(m_mbSize[0], 0, 0, 1);
         else                                    // using only one epoch
-            trainSetDataReader->StartMinibatchLoop(m_mbSize[0], 0, m_epochSize);
+            trainSetDataReader->StartDistributedMinibatchLoop(m_mbSize[0], 0, 0, 1, m_epochSize);
         net.StartEvaluateMinibatchLoop(nodes);
 
         // initialize
@@ -1686,38 +1686,38 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return lastTriedTrialMinibatchSize;
     }
 
-    // Attemps to compute the error signal for the whole utterance, which will
-    // be fed to the neural network as features. Currently it is a workaround
-    // for the two-forward-pass sequence and ctc training, which allows
-    // processing more utterances at the same time. Only used in Kaldi2Reader.
-    // TODO: move the two-forward-pass support out of the reader.
-    template<class ElemType>
-    void SGD<ElemType>::AttemptUtteranceDerivativeFeatures(ComputationNetwork& net,
-                                            IDataReader<ElemType>* trainSetDataReader,
-                                            const std::vector<ComputationNodeBasePtr> & featureNodes,
-                                            std::map<std::wstring, Matrix<ElemType>*>* inputMatrices)
-    {
-        assert(trainSetDataReader != NULL);
-        std::vector<std::vector<std::pair<wstring, size_t>>> uttInfo;
-        auto pMBLayout = make_shared<MBLayout>();
-        // TODO: use GetMinibatchIntoNetwork().
-        while (trainSetDataReader->GetMinibatchCopy(uttInfo, *inputMatrices, pMBLayout))
-        {
-            ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
+    //// Attemps to compute the error signal for the whole utterance, which will
+    //// be fed to the neural network as features. Currently it is a workaround
+    //// for the two-forward-pass sequence and ctc training, which allows
+    //// processing more utterances at the same time. Only used in Kaldi2Reader.
+    //// TODO: move the two-forward-pass support out of the reader.
+    //template<class ElemType>
+    //void SGD<ElemType>::AttemptUtteranceDerivativeFeatures(ComputationNetwork& net,
+    //                                        IDataReader<ElemType>* trainSetDataReader,
+    //                                        const std::vector<ComputationNodeBasePtr> & featureNodes,
+    //                                        std::map<std::wstring, Matrix<ElemType>*>* inputMatrices)
+    //{
+    //    assert(trainSetDataReader != NULL);
+    //    std::vector<std::vector<std::pair<wstring, size_t>>> uttInfo;
+    //    auto pMBLayout = make_shared<MBLayout>();
+    //    // TODO: use GetMinibatchIntoNetwork().
+    //    while (trainSetDataReader->GetMinibatchCopy(uttInfo, *inputMatrices, pMBLayout))
+    //    {
+    //        ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
 
-            auto & outputNodes = net.OutputNodes();
-            if (outputNodes.empty())
-                LogicError("no output node was found.");
+    //        auto & outputNodes = net.OutputNodes();
+    //        if (outputNodes.empty())
+    //            LogicError("no output node was found.");
 
-            //net.SetActualMiniBatchSizeFromFeatures();
-            trainSetDataReader->CopyMBLayoutTo(net.GetMBLayoutPtr());
-            net.VerifyActualNumParallelSequences(trainSetDataReader->GetNumParallelSequences());
-            net.Evaluate(outputNodes[0]);   // Only evaluate the first output
-            trainSetDataReader->SetNetOutput(uttInfo,
-                                             dynamic_pointer_cast<ComputationNode<ElemType>>(outputNodes[0])->FunctionValues(),
-                                             pMBLayout);
-        }
-    }
+    //        //net.SetActualMiniBatchSizeFromFeatures();
+    //        trainSetDataReader->CopyMBLayoutTo(net.GetMBLayoutPtr());
+    //        net.VerifyActualNumParallelSequences(trainSetDataReader->GetNumParallelSequences());
+    //        net.Evaluate(outputNodes[0]);   // Only evaluate the first output
+    //        trainSetDataReader->SetNetOutput(uttInfo,
+    //                                         dynamic_pointer_cast<ComputationNode<ElemType>>(outputNodes[0])->FunctionValues(),
+    //                                         pMBLayout);
+    //    }
+    //}
 
     static string GeneratePaddedFloatOrExpFormat(int padSize, int precision, double value)
     {
@@ -1819,8 +1819,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_numMBsToCUDAProfile = 0;
 
         bool useDistributedMBReading = useParallelTrain &&
-                                       m_enableDistributedMBReading &&
-                                       trainSetDataReader->SupportsDistributedMBRead();
+                                       m_enableDistributedMBReading /*&&
+                                       trainSetDataReader->SupportsDistributedMBRead()*/; // eldak: assume everybody supports distributed MB read otherwise throw an error.
         if (useDistributedMBReading)
         {
             trainSetDataReader->StartDistributedMinibatchLoop(tunedMBSize, epochNumber, g_mpi->CurrentNodeRank(),
@@ -1828,7 +1828,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
         else
         {
-            trainSetDataReader->StartMinibatchLoop(tunedMBSize, epochNumber, epochSize);
+            trainSetDataReader->StartDistributedMinibatchLoop(tunedMBSize, epochNumber, 0, 1, epochSize);
         }
 
         net.StartEvaluateMinibatchLoop(evaluationNodes);
@@ -1838,12 +1838,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             refNet.StartEvaluateMinibatchLoop(refNode);
         }
 
+        /* eldak - should not be here.
         // Attemps to compute the error signal for the whole utterance, which will
         // be fed to the neural network as features. Currently it is a workaround
         // for the two-forward-pass sequence and ctc training, which allows
         // processing more utterances at the same time. Only used in Kaldi2Reader.
         // TODO: move the two-forward-pass support out of the reader.
         AttemptUtteranceDerivativeFeatures(net, trainSetDataReader, featureNodes, inputMatrices);
+        */
 
         fprintf(stderr, "\nStarting minibatch loop");
         if (useGradientAggregation)
@@ -2165,12 +2167,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // DataEnd does reader specific process if sentence ending is reached
             trainSetDataReader->DataEnd(EndDataType::endDataSentence);
 
+            /* eldak - should not be here.
             // Attemps to compute the error signal for the whole utterance, which will
             // be fed to the neural network as features. Currently it is a workaround
             // for the two-forward-pass sequence and ctc training, which allows
             // processing more utterances at the same time. Only used in Kaldi2Reader.
             // TODO: move the two-forward-pass support out of the reader.
             AttemptUtteranceDerivativeFeatures(net, trainSetDataReader, featureNodes, inputMatrices);
+            */
 
             profiler.NextSample();
         }

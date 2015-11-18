@@ -48,7 +48,7 @@ void DoCommand(const ConfigParameters& configRoot)
 
     DataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig);
     eval.LoadModel(modelPath);
-    dataReader->StartMinibatchLoop(mbSize, 0, epochSize);
+    dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, epochSize);
     eval.StartEvaluateMinibatchLoop(outputName);
     while (dataReader->GetMinibatch(inputMatrices))
     {

@@ -167,7 +167,7 @@ public:
     void SetSentenceEnd(int /*actualMbSize*/){};
     void SetRandomSeed(int){ NOT_IMPLEMENTED };
 
-    bool RequireSentenceSeg() const override { return !m_frameMode; }; 
+//    bool RequireSentenceSeg() const override { return !m_frameMode; }; 
 };
 
 }}}

@@ -62,7 +62,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             //endOfFile(0,0)=0;
 
             // evaluate with minibatches
-            dataReader.StartMinibatchLoop(mbSize, 0, numOutputSamples);
+            dataReader.StartDistributedMinibatchLoop(mbSize, 0, 0, 1, numOutputSamples);
             dataReader.SetNumParallelSequences(1);
 
             m_net.StartEvaluateMinibatchLoop(outputNodes);
@@ -145,7 +145,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 inputMatrices[featureNodes[i]->NodeName()] = &dynamic_pointer_cast<ComputationNode<ElemType>>(featureNodes[i])->FunctionValues();
 
             // evaluate with minibatches
-            dataReader.StartMinibatchLoop(mbSize, 0, numOutputSamples);
+            dataReader.StartDistributedMinibatchLoop(mbSize, 0, 0, 1, numOutputSamples);
 
             m_net.StartEvaluateMinibatchLoop(outputNodes);
 

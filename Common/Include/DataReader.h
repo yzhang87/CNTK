@@ -32,6 +32,9 @@
 #include "simplesenonehmm.h"
 #include "latticesource.h"
 
+#include "../../DataReader/NewHTKMLFReader/interfaces/Data.h"
+#include "../../DataReader/NewHTKMLFReader/interfaces/ProcessingUnit.h"
+
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 // randomize range set automatically, parameter value for Init()
@@ -53,23 +56,47 @@ enum EndDataType
     endDataSentence, // end of sentence
 };
 
+template<class ElemType>
+class MinibatchIterator
+{
+public:
+    ProcessingUnit& operator*();
+};
+
+template<class ElemType>
+ProcessingUnit& MinibatchIterator<ElemType>::operator* ()
+{
+    LogicError("Not implemented!");
+}
+
 // Data Reader interface
 // implemented by DataReader and underlying classes
 template<class ElemType>
 class DATAREADER_API IDataReader
 {
-public:
-    typedef std::string LabelType;
-    typedef unsigned int LabelIdType;
+protected:
     unsigned m_seed;
     size_t   mBlgSize;  /// number of utterances per minibatch
     bool     mDoRandomize = true;
 
+    virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize) = 0;
+    virtual bool SupportsDistributedMBRead() const { return false; };
+
+public:
+    typedef std::string LabelType;
+    typedef unsigned int LabelIdType;
+
+    // eldak
+    virtual void SetEpochParameters() { LogicError("Not implemented!"); }
+    virtual MinibatchIterator<ElemType> begin() { LogicError("Not implemented!"); }
+    virtual MinibatchIterator<ElemType> end() { LogicError("Not implemented!"); }
+
+
+    //////// Main interface that will be emulated with iterators.
+
     virtual void Init(const ConfigParameters& /*config*/) = 0;
     virtual void Destroy() = 0;
-    virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples=requestDataSize) = 0;
 
-    virtual bool SupportsDistributedMBRead() const { return false; };
     virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize)
     {
         if (SupportsDistributedMBRead() || (numSubsets != 1) || (subsetNum != 0))
@@ -82,48 +109,66 @@ public:
 
     virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices) = 0;
     virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & /*latticeinput*/, vector<size_t> &/*uids*/, vector<size_t> &/*boundaries*/, vector<size_t> &/*extrauttmap*/) { NOT_IMPLEMENTED; };
-    virtual bool GetHmmData(msra::asr::simplesenonehmm * /*hmm*/) { NOT_IMPLEMENTED; };
-    virtual size_t GetNumParallelSequences() = 0; 
-    virtual int GetSentenceEndIdFromOutputLabel() { return -1; }
+
+    // Should be passed as config.
+    virtual size_t GetNumParallelSequences() = 0;
     virtual void SetNumParallelSequences(const size_t sz) { mBlgSize = sz; }
-    virtual bool RequireSentenceSeg() const { return false; }
-    virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring&) { NOT_IMPLEMENTED; }
-    virtual void SetLabelMapping(const std::wstring&, const std::map<LabelIdType, LabelType>&) { NOT_IMPLEMENTED; }
-    virtual bool GetData(const std::wstring&, size_t, void*, size_t&, size_t) { NOT_IMPLEMENTED; }
-    virtual bool DataEnd(EndDataType) { NOT_IMPLEMENTED; }
-    virtual void CopyMBLayoutTo(MBLayoutPtr) { NOT_IMPLEMENTED; }
     virtual void SetRandomSeed(unsigned seed = 0) { m_seed = seed; }
+
+
+    // It seems there is some metadata which is associated not with a minibatch, but with input stream, i.e. label mapping ? 
+    // we need to expose it in a generic way from the reader interface.
+    // virtual void SetLabelMapping(const std::wstring&, const std::map<LabelIdType, LabelType>&) { NOT_IMPLEMENTED; }
+    // virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring&) { NOT_IMPLEMENTED; }
+
+    virtual bool GetHmmData(msra::asr::simplesenonehmm * /*hmm*/) { NOT_IMPLEMENTED; };
+    //virtual bool GetData(const std::wstring&, size_t, void*, size_t&, size_t) { NOT_IMPLEMENTED; }
+    virtual bool DataEnd(EndDataType) { NOT_IMPLEMENTED; }
+
+    //virtual int GetSentenceEndIdFromOutputLabel() { return -1; }
+
+    //virtual bool RequireSentenceSeg() const { return false; }
+
+    virtual void CopyMBLayoutTo(MBLayoutPtr) { NOT_IMPLEMENTED; }
+
+    
+    /*
     virtual bool GetProposalObs(std::map<std::wstring, Matrix<ElemType>*>*, const size_t, vector<size_t>&) { return false; }
-    virtual void InitProposals(std::map<std::wstring, Matrix<ElemType>*>*) { }
-    virtual bool CanReadFor(wstring /* nodeName */) { return false; }
 
-    bool GetFrame(std::map<std::wstring, Matrix<ElemType>*>& /*matrices*/, const size_t /*tidx*/, vector<size_t>& /*history*/) { NOT_IMPLEMENTED; }
+    virtual void InitProposals(std::map<std::wstring, Matrix<ElemType>*>*) { }*/
 
-    void SetDoRandomize(bool b){ mDoRandomize = b; }
+    /*virtual bool CanReadFor(wstring nodeName ) { return false; }*/
 
-    // Workaround for the two-forward-pass sequence and ctc training, which
-    // allows processing more utterances at the same time. Only used in
-    // Kaldi2Reader.
-    // TODO: move this out of the reader.
-    virtual bool GetMinibatchCopy(
-        std::vector<std::vector<std::pair<wstring, size_t>>>& /*uttInfo*/,
-        std::map<std::wstring, Matrix<ElemType>*>& /*matrices*/,
-        MBLayoutPtr /*data copied here*/)
-    {
-        return false;
-    }
+    //bool GetFrame(std::map<std::wstring, Matrix<ElemType>*>& /*matrices*/, const size_t /*tidx*/, vector<size_t>& /*history*/) { NOT_IMPLEMENTED; }
 
-    // Workaround for the two-forward-pass sequence and ctc training, which
-    // allows processing more utterances at the same time. Only used in
-    // Kaldi2Reader.
-    // TODO: move this out of the reader.
-    virtual bool SetNetOutput(
-        const std::vector<std::vector<std::pair<wstring, size_t>>>& /*uttInfo*/,
-        const Matrix<ElemType>& /*outputs*/,
-        const MBLayoutPtr)
-    {
-        return false;
-    }
+    /*
+    void SetDoRandomize(bool b){ mDoRandomize = b; }*/
+
+    //// Workaround for the two-forward-pass sequence and ctc training, which
+    //// allows processing more utterances at the same time. Only used in
+    //// Kaldi2Reader.
+    //// TODO: move this out of the reader.
+    //virtual bool GetMinibatchCopy(
+    //    std::vector<std::vector<std::pair<wstring, size_t>>>& /*uttInfo*/,
+    //    std::map<std::wstring, Matrix<ElemType>*>& /*matrices*/,
+    //    MBLayoutPtr /*data copied here*/)
+    //{
+    //    return false;
+    //}
+
+    //// Workaround for the two-forward-pass sequence and ctc training, which
+    //// allows processing more utterances at the same time. Only used in
+    //// Kaldi2Reader.
+    //// TODO: move this out of the reader.
+    //virtual bool SetNetOutput(
+    //    const std::vector<std::vector<std::pair<wstring, size_t>>>& /*uttInfo*/,
+    //    const Matrix<ElemType>& /*outputs*/,
+    //    const MBLayoutPtr)
+    //{
+    //    return false;
+    //}
+
+    template<typename> friend class DataReader;
 };
 
 // GetReader - get a reader type from the DLL
@@ -180,19 +225,20 @@ public:
     /// number of utterances per minibatch, for data parallelsim
     size_t mNbrUttPerMinibatch;
 
-public:
-    // DataReader Constructor
-    // config - [in] configuration parameters for the datareader 
-    DataReader(const ConfigParameters& config);
-    virtual ~DataReader();
-
+protected:
     //StartMinibatchLoop - Startup a minibatch loop 
     // mbSize - [in] size of the minibatch (number of frames, etc.)
     // epoch - [in] epoch number for this loop
     // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
     virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
 
-    virtual bool SupportsDistributedMBRead() const override;
+public:
+    // DataReader Constructor
+    // config - [in] configuration parameters for the datareader 
+    DataReader(const ConfigParameters& config);
+    virtual ~DataReader();
+
+    //virtual bool SupportsDistributedMBRead() const override;
     virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize) override;
 
     // GetMinibatch - Get the next minibatch (features and labels)
@@ -204,17 +250,17 @@ public:
 	virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
     size_t GetNumParallelSequences();
-    int GetSentenceEndIdFromOutputLabel();
-    bool RequireSentenceSeg() const override;
+    //int GetSentenceEndIdFromOutputLabel();
+//    bool RequireSentenceSeg() const override;
 
     // GetLabelMapping - Gets the label mapping from integer index to label type 
     // returns - a map from numeric datatype to native label type 
-    virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
+    // virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
 
     // SetLabelMapping - Sets the label mapping from integer index to label 
     // labelMapping - mapping table from label values to IDs (must be 0-n)
     // note: for tasks with labels, the mapping table must be the same between a training run and a testing run 
-    virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping);
+    // virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping);
 
     // GetData - Gets metadata from the specified section (into CPU memory) 
     // sectionName - section name to retrieve data from
@@ -224,30 +270,30 @@ public:
     //                  [out] size of buffer filled with data
     // recordStart - record to start reading from, defaults to zero (start of data)
     // returns: true if data remains to be read, false if the end of data was reached
-    virtual bool GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart = 0);
+    //virtual bool GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart = 0);
 
     virtual bool DataEnd(EndDataType endDataType);
 
-    // Gets a copy of the minibatch for the forward computation. This can be
-    // useful if some of the computation has to happen in the reader.
-    virtual bool GetMinibatchCopy(
-        std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
-        std::map<std::wstring, Matrix<ElemType>*>& matrices,
-        MBLayoutPtr);
+    //// Gets a copy of the minibatch for the forward computation. This can be
+    //// useful if some of the computation has to happen in the reader.
+    //virtual bool GetMinibatchCopy(
+    //    std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
+    //    std::map<std::wstring, Matrix<ElemType>*>& matrices,
+    //    MBLayoutPtr);
 
-    // Sets the neural network output to the reader. This can be useful if some
-    // of the computation has to happen in the reader.
-    virtual bool SetNetOutput(
-        const std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
-        const Matrix<ElemType>& outputs,
-        const MBLayoutPtr);
+    //// Sets the neural network output to the reader. This can be useful if some
+    //// of the computation has to happen in the reader.
+    //virtual bool SetNetOutput(
+    //    const std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
+    //    const Matrix<ElemType>& outputs,
+    //    const MBLayoutPtr);
 
     void CopyMBLayoutTo(MBLayoutPtr pMBLayout);
 
     void SetRandomSeed(int);
-
+    /*
     bool GetProposalObs(std::map<std::wstring, Matrix<ElemType>*>*, const size_t, vector<size_t>&);
-    void InitProposals(std::map<std::wstring, Matrix<ElemType>*>* matrices);
+    void InitProposals(std::map<std::wstring, Matrix<ElemType>*>* matrices);*/
 
 };
 

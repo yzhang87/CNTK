@@ -850,7 +850,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (auto ptr = dataReader.begin(); ptr != dataReader.end(); ptr++)
             {
-                (*ptr)->StartMinibatchLoop(m_mbSize[epochNumber], epochNumber, m_epochSize);
+                (*ptr)->StartDistributedMinibatchLoop(m_mbSize[epochNumber], epochNumber, 0, 1, m_epochSize);
             }
 
             startReadMBTime = clock();
