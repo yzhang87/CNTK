@@ -202,6 +202,8 @@ bool DataReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*
     return bRet;
 }
 
+/*
+
 // GetMinibatch4SE - Get the next minibatch for SE training, including lattice, labels and phone boundary
 // latticeinput - lattice for each utterances in this minibatch
 // uids - lables stored in size_t vector instead of ElemType matrix
@@ -217,6 +219,8 @@ bool DataReader<ElemType>::GetMinibatch4SE(std::vector<shared_ptr<const msra::db
 	}
 	return bRet;
 }
+
+*/
 
 // GetHmmData - Get the HMM definition for SE training
 // hmm - HMM definition 

@@ -95,8 +95,6 @@ public:
     //////// Main interface that will be emulated with iterators.
 
     virtual void Init(const ConfigParameters& /*config*/) = 0;
-    virtual void Destroy() = 0;
-
     virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize)
     {
         if (SupportsDistributedMBRead() || (numSubsets != 1) || (subsetNum != 0))
@@ -106,9 +104,10 @@ public:
 
         return StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
     }
+    virtual void Destroy() = 0;
 
     virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices) = 0;
-    virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & /*latticeinput*/, vector<size_t> &/*uids*/, vector<size_t> &/*boundaries*/, vector<size_t> &/*extrauttmap*/) { NOT_IMPLEMENTED; };
+    // virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & /*latticeinput*/, vector<size_t> &/*uids*/, vector<size_t> &/*boundaries*/, vector<size_t> &/*extrauttmap*/) { NOT_IMPLEMENTED; };
 
     // Should be passed as config.
     virtual size_t GetNumParallelSequences() = 0;
@@ -246,7 +245,10 @@ public:
     //             [out] each matrix resized if necessary containing data. 
     // returns - true if there are more minibatches, false if no more minibatchs remain
     virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices);
-    virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, vector<size_t> &extrauttmap);
+
+    // eldak: this information should be taken inside the UpdateWithMinibatch function of the computation node.
+    //virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, vector<size_t> &extrauttmap);
+
 	virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
     size_t GetNumParallelSequences();

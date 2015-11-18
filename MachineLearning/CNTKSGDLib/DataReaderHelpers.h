@@ -138,15 +138,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             net.VerifyActualNumParallelSequences(trainSetDataReader.GetNumParallelSequences()); // info already contained in MBLayout
             //assert(trainSetDataReader.RequireSentenceSeg() == pMBLayout->RequireSentenceSeg()); // this one is redundant, too
 
-            if ((criterionNode != nullptr) && (criterionNode->OperationName() == L"SequenceWithSoftmax"))
-            {
-                auto node = dynamic_pointer_cast<SequenceWithSoftmaxNode<ElemType>>(criterionNode);
-                auto latticeinput = node->getLatticePtr();
-                auto uids = node->getuidprt();
-                auto boundaries = node->getboundaryprt();
-                auto extrauttmap = node->getextrauttmap();
 
-                trainSetDataReader.GetMinibatch4SE(*latticeinput, *uids, *boundaries, *extrauttmap);
+            if (criterionNode != nullptr)
+            {
+                // eldak: processing unit should be taken from getminibatch.
+                criterionNode->UpdateWithMinibatch(ProcessingUnit());
             }
 
             // did we reach end of epoch?

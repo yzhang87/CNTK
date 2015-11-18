@@ -1474,6 +1474,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             partialtime = m_partialtime;
         }
 
+        virtual void UpdateWithMinibatch(const ProcessingUnit& /*unit*/) override
+        {
+            /*auto latticeinput = node->getLatticePtr();
+            auto uids = node->getuidprt();
+            auto boundaries = node->getboundaryprt();
+            auto extrauttmap = node->getextrauttmap();*/
+
+            assert(false);
+            // eldak: should copy and do the same as
+            // trainSetDataReader.GetMinibatch4SE(*latticeinput, *uids, *boundaries, *extrauttmap);
+        }
+
     protected:
         shared_ptr<Matrix<ElemType>> m_logSoftmaxOfRight;
         shared_ptr<Matrix<ElemType>> m_softmaxOfRight;

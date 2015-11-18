@@ -25,6 +25,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "../../DataReader/NewHTKMLFReader/interfaces/ProcessingUnit.h"
+
 //#define RNN_DEBUG 1
 #define DEFAULT_HIDDEN_ACTIVATION 0.1
 
@@ -325,6 +327,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
         // helper functions for common cases
+
+
+        // eldak: for updating sequence with soft max with lattices
+        virtual void UpdateWithMinibatch(const ProcessingUnit&) {}
+
     private:
         // determine number of columns from a child and/or layout
         size_t DetermineNumCols(const ComputationNodeBasePtr & child) const
