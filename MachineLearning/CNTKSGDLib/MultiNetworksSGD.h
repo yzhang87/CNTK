@@ -995,10 +995,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 /// DataEnd does reader specific process if sentence ending is reached
                 //                    encoderTrainSetDataReader->SetSentenceEnd(true);
                 //                    decoderTrainSetDataReader->SetSentenceEnd(true);
-                for (auto ptr = dataReader.begin(); ptr != dataReader.end(); ptr++)
-                {
-                    (*ptr)->DataEnd(endDataSentence);
-                }
+                // eldak: should be done at teh end of the minibatch, not here.
+                //for (auto ptr = dataReader.begin(); ptr != dataReader.end(); ptr++)
+                //{
+                //    (*ptr)->DataEnd(endDataSentence);
+                //}
 
                 uSeedForDataReader++;
             }

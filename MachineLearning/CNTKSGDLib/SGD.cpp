@@ -749,13 +749,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         //get hmm file for sequence training
         bool isSequenceTrainingCriterion = (criterionNodes[0]->OperationName() == L"SequenceWithSoftmax");
-        if (isSequenceTrainingCriterion)
+        // eldak similar to what have been done to lattices
+        // but it seems we need some configuration data which does not directly comes on the minibatch level, but more on the reader level
+        /*if (isSequenceTrainingCriterion)
         {
             //SequenceWithSoftmaxNode<ElemType>* node = static_cast<SequenceWithSoftmaxNode<ElemType>*>(criterionNodes[0]);
             auto node = dynamic_pointer_cast<SequenceWithSoftmaxNode<ElemType>>(criterionNodes[0]);
             auto  hmm = node->gethmm();
             trainSetDataReader->GetHmmData(hmm);
-        }
+        }*/
 
         // used for KLD regularized adaptation. For all other adaptation techniques
         // use MEL to edit the model and using normal training algorithm
@@ -2165,7 +2167,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // call DataEnd function
             // This signals something from SGD to the reader.
             // DataEnd does reader specific process if sentence ending is reached
-            trainSetDataReader->DataEnd(EndDataType::endDataSentence);
+            // eldak this is valid only for binary.
+            // trainSetDataReader->DataEnd(EndDataType::endDataSentence);
 
             /* eldak - should not be here.
             // Attemps to compute the error signal for the whole utterance, which will

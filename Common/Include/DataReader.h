@@ -82,6 +82,7 @@ protected:
     virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize) = 0;
     virtual bool SupportsDistributedMBRead() const { return false; };
     virtual void CopyMBLayoutTo(MBLayoutPtr) { NOT_IMPLEMENTED; }
+    virtual bool GetHmmData(msra::asr::simplesenonehmm * /*hmm*/) { NOT_IMPLEMENTED; };
 
 public:
     typedef std::string LabelType;
@@ -115,15 +116,14 @@ public:
     virtual void SetNumParallelSequences(const size_t sz) { mBlgSize = sz; }
     virtual void SetRandomSeed(unsigned seed = 0) { m_seed = seed; }
 
-
     // It seems there is some metadata which is associated not with a minibatch, but with input stream, i.e. label mapping ? 
     // we need to expose it in a generic way from the reader interface.
     // virtual void SetLabelMapping(const std::wstring&, const std::map<LabelIdType, LabelType>&) { NOT_IMPLEMENTED; }
     // virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring&) { NOT_IMPLEMENTED; }
 
-    virtual bool GetHmmData(msra::asr::simplesenonehmm * /*hmm*/) { NOT_IMPLEMENTED; };
+    
     //virtual bool GetData(const std::wstring&, size_t, void*, size_t&, size_t) { NOT_IMPLEMENTED; }
-    virtual bool DataEnd(EndDataType) { NOT_IMPLEMENTED; }
+    // virtual bool DataEnd(EndDataType) const { NOT_IMPLEMENTED; }
 
     //virtual int GetSentenceEndIdFromOutputLabel() { return -1; }
 
@@ -187,6 +187,9 @@ class DataReader: public IDataReader<ElemType>, protected Plugin
 {
     typedef typename IDataReader<ElemType>::LabelType LabelType;
     typedef typename IDataReader<ElemType>::LabelIdType LabelIdType;
+protected:
+    void CopyMBLayoutTo(MBLayoutPtr pMBLayout);
+
 public:
     vector<wstring> m_ioNames;
     map<wstring, IDataReader<ElemType> *> m_dataReader;  // readers
@@ -231,6 +234,7 @@ protected:
     // epoch - [in] epoch number for this loop
     // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
     virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
+    virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
 public:
     // DataReader Constructor
@@ -238,6 +242,7 @@ public:
     DataReader(const ConfigParameters& config);
     virtual ~DataReader();
 
+protected:
     //virtual bool SupportsDistributedMBRead() const override;
     virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize) override;
 
@@ -250,7 +255,6 @@ public:
     // eldak: this information should be taken inside the UpdateWithMinibatch function of the computation node.
     //virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, vector<size_t> &extrauttmap);
 
-	virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
     size_t GetNumParallelSequences();
     //int GetSentenceEndIdFromOutputLabel();
@@ -275,7 +279,7 @@ public:
     // returns: true if data remains to be read, false if the end of data was reached
     //virtual bool GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart = 0);
 
-    virtual bool DataEnd(EndDataType endDataType);
+    //virtual bool DataEnd(EndDataType endDataType) const;
 
     //// Gets a copy of the minibatch for the forward computation. This can be
     //// useful if some of the computation has to happen in the reader.
@@ -291,7 +295,7 @@ public:
     //    const Matrix<ElemType>& outputs,
     //    const MBLayoutPtr);
 
-    void CopyMBLayoutTo(MBLayoutPtr pMBLayout);
+
 
     void SetRandomSeed(int);
     /*

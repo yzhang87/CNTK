@@ -1735,7 +1735,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 
     template<class ElemType>
-        bool HTKMLFReader<ElemType>::DataEnd(EndDataType endDataType)
+        bool HTKMLFReader<ElemType>::DataEnd(EndDataType endDataType) const
         {
             // each minibatch is considered a "sentence"
             // other datatypes not really supported...

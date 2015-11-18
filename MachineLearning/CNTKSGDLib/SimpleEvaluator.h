@@ -138,7 +138,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 /// call DataEnd to check if end of sentence is reached
                 /// datareader will do its necessary/specific process for sentence ending 
-                dataReader->DataEnd(endDataSentence);
+                // eldak should be done at the end of the minibatch. why is this necessary?
+                // dataReader->DataEnd(endDataSentence);
             }
 
             // show last batch of results

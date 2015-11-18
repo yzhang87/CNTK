@@ -100,7 +100,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             
                 /// call DataEnd function in dataReader to do
                 /// reader specific process if sentence ending is reached
-                dataReader.DataEnd(endDataSentence);
+                // eldak - function has not side effects.
+                 // dataReader.DataEnd(endDataSentence);
             }           
 
             if (m_verbosity > 0)

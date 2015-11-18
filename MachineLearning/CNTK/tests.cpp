@@ -107,6 +107,7 @@ void TestReader(const ConfigParameters& configBase)
     }
 
     DataReader<ElemType> dataReader(readerConfig);
+    IDataReader<ElemType>* reader = &dataReader;
 
     // get names of features and labels
     std::vector<std::wstring> featureNames;
@@ -126,9 +127,9 @@ void TestReader(const ConfigParameters& configBase)
     MBLayoutPtr layout(new MBLayout);
     for (int epoch = 0; epoch < epochs; epoch++)
     {
-        dataReader.StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, epochSize);
+        reader->StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, epochSize);
         int i = 0;
-        while (dataReader.GetMinibatch(matrices, layout))
+        while (reader->GetMinibatch(matrices, layout))
         {
             Matrix<ElemType>& features = *matrices[featureNames[0]];
             Matrix<ElemType>& labels = *matrices[labelNames[0]];

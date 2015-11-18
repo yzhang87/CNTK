@@ -334,10 +334,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 /// call DataEnd to check if end of sentence is reached
                 /// datareader will do its necessary/specific process for sentence ending 
-                for (auto ptr = dataReaders.begin(); ptr != dataReaders.end(); ptr++)
-                {
-                    (*ptr)->DataEnd(endDataSentence);
-                }
+                // should be done at the end of the GetMinibatch, not here.
+                //for (auto ptr = dataReaders.begin(); ptr != dataReaders.end(); ptr++)
+                //{
+                //    (*ptr)->DataEnd(endDataSentence);
+                //}
             }
 
             // show last batch of results
@@ -522,8 +523,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 /// call DataEnd to check if end of sentence is reached
                 /// datareader will do its necessary/specific process for sentence ending 
-                for (auto ptr = readers.begin(); ptr != readers.end(); ptr++)
-                    (*ptr)->DataEnd(endDataSentence);
+                // THis has no side effects.
+                // for (auto ptr = readers.begin(); ptr != readers.end(); ptr++)
+                //    (*ptr)->DataEnd(endDataSentence);
             }
         }
 
@@ -694,7 +696,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 /// call DataEnd to check if end of sentence is reached
                 /// datareader will do its necessary/specific process for sentence ending 
-                dataReader->DataEnd(endDataSentence);
+                // dataReader->DataEnd(endDataSentence);
 
                 endComputeMBTime = clock();
                 numMBsRun++;

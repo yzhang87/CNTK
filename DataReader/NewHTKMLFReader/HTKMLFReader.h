@@ -160,7 +160,7 @@ public:
     virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, vector<size_t> &extrauttmap);
     virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
-    virtual bool DataEnd(EndDataType endDataType);
+    virtual bool DataEnd(EndDataType endDataType) const;
     void CopyMBLayoutTo(MBLayoutPtr);
     void SetSentenceEndInBatch(vector<size_t> &/*sentenceEnd*/);
     void SetSentenceEnd(int /*actualMbSize*/){};

@@ -363,14 +363,19 @@ void DataReader<ElemType>::SetRandomSeed(int seed)
 //    return bRet;
 //}
 
-template<class ElemType>
-bool DataReader<ElemType>::DataEnd(EndDataType endDataType)
+/*template<class ElemType>
+bool DataReader<ElemType>::DataEnd(EndDataType endDataType) const
 {
     bool bRet = true;
+
     for (size_t i = 0; i < m_ioNames.size(); i++)
-        bRet &= m_dataReader[m_ioNames[i]]->DataEnd(endDataType);
+    {
+        auto dt = m_dataReader.find(m_ioNames[i]);
+        assert(dt != m_dataReader.end());
+        bRet &= dt->second->DataEnd(endDataType);
+    }
     return bRet;
-}
+}*/
 
 //The explicit instantiation
 template class DataReader<double>;

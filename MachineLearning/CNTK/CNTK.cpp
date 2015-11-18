@@ -432,18 +432,19 @@ void DoCreateLabelMap(const ConfigParameters& config)
         fprintf(stderr, "CreateLabelMap: Creating the mapping file '%s' \n", labelMappingFile.c_str());
 
         DataReader<ElemType> dataReader(readerConfig);
+        IDataReader<ElemType>* reader = &dataReader;
 
-        dataReader.StartDistributedMinibatchLoop(minibatchSize, 0, 0, 1, requestDataSize);
+        reader->StartDistributedMinibatchLoop(minibatchSize, 0, 0, 1, requestDataSize);
         int count = 0;
         MBLayoutPtr tmp(new MBLayout());
-        while (dataReader.GetMinibatch(matrices, tmp))
+        while (reader->GetMinibatch(matrices, tmp))
         {
             Matrix<ElemType>& features = *matrices[featureNames[0]];
             count += features.GetNumCols();
             if (traceLevel > 1)
                 fprintf(stderr, "."); // progress meter
         }
-        dataReader.StartDistributedMinibatchLoop(minibatchSize, 1, 0, 1, requestDataSize);
+        reader->StartDistributedMinibatchLoop(minibatchSize, 1, 0, 1, requestDataSize);
 
         // print the results
         if (traceLevel > 0)
