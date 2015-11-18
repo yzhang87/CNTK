@@ -125,9 +125,15 @@ void TestReader(const ConfigParameters& configBase)
     int epochs = config("maxEpochs");
     epochs *= 2;
     MBLayoutPtr layout(new MBLayout);
+
+    EpochConfiguration ec;
+    ec.minibatchSize = mbSize;
+    ec.epochSize = epochSize;
     for (int epoch = 0; epoch < epochs; epoch++)
     {
-        reader->StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, epochSize);
+        ec.currentEpoch = epoch;
+        reader->Set(ec);
+
         int i = 0;
         while (reader->GetMinibatch(matrices, layout))
         {

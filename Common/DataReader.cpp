@@ -297,12 +297,12 @@ void DataReader<ElemType>::CopyMBLayoutTo(MBLayoutPtr pMBLayout)
         m_dataReader[m_ioNames[i]]->CopyMBLayoutTo(pMBLayout);
 }
 
-template<class ElemType>
-void DataReader<ElemType>::SetRandomSeed(int seed)
-{
-    for (size_t i = 0; i < m_ioNames.size(); i++)
-        m_dataReader[m_ioNames[i]]->SetRandomSeed(seed);
-}
+//template<class ElemType>
+//void DataReader<ElemType>::SetRandomSeed(int seed)
+//{
+//    for (size_t i = 0; i < m_ioNames.size(); i++)
+//        m_dataReader[m_ioNames[i]]->SetRandomSeed(seed);
+//}
 
 //template<class ElemType>
 //bool DataReader<ElemType>::GetMinibatchCopy(

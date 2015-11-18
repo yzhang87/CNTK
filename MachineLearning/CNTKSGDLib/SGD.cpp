@@ -1235,10 +1235,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // trainSetDataReader->StartMinibatchLoop(m_mbSize[0],  0 , m_epochSize); // only based on one epoch
         // [1/12/2015 erw] to support large dataset, we usually partition whole dataset into several epoch's,
         // so we need to use all the data to do precomputing
-        if (m_useAllDataForPreComputedNode)     // using all the data
-            trainSetDataReader->StartDistributedMinibatchLoop(m_mbSize[0], 0, 0, 1);
-        else                                    // using only one epoch
-            trainSetDataReader->StartDistributedMinibatchLoop(m_mbSize[0], 0, 0, 1, m_epochSize);
+        EpochConfiguration ec;
+        ec.minibatchSize = m_mbSize[0];
+
+        if (!m_useAllDataForPreComputedNode)     // using all the data
+        {
+            ec.epochSize = m_epochSize;
+        }
+
+        trainSetDataReader->Set(ec);
+
         net.StartEvaluateMinibatchLoop(nodes);
 
         // initialize
@@ -1823,15 +1829,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool useDistributedMBReading = useParallelTrain &&
                                        m_enableDistributedMBReading /*&&
                                        trainSetDataReader->SupportsDistributedMBRead()*/; // eldak: assume everybody supports distributed MB read otherwise throw an error.
+
+        EpochConfiguration ec;
+        ec.minibatchSize = tunedMBSize;
+        ec.currentEpoch = epochNumber;
+        ec.epochSize = epochSize;
         if (useDistributedMBReading)
         {
-            trainSetDataReader->StartDistributedMinibatchLoop(tunedMBSize, epochNumber, g_mpi->CurrentNodeRank(),
-                                                              g_mpi->NumNodesInUse(), epochSize);
+            ec.workerRank = g_mpi->CurrentNodeRank();
+            ec.numberOfWorkers = g_mpi->NumNodesInUse();
         }
-        else
-        {
-            trainSetDataReader->StartDistributedMinibatchLoop(tunedMBSize, epochNumber, 0, 1, epochSize);
-        }
+
+        trainSetDataReader->Set(ec);
 
         net.StartEvaluateMinibatchLoop(evaluationNodes);
         net.StartEvaluateMinibatchLoop(criterionNodes);

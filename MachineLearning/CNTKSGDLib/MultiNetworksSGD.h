@@ -848,9 +848,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             localEpochCriterion.SetValue(0);
             localEpochEvalErrors.SetValue(0);
 
+            EpochConfiguration ec;
+            ec.epochSize = m_epochSize;
+            ec.currentEpoch = epochNumber;
+            ec.minibatchSize = m_mbSize[epochNumber];
             for (auto ptr = dataReader.begin(); ptr != dataReader.end(); ptr++)
             {
-                (*ptr)->StartDistributedMinibatchLoop(m_mbSize[epochNumber], epochNumber, 0, 1, m_epochSize);
+                (*ptr)->Set(ec);
             }
 
             startReadMBTime = clock();
@@ -869,7 +873,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     layout.push_back(MBLayoutPtr(new MBLayout()));
 
                     IDataReader<ElemType>* pptr = (*ptr);
-                    pptr->SetRandomSeed(uSeedForDataReader);
+                    // eldak: ignored anyway. not clear why to have this.
+                    //pptr->SetRandomSeed(uSeedForDataReader);
                     if (i == 0)
                         pptr->GetMinibatch(*(inputMatrices[i]), *(layout.end() - 1));
                     else

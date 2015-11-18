@@ -34,6 +34,7 @@
 
 #include "../../DataReader/NewHTKMLFReader/interfaces/Data.h"
 #include "../../DataReader/NewHTKMLFReader/interfaces/ProcessingUnit.h"
+#include <utility>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -57,25 +58,89 @@ enum EndDataType
 };
 
 template<class ElemType>
-class MinibatchIterator
+class DATAREADER_API IDataReader;
+
+template<class ElemType>
+class MinibatchIterator // should be proper STD, currently very stupid one.
 {
+    IDataReader<ElemType>* reader_;
+    bool endReached_;
+    std::shared_ptr<ProcessingUnit> cached_;
+
 public:
+    MinibatchIterator(IDataReader<ElemType>* reader, bool endReached)
+        : reader_(reader)
+        , endReached_(endReached)
+    {
+    }
+
     ProcessingUnit& operator*();
+    MinibatchIterator operator++(int);
+
+    friend bool operator==<>(const MinibatchIterator<ElemType>& i1, const MinibatchIterator<ElemType>& i2);
+    friend bool operator!=<>(const MinibatchIterator<ElemType>& i1, const MinibatchIterator<ElemType>& i2);
 };
 
 template<class ElemType>
 ProcessingUnit& MinibatchIterator<ElemType>::operator* ()
 {
-    LogicError("Not implemented!");
+    return *cached;
 }
+
+// Define postfix increment operator.
+template<class ElemType>
+MinibatchIterator<ElemType> MinibatchIterator<ElemType>::operator++(int)
+{
+    MinibatchIterator<ElemType> temp(this->reader_, false);
+    std::pair<bool, std::shared_ptr<ProcessingUnit>> minibatch = reader_->GetMinibatch();
+    temp.cached_ = minibatch.second;
+    temp.endReached_ = minibatch.first;
+    return temp;
+}
+
+template<class ElemType>
+bool operator==(const MinibatchIterator<ElemType>& i1, const MinibatchIterator<ElemType>& i2)
+{
+    return i1.endReached_ == i2.endReached_;
+}
+
+template<class ElemType>
+bool operator!=(const MinibatchIterator<ElemType>& i1, const MinibatchIterator<ElemType>& i2)
+{
+    return !(i1 == i2);
+}
+
+struct EpochConfiguration
+{
+    EpochConfiguration()
+        : workerRank(0)
+        , numberOfWorkers(1)
+        , minibatchSize(0)
+        , currentEpoch(0)
+        , epochSize(requestDataSize)
+        , randomSeed(0)
+        , numberOfParallelSequences(0)
+    {
+    }
+
+    size_t workerRank;
+    size_t numberOfWorkers;
+
+    size_t minibatchSize;
+    size_t currentEpoch;
+    size_t epochSize;
+
+    int randomSeed;
+    int numberOfParallelSequences;
+};
 
 // Data Reader interface
 // implemented by DataReader and underlying classes
 template<class ElemType>
 class DATAREADER_API IDataReader
 {
-protected:
-    unsigned m_seed;
+private:
+    
     size_t   mBlgSize;  /// number of utterances per minibatch
     bool     mDoRandomize = true;
 
@@ -84,19 +149,6 @@ protected:
     virtual void CopyMBLayoutTo(MBLayoutPtr) { NOT_IMPLEMENTED; }
     virtual bool GetHmmData(msra::asr::simplesenonehmm * /*hmm*/) { NOT_IMPLEMENTED; };
 
-public:
-    typedef std::string LabelType;
-    typedef unsigned int LabelIdType;
-
-    // eldak
-    virtual void SetEpochParameters() { LogicError("Not implemented!"); }
-    virtual MinibatchIterator<ElemType> begin() { LogicError("Not implemented!"); }
-    virtual MinibatchIterator<ElemType> end() { LogicError("Not implemented!"); }
-
-
-    //////// Main interface that will be emulated with iterators.
-
-    virtual void Init(const ConfigParameters& /*config*/) = 0;
     virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize)
     {
         if (SupportsDistributedMBRead() || (numSubsets != 1) || (subsetNum != 0))
@@ -106,15 +158,54 @@ public:
 
         return StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
     }
+
+    std::pair<bool, std::shared_ptr<ProcessingUnit>> GetMinibatch()
+    {
+        LogicError("Not implemented.");
+    }
+
+    virtual void SetNumParallelSequences(const size_t sz) { mBlgSize = sz; }
+
+
+public:
+    typedef std::string LabelType;
+    typedef unsigned int LabelIdType;
+
+    virtual void Init(const ConfigParameters& /*config*/) = 0;
+
+    virtual void Set(const EpochConfiguration& c)
+    {
+        this->StartDistributedMinibatchLoop(c.minibatchSize, c.currentEpoch, c.workerRank, c.numberOfWorkers, c.epochSize);
+        if (c.numberOfParallelSequences != 0)
+        {
+            this->SetNumParallelSequences(c.numberOfParallelSequences);
+        }
+    }
+
+    virtual MinibatchIterator<ElemType> begin()
+    {
+        MinibatchIterator<ElemType> i(this, false);
+        return i++;
+    }
+
+    virtual MinibatchIterator<ElemType> end()
+    {
+        return MinibatchIterator<ElemType>(this, true);
+    }
+
     virtual void Destroy() = 0;
 
+    //////// Main interface that will be emulated with iterators.
+
     virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout) = 0;
+
     // virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & /*latticeinput*/, vector<size_t> &/*uids*/, vector<size_t> &/*boundaries*/, vector<size_t> &/*extrauttmap*/) { NOT_IMPLEMENTED; };
 
     // Should be passed as config.
     virtual size_t GetNumParallelSequences() = 0;
-    virtual void SetNumParallelSequences(const size_t sz) { mBlgSize = sz; }
-    virtual void SetRandomSeed(unsigned seed = 0) { m_seed = seed; }
+    // virtual void SetRandomSeed(unsigned /*seed = 0*/) {  }
+
+    //virtual void SetRandomSeed(unsigned seed = 0) { m_seed = seed; }
 
     // It seems there is some metadata which is associated not with a minibatch, but with input stream, i.e. label mapping ? 
     // we need to expose it in a generic way from the reader interface.
@@ -169,6 +260,7 @@ public:
     //}
 
     template<typename> friend class DataReader;
+    template<typename> friend class MinibatchIterator;
 };
 
 // GetReader - get a reader type from the DLL
@@ -297,7 +389,7 @@ protected:
 
 
 
-    void SetRandomSeed(int);
+    //void SetRandomSeed(int);
     /*
     bool GetProposalObs(std::map<std::wstring, Matrix<ElemType>*>*, const size_t, vector<size_t>&);
     void InitProposals(std::map<std::wstring, Matrix<ElemType>*>* matrices);*/

@@ -80,7 +80,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 inputMatrices[labelNodes[i]->NodeName()] = &dynamic_pointer_cast<ComputationNode<ElemType>>(labelNodes[i])->FunctionValues();
             inputMatrices[L"numberobs"] = new Matrix<ElemType>(1, 1, m_net.GetDeviceId());
 
-            dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
+            EpochConfiguration ec;
+            ec.minibatchSize = mbSize;
+            ec.epochSize = testSize;
+
+            dataReader->Set(ec);
             m_net.StartEvaluateMinibatchLoop(criterionNodes, evaluationNodes);
 
             double epochEvalError = 0;
@@ -242,8 +246,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             double evalResultsLastMBs = (double)0;
 
+            EpochConfiguration ec;
+            ec.minibatchSize = mbSize;
+            ec.epochSize = testSize;
             for (auto ptr = dataReaders.begin(); ptr != dataReaders.end(); ptr++)
-                (*ptr)->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
+                (*ptr)->Set(ec);
             // BUGBUG: Code below will fail because we now must call StartMinibatchLoop(), but I can't tell from below which nodes to call it for.
             //for (auto & ptr : nets)
             //    ptr->StartMinibatchLoop(xxx);
@@ -458,10 +465,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t totalEpochSamples = 0;
             size_t actualMBSize = 0;
 
+            EpochConfiguration ec;
+            ec.minibatchSize = mbSize;
+            ec.epochSize = testSize;
+            ec.numberOfParallelSequences = 1;
             for (auto ptr = readers.begin(); ptr != readers.end(); ptr++)
             {
-                (*ptr)->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
-                (*ptr)->SetNumParallelSequences(1);
+                (*ptr)->Set(ec);
             }
 
             Matrix<ElemType> historyMat(m_net.GetDeviceId());
@@ -672,8 +682,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t totalEpochSamples = 0;
             size_t actualMBSize = 0;
 
-            dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, testSize);
-            dataReader->SetNumParallelSequences(1);
+            EpochConfiguration ec;
+            ec.minibatchSize = mbSize;
+            ec.epochSize = testSize;
+            ec.numberOfParallelSequences = 1;
+
+            dataReader->Set(ec);
 
             startReadMBTime = clock();
             size_t numMBsRun = 0;

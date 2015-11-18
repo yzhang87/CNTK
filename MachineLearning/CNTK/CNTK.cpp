@@ -434,7 +434,10 @@ void DoCreateLabelMap(const ConfigParameters& config)
         DataReader<ElemType> dataReader(readerConfig);
         IDataReader<ElemType>* reader = &dataReader;
 
-        reader->StartDistributedMinibatchLoop(minibatchSize, 0, 0, 1, requestDataSize);
+        EpochConfiguration ec;
+        ec.minibatchSize = minibatchSize;
+        reader->Set(ec);
+
         int count = 0;
         MBLayoutPtr tmp(new MBLayout());
         while (reader->GetMinibatch(matrices, tmp))
@@ -444,7 +447,9 @@ void DoCreateLabelMap(const ConfigParameters& config)
             if (traceLevel > 1)
                 fprintf(stderr, "."); // progress meter
         }
-        reader->StartDistributedMinibatchLoop(minibatchSize, 1, 0, 1, requestDataSize);
+
+        ec.currentEpoch = 1;
+        reader->Set(ec);
 
         // print the results
         if (traceLevel > 0)

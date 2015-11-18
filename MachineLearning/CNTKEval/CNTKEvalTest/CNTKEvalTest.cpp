@@ -48,7 +48,15 @@ void DoCommand(const ConfigParameters& configRoot)
 
     IDataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig);
     eval.LoadModel(modelPath);
-    dataReader->StartDistributedMinibatchLoop(mbSize, 0, 0, 1, epochSize);
+
+    EpochConfiguration ec = {};
+    ec.workerRank = 0;
+    ec.numberOfWorkers = 1;
+    ec.currentEpoch = 0;
+    ec.minibatchSize = mbSize;
+    ec.epochSize = epochSize;
+
+    dataReader->Set(ec);
     eval.StartEvaluateMinibatchLoop(outputName);
     MBLayoutPtr tmp(new MBLayout());
     while (dataReader->GetMinibatch(inputMatrices, tmp))
