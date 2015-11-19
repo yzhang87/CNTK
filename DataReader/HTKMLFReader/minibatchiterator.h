@@ -180,24 +180,24 @@ public:
         fillorclear(); // get the first batch
     }
     
-    // TODO not nice, but don't know how to access these frames otherwise
-    // mbiterator constructor, set epochstart and -endframe explicitly
-    minibatchiterator(msra::dbn::minibatchsource & source, size_t epoch, size_t epochstart, size_t epochend, size_t requestedmbframes, size_t subsetnum, size_t numsubsets, size_t datapasses)
-        : source (source),
-          epochstartframe (epochstart),
-          epochendframe (epochend),
-          requestedmbframes (requestedmbframes),
-          subsetnum(subsetnum), numsubsets(numsubsets),
-          datapasses(datapasses),
-          timegetbatch (0), timechecklattice (0)
-    {
-        firstvalidepochstartframe = source.firstvalidglobalts (epochstartframe); // epochstartframe may fall between utterance boundaries; this gets us the first valid boundary
-        fprintf (stderr, "minibatchiterator: epoch %d: frames [%d..%d] (first utterance at frame %d), data subset %d of %d, with %d datapasses\n",
-                 (int)epoch, (int)epochstartframe, (int)epochendframe, (int)firstvalidepochstartframe, (int)subsetnum, (int)numsubsets, (int)datapasses);
-        mbstartframe = firstvalidepochstartframe;
-        datapass = 0;
-        fillorclear(); // get the first batch
-    }
+    //// TODO not nice, but don't know how to access these frames otherwise
+    //// mbiterator constructor, set epochstart and -endframe explicitly
+    //minibatchiterator(msra::dbn::minibatchsource & source, size_t epoch, size_t epochstart, size_t epochend, size_t requestedmbframes, size_t subsetnum, size_t numsubsets, size_t datapasses)
+    //    : source (source),
+    //      epochstartframe (epochstart),
+    //      epochendframe (epochend),
+    //      requestedmbframes (requestedmbframes),
+    //      subsetnum(subsetnum), numsubsets(numsubsets),
+    //      datapasses(datapasses),
+    //      timegetbatch (0), timechecklattice (0)
+    //{
+    //    firstvalidepochstartframe = source.firstvalidglobalts (epochstartframe); // epochstartframe may fall between utterance boundaries; this gets us the first valid boundary
+    //    fprintf (stderr, "minibatchiterator: epoch %d: frames [%d..%d] (first utterance at frame %d), data subset %d of %d, with %d datapasses\n",
+    //             (int)epoch, (int)epochstartframe, (int)epochendframe, (int)firstvalidepochstartframe, (int)subsetnum, (int)numsubsets, (int)datapasses);
+    //    mbstartframe = firstvalidepochstartframe;
+    //    datapass = 0;
+    //    fillorclear(); // get the first batch
+    //}
 
     // need virtual destructor to ensure proper destruction
     virtual ~minibatchiterator()

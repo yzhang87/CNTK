@@ -17,12 +17,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         unique_ptr<msra::dbn::latticesource> m_lattices;
         map<wstring, msra::lattices::lattice::htkmlfwordsequence> m_latticeMap;
 
+        std::vector<InputDefinition> m_inputs;
+
         vector<bool> m_sentenceEnd;
-        bool m_truncated;
         bool m_frameMode;
         vector<size_t> m_processedFrame;
-        intargvector m_numSeqsPerMBForAllEpochs;
-        size_t m_numSeqsPerMB;                  // requested number of parallel sequences
         size_t m_mbNumTimeSteps;                // number of time steps  to fill/filled (note: for frame randomization, this the #frames, and not 1 as later reported)
         vector<size_t> m_numFramesToProcess;    // [seq index] number of frames available (left to return) in each parallel sequence
         vector<size_t> m_switchFrame;           /// TODO: something like the position where a new sequence starts; still supported?
@@ -45,10 +44,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<size_t> m_labelsStartIndexMultiUtt;
 
         unique_ptr<CUDAPageLockedMemAllocator> m_cudaAllocator;
-        std::vector<std::shared_ptr<ElemType>> m_featuresBufferMultiIO;
-        std::vector<size_t> m_featuresBufferAllocatedMultiIO;
-        std::vector<std::shared_ptr<ElemType>> m_labelsBufferMultiIO;
-        std::vector<size_t> m_labelsBufferAllocatedMultiIO;
 
         //for lattice uids and phoneboundaries
         std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>>  m_latticeBufferMultiUtt;
@@ -81,28 +76,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         int m_verbosity;
 
-        void PrepareForTrainingOrTesting(const ConfigParameters& config);
-        void PrepareForWriting(const ConfigParameters& config);
-
-        bool GetMinibatchToTrainOrTest(std::map<std::wstring, Matrix<ElemType>*>&matrices);
         bool GetMinibatch4SEToTrainOrTest(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, std::vector<size_t> &extrauttmap);
-        void fillOneUttDataforParallelmode(std::map<std::wstring, Matrix<ElemType>*>& matrices, size_t startFr, size_t framenum, size_t channelIndex, size_t sourceChannelIndex);
-        bool GetMinibatchToWrite(std::map<std::wstring, Matrix<ElemType>*>&matrices);
+
 
         void StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize);
-        void StartMinibatchLoopToWrite(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
-
-        bool ReNewBufferForMultiIO(size_t i);
-
-        void SetNumParallelSequences(const size_t) { };
-
-        void GetDataNamesFromConfig(const ConfigParameters& readerConfig, std::vector<std::wstring>& features, std::vector<std::wstring>& labels,
-            std::vector<std::wstring>& hmms, std::vector<std::wstring>& lattices);
-
-        size_t ReadLabelToTargetMappingFile(const std::wstring& labelToTargetMappingFile, const std::wstring& labelListFile, std::vector<std::vector<ElemType>>& labelToTargetMap);
-
-        void ExpandDotDotDot(wstring & featPath, const wstring & scpPath, wstring & scpDirCached);
-
 
         enum InputOutputTypes
         {
@@ -134,26 +111,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize);
 
-        virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout);
-        virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, vector<size_t> &extrauttmap);
         virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
-        void SetSentenceEndInBatch(vector<size_t> &/*sentenceEnd*/);
-        void SetSentenceEnd(int /*actualMbSize*/){};
-        void SetRandomSeed(int){ NOT_IMPLEMENTED };
+        virtual Timeline& getTimeline() override;
+        virtual std::map<size_t, Sequence> getSequenceById(sequenceId id) override;
+        virtual std::vector<InputDefinition> getInputs() override;
 
-        virtual Timeline& getTimeline() override
-        {
-            throw std::logic_error("The method or operation is not implemented.");
-        }
-
-        virtual std::map<std::string, std::vector<sequence>> getSequenceById(std::vector<sequenceId> ids) override
-        {
-            throw std::logic_error("The method or operation is not implemented.");
-        }
-
-        //    bool RequireSentenceSeg() const  { return !m_frameMode; }; 
-    };
+        private:
+        void AdvanceIteratorToNextDataPortion();
+};
 
 }
 }

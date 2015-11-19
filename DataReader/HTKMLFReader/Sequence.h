@@ -6,8 +6,9 @@
 #include "frame.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-    class sequence
+    class Sequence
     {
+    public:
         std::vector<Frame> frames;
     };
 }}}

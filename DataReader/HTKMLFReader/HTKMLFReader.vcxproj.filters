@@ -123,6 +123,9 @@
     <ClInclude Include="CudaMemoryProvider.h">
       <Filter>MemoryProviders</Filter>
     </ClInclude>
+    <ClInclude Include="Utils.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />

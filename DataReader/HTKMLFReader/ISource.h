@@ -15,11 +15,20 @@ namespace Microsoft
     {
         namespace CNTK
         {
+            struct InputDefinition
+            {
+                std::wstring name;
+                size_t id;
+                std::vector<size_t> dimensions;
+                size_t elementSize;
+            };
+
             class ISource
             {
             public:
                 virtual Timeline& getTimeline() = 0;
-                virtual std::map<std::string, std::vector<sequence>> getSequenceById(std::vector<sequenceId> ids) = 0;
+                virtual std::vector<InputDefinition> getInputs() = 0;
+                virtual std::map<size_t, Sequence> getSequenceById(sequenceId id) = 0;
                 virtual ~ISource() {}
             };
         }
