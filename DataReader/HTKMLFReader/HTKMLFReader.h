@@ -16,9 +16,7 @@ template<class ElemType>
 class HTKMLFReader : public IDataReader<ElemType>
 {
 private:
-    std::unique_ptr<IMemoryProvider> m_provider;
-
-private:
+    std::shared_ptr<IMemoryProvider> m_provider;
     std::shared_ptr<ElemType> Allocate(size_t numberOfElements);
 
     const static size_t m_htkRandomizeAuto = 0;
@@ -135,7 +133,7 @@ public:
 
     HTKMLFReader();
 
-    virtual void Init(const ConfigParameters& config);
+    virtual void Init(const ConfigParameters& config, shared_ptr<IMemoryProvider> memoryProvider);
     virtual void Destroy() { delete this; }
     virtual ~HTKMLFReader() { }
 

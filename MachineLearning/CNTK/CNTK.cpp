@@ -52,6 +52,8 @@
 #include "BestGpu.h"
 #include "ScriptableObjects.h"
 #include <fileutil.h>
+#include "../../DataReader/HTKMLFReader/HeapMemoryProvider.h"
+#include "../../DataReader/HTKMLFReader/CudaMemoryProvider.h"
 
 // TODO: Get rid of this global
 Microsoft::MSR::CNTK::MPIWrapper *g_mpi = nullptr;
@@ -105,7 +107,7 @@ void DumpNodeInfo(const ConfigParameters& config)
     wstring defOutFilePath = modelPath + L"." + nodeName + L".txt";
     wstring outputFile = config("outputFile", WCharToString(defOutFilePath.c_str()).c_str());
     bool printValues = config("printValues", "true");
-	
+
 
     ComputationNetwork net(-1);  //always use CPU
     net.LoadFromFile<ElemType>(modelPath);
@@ -150,15 +152,15 @@ void DoEval(const ConfigParameters& config)
     ConfigParameters readerConfig(config("reader"));
     readerConfig.Insert("traceLevel", config("traceLevel", "0"));
 
-    DataReader<ElemType> testDataReader(readerConfig);
+    DataReader<ElemType> testDataReader(readerConfig, nullptr);
 
     DoEvalBase(config, testDataReader);
 }
 
 #if 0
 // Special early implementation of RNNs by emulating them as a DNN.
-// The code is very restricted to simple RNNs. 
-// The idea can be used for more complicated network but need to know which nodes are stateful or time-dependent so that unroll is done in a correct way to represent recurrent networks. 
+// The code is very restricted to simple RNNs.
+// The idea can be used for more complicated network but need to know which nodes are stateful or time-dependent so that unroll is done in a correct way to represent recurrent networks.
 // TODO: can probably be removed.
 template <typename ElemType>
 void DoEvalUnroll(const ConfigParameters& config)
@@ -225,7 +227,7 @@ void DoCrossValidate(const ConfigParameters& config)
     std::vector<std::vector<double>> cvErrorResults;
     std::vector<std::wstring> cvModels;
 
-    DataReader<ElemType> cvDataReader(readerConfig);
+    DataReader<ElemType> cvDataReader(readerConfig, nullptr);
 
     bool finalModelEvaluated = false;
     for (size_t i = cvInterval[0]; i <= cvInterval[2]; i += cvInterval[1])
@@ -301,7 +303,7 @@ void DoWriteOutput(const ConfigParameters& config)
     readerConfig.Insert("traceLevel", config("traceLevel", "0"));
     readerConfig.Insert("randomize", "None");  //we don't want randomization when output results
 
-    DataReader<ElemType> testDataReader(readerConfig);
+    DataReader<ElemType> testDataReader(readerConfig, nullptr);
 
     DEVICEID_TYPE deviceId = DeviceFromConfig(config);
     ConfigArray minibatchSize = config("minibatchSize", "2048");
@@ -336,7 +338,7 @@ void DoWriteOutput(const ConfigParameters& config)
     }
     else if (config.Exists("outputPath"))
     {
-        wstring outputPath = config("outputPath"); // crashes if no default given? 
+        wstring outputPath = config("outputPath"); // crashes if no default given?
         writer.WriteOutput(testDataReader, mbSize[0], outputPath, outputNodeNamesVector, epochSize);
     }
     //writer.WriteOutput(testDataReader, mbSize[0], testDataWriter, outputNodeNamesVector, epochSize);
@@ -438,7 +440,7 @@ void DoCreateLabelMap(const ConfigParameters& config)
         }
         fprintf(stderr, "CreateLabelMap: Creating the mapping file '%s' \n", labelMappingFile.c_str());
 
-        DataReader<ElemType> dataReader(readerConfig);
+        DataReader<ElemType> dataReader(readerConfig, nullptr);
         IDataReader<ElemType>* reader = &dataReader;
 
         EpochConfiguration ec;
@@ -470,24 +472,24 @@ void DoCreateLabelMap(const ConfigParameters& config)
 
 //////////////////////////////////////////////////////////////////////////
 //  for action SVD
-//      An action "SVD" performs the following process to transform an existing model: 
-//          1.  For a Learnable Parameter A whose name matches with the user specified regex, 
-//              A is approximated by two matrice multiplication B*C ; 
-//          2.  In order to keep the low-rank structure in training, 
+//      An action "SVD" performs the following process to transform an existing model:
+//          1.  For a Learnable Parameter A whose name matches with the user specified regex,
+//              A is approximated by two matrice multiplication B*C ;
+//          2.  In order to keep the low-rank structure in training,
 //              the original A node will be replaced by A' whose opertions is Times
-//              with its left children being B and right chilren being 
+//              with its left children being B and right chilren being
 //
 //      To use this command,
-//          user need to specify: 
-//                  1)  modelPath           -- path to the existing model 
-//                  2)  outputmodelPath     -- where to write the transformed model 
+//          user need to specify:
+//                  1)  modelPath           -- path to the existing model
+//                  2)  outputmodelPath     -- where to write the transformed model
 //                  3)  KeepRatio           -- how many percentage of energy we want to keep
-//					4)	AlignedSize			-- the resultant number of signular values is aligned to e.g., 32 or 64  
-//                  5)  ParameterName       -- name (regex) of the parameter node we want to perform a SVD decomposition 
-//              
+//					4)	AlignedSize			-- the resultant number of signular values is aligned to e.g., 32 or 64
+//                  5)  ParameterName       -- name (regex) of the parameter node we want to perform a SVD decomposition
+//
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
-//  helper function for DoParameterSVD 
+//  helper function for DoParameterSVD
 //////////////////////////////////////////////////////////////////////////
 bool ParseSVDConfigFile(wstring fn, map<wstring, float>& config)
 {
@@ -502,7 +504,7 @@ bool ParseSVDConfigFile(wstring fn, map<wstring, float>& config)
     }
     return true;
 }
-// a brief on the SVD config file usage 
+// a brief on the SVD config file usage
 void SVDConfigFileUsage()
 {
     fprintf(stderr, "usage of SVDConfigFile\n");
@@ -517,7 +519,7 @@ void SVDConfigFileUsage()
 template<class ElemType>
 void  DoParameterSVD(const ConfigParameters& config)
 {
-    DEVICEID_TYPE deviceID = -1;        // use CPU for SVD 
+    DEVICEID_TYPE deviceID = -1;        // use CPU for SVD
     wstring modelPath = config("modelPath");
     wstring outputmodelPath = config("outputmodelPath");
     map<wstring, float>     svdconfig;
@@ -531,7 +533,7 @@ void  DoParameterSVD(const ConfigParameters& config)
     }
     else
     {
-        // alternatively, user can also use a config to specify KeepRatios for different groups of nodes 
+        // alternatively, user can also use a config to specify KeepRatios for different groups of nodes
         wstring svdnodeConfigFile = config("SVDConfig", L"");
         if (!ParseSVDConfigFile(svdnodeConfigFile, svdconfig))
         {
@@ -570,7 +572,7 @@ void  DoParameterSVD(const ConfigParameters& config)
 ///       2      45020  <unk>   1
 ///       the first column is word index
 ///       the last column is class index of the word
-///       the second column and the third column are for information purpose and 
+///       the second column and the third column are for information purpose and
 ///       are not really used in generating outputs for later process in the neural networks training
 ///
 ///    wrd2cls in dense matrix in[vocab_size X 1].it maps a word to its class id.
@@ -803,6 +805,8 @@ void DoTrain(const ConfigParameters& config, size_t fullEpochsOffset, size_t ful
 
     unique_ptr<IComputationNetBuilder<ElemType>> netBuilder;
 
+    DEVICEID_TYPE deviceId = DeviceFromConfig(config);
+
     if (config.Exists("NDLNetworkBuilder"))
     {
         ConfigParameters ndlNetworkBuilderConfig(config("NDLNetworkBuilder"));
@@ -815,16 +819,25 @@ void DoTrain(const ConfigParameters& config, size_t fullEpochsOffset, size_t ful
     }
     else if (config.Exists("ExperimentalNetworkBuilder"))   // for testing/early access to NDL extensions
     {
-        DEVICEID_TYPE deviceId = DeviceFromConfig(config);
         string sourceCode(config("ExperimentalNetworkBuilder"));
         netBuilder = unique_ptr<IComputationNetBuilder<ElemType>>(new ExperimentalNetworkBuilder<ElemType>(msra::strfun::utf16(sourceCode), deviceId));
     }
     else
     {
-        RuntimeError("No network builder found in the config file. NDLNetworkBuilder or SimpleNetworkBuilde must be specified");
+        RuntimeError("No network builder found in the config file. NDLNetworkBuilder or SimpleNetworkBuilder must be specified");
     }
 
-    unique_ptr<DataReader<ElemType>> dataReader { new DataReader<ElemType>(readerConfig) };
+    shared_ptr<IMemoryProvider> memoryProvider;
+    if (deviceId == CPUDEVICE)
+    {
+        memoryProvider = std::make_shared<HeapMemoryProvider>();
+    }
+    else
+    {
+        memoryProvider = std::make_shared<CudaMemoryProvider>(deviceId);
+    }
+
+    unique_ptr<DataReader<ElemType>> dataReader { new DataReader<ElemType>(readerConfig, memoryProvider) };
 
     unique_ptr<DataReader<ElemType>> cvDataReader;
     ConfigParameters cvReaderConfig(config("cvReader", L""));
@@ -832,7 +845,7 @@ void DoTrain(const ConfigParameters& config, size_t fullEpochsOffset, size_t ful
     if (cvReaderConfig.size() != 0)
     {
         cvReaderConfig.Insert("traceLevel", config("traceLevel", "0"));
-        cvDataReader = unique_ptr<DataReader<ElemType> >{ new DataReader<ElemType>(cvReaderConfig) };
+        cvDataReader = unique_ptr<DataReader<ElemType> >{ new DataReader<ElemType>(cvReaderConfig, memoryProvider) };
     }
 
     SGD<ElemType> sgd(configSGD, fullEpochsOffset, fullTotalMaxEpochs);
@@ -851,7 +864,7 @@ void DoAdapt(const ConfigParameters& config, size_t fullEpochsOffset, size_t ful
     ConfigParameters readerConfig(config("reader"));
     readerConfig.Insert("traceLevel", config("traceLevel", "0"));
 
-    DataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig);
+    DataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig, nullptr);
 
     DataReader<ElemType>* cvDataReader = nullptr;
     ConfigParameters cvReaderConfig(config("cvReader", L""));
@@ -859,7 +872,7 @@ void DoAdapt(const ConfigParameters& config, size_t fullEpochsOffset, size_t ful
     if (cvReaderConfig.size() != 0)
     {
         cvReaderConfig.Insert("traceLevel", config("traceLevel", "0"));
-        cvDataReader = new DataReader<ElemType>(cvReaderConfig);
+        cvDataReader = new DataReader<ElemType>(cvReaderConfig, nullptr);
     }
 
     wstring origModelFileName = config("origModelFileName", L"");
@@ -1035,7 +1048,7 @@ void DoBidirectionEncoderDecoder(const ConfigParameters& config, size_t fullEpoc
 /**
 Originally, this is for testing models trained using the sequence to sequence translation method below
 http://arxiv.org/pdf/1409.3215.pdf
-Later on, it is extended to be more general to include a sequence of network operations. 
+Later on, it is extended to be more general to include a sequence of network operations.
 */
 template <typename ElemType>
 void DoEvalEncodingBeamSearchDecoding(const ConfigParameters& config)
@@ -1104,7 +1117,7 @@ void DoEvalEncodingBeamSearchDecoding(const ConfigParameters& config)
     MultiNetworksEvaluator<ElemType> eval(decoderNet, numMBsToShowResult, traceLevel);
     eval.InitTrainEncoderDecoderWithHiddenStates(config);
 
-    eval.EncodingEvaluateDecodingBeamSearch(nets, readers, 
+    eval.EncodingEvaluateDecodingBeamSearch(nets, readers,
                                             testDataWriter, evalNodeNamesVector,
                                             outputNodeNamesVector,
                                             mbSize[0], beamWidth, epochSize);
@@ -1201,7 +1214,7 @@ void DoSequenceTrain(const ConfigParameters& config, size_t fullEpochsOffset, si
         RuntimeError("No network builder found in the config file. NDLNetworkBuilder or SimpleNetworkBuilde must be specified");
     }
 
-    DataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig);
+    DataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig, nullptr);
 
     DataReader<ElemType>* cvDataReader = nullptr;
     ConfigParameters cvReaderConfig(config("cvReader", L""));
@@ -1209,7 +1222,7 @@ void DoSequenceTrain(const ConfigParameters& config, size_t fullEpochsOffset, si
     if (cvReaderConfig.size() != 0)
     {
         cvReaderConfig.Insert("traceLevel", config("traceLevel", "0"));
-        cvDataReader = new DataReader<ElemType>(cvReaderConfig);
+        cvDataReader = new DataReader<ElemType>(cvReaderConfig, nullptr);
     }
 
     wstring origModelFileName = config("origModelFileName", L"");
@@ -1250,7 +1263,7 @@ void DoConvertFromDbn(const ConfigParameters& config)
     delete (netBuilder);
 }
 
-// do topological plot of computation network 
+// do topological plot of computation network
 template <typename ElemType>
 void DoTopologyPlot(const ConfigParameters& config)
 {
@@ -1258,7 +1271,7 @@ void DoTopologyPlot(const ConfigParameters& config)
     wstring outdot = config("outputDotFile");           // filename for the dot language output, if not specified, %modelpath%.dot will be used
     wstring outRending = config("outputFile");      // filename for the rendered topology plot
     // this can be empty, in that case no rendering will be done
-    // or if this is set, renderCmd must be set, so CNTK will call re       
+    // or if this is set, renderCmd must be set, so CNTK will call re
     wstring RenderCmd = config("RenderCmd");               // if this option is set, then CNTK will call the render to convert the outdotFile to a graph
     // e.g. "d:\Tools\graphviz\bin\dot.exe -Tpng -x <IN> -o<OUT>"
     //              where <IN> and <OUT> are two special placeholders
@@ -1314,7 +1327,7 @@ static void DisableLegacyTruncationSettings(const ConfigParameters& TopLevelConf
         return;
     }
 
-    // if any of the action has set a reader/SGD section and has different Truncated value for reader and SGD section 
+    // if any of the action has set a reader/SGD section and has different Truncated value for reader and SGD section
     ConfigArray actions = commandConfig("action");
     for (size_t i = 0; i < actions.size(); i++)
     {
@@ -1323,7 +1336,7 @@ static void DisableLegacyTruncationSettings(const ConfigParameters& TopLevelConf
 
             ConfigParameters sgd = ConfigParameters(commandConfig("SGD"));
             ConfigParameters reader = ConfigParameters(commandConfig("reader"));
-            // reader and SGD sections are two must-have sections in train/trainRNN 
+            // reader and SGD sections are two must-have sections in train/trainRNN
             if (reader.ExistsCurrent("Truncated") && !sgd.ExistsCurrent("Truncated"))
             {
                 InvalidArgument("DisableLegacyUsage: setting Truncated only in reader section are not allowed. Please move Truncated=true/false to the top level section.");
@@ -1635,7 +1648,7 @@ int wmain1(int argc, wchar_t* argv[])   // called from wmain which is a wrapper 
             RuntimeError("invalid precision specified: %s", type.c_str());
         }
 
-        // still here , write a DoneFile if necessary 
+        // still here , write a DoneFile if necessary
         if (!DoneFile.empty())
         {
             FILE* fp = fopenOrDie(DoneFile.c_str(), L"w");

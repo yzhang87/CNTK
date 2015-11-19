@@ -22,7 +22,7 @@ template<> std::string GetReaderName(float) {std::string name = "GetReaderF"; re
 template<> std::string GetReaderName(double) {std::string name = "GetReaderD"; return name;}
 
 template<class ElemType>
-void DataReader<ElemType>::Init(const ConfigParameters& /*config*/)
+void DataReader<ElemType>::Init(const ConfigParameters& /*config*/, shared_ptr<IMemoryProvider> /*memoryProvider*/)
 {
     RuntimeError("Init shouldn't be called, use constructor");
     // not implemented, calls the underlying class instead
@@ -101,17 +101,18 @@ void DataReader<ElemType>::GetDataReader(const ConfigParameters& config)
 // DataReader Constructor
 // options - [in] string  of options (i.e. "-windowsize:11 -addenergy") data reader specific 
 template<class ElemType>
-DataReader<ElemType>::DataReader(const ConfigParameters& config)
+DataReader<ElemType>::DataReader(const ConfigParameters& config, shared_ptr<IMemoryProvider> memoryProvider) : m_memoryProvider(memoryProvider)
 {
     GetDataReader(config);
+
+    assert(memoryProvider.get() != nullptr); // mahilleb: right now we've only patched this into DoTrain()
+
     // now pass that to concurrent reader so we can read ahead
     //m_DataReader = new ConcurrentReader<ElemType>(m_DataReader);
     // NOW we can init
     for (size_t i = 0; i < m_ioNames.size(); i++)
     {
-        // eldak - need device id.
-        
-        m_dataReader[m_ioNames[i]]->Init(m_configure[m_ioNames[i]]);
+        m_dataReader[m_ioNames[i]]->Init(m_configure[m_ioNames[i]], m_memoryProvider);
         m_dataReader[m_ioNames[i]]->SetNumParallelSequences(mNbrUttPerMinibatch);
     }
 }
