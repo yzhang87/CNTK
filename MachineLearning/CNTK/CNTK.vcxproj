@@ -182,7 +182,6 @@
     <ClInclude Include="..\CNTKComputationNetworkLib\MatrixPool.h" />
     <ClInclude Include="..\CNTKSGDLib\DataReaderHelpers.h" />
     <ClInclude Include="..\CNTKSGDLib\IComputationNetBuilder.h" />
-    <ClInclude Include="..\CNTKSGDLib\MultiNetworksSGD.h" />
     <ClInclude Include="..\CNTKSGDLib\SGD.h" />
     <ClInclude Include="..\CNTKSGDLib\SimpleEvaluator.h" />
     <ClInclude Include="..\CNTKSGDLib\SimpleOutputWriter.h" />

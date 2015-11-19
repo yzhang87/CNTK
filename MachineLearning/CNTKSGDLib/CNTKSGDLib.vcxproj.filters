@@ -153,12 +153,6 @@
     <ClInclude Include="DataReaderHelpers.h">
       <Filter>Data Reading</Filter>
     </ClInclude>
-    <ClInclude Include="MultiNetworksSGD.h">
-      <Filter>MultiNetworks</Filter>
-    </ClInclude>
-    <ClInclude Include="MultiNetworksEvaluator.h">
-      <Filter>MultiNetworks</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Common\Include\Sequences.h">
       <Filter>Common\Include</Filter>
     </ClInclude>

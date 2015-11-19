@@ -208,9 +208,6 @@
     <ClInclude Include="..\CNTKSGDLib\SimpleEvaluator.h">
       <Filter>from CNTKSGDLib\SGD</Filter>
     </ClInclude>
-    <ClInclude Include="..\CNTKSGDLib\MultiNetworksSGD.h">
-      <Filter>from CNTKSGDLib\SGD</Filter>
-    </ClInclude>
     <ClInclude Include="..\CNTKSGDLib\SGD.h">
       <Filter>from CNTKSGDLib\SGD</Filter>
     </ClInclude>

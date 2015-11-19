@@ -43,10 +43,12 @@
 #include "SGD.h"
 #include "MPIWrapper.h"
 #include "commandArgUtil.h"
-#include "MultiNetworksSGD.h"
+// No multi-network
+//#include "MultiNetworksSGD.h"
 #include "SimpleEvaluator.h"
 #include "SimpleOutputWriter.h"
-#include "MultiNetworksEvaluator.h"
+// No multi-network
+//#include "MultiNetworksEvaluator.h"
 #include "BestGpu.h"
 #include "ScriptableObjects.h"
 #include <fileutil.h>
@@ -62,8 +64,11 @@ using namespace Microsoft::MSR::CNTK;
 template <typename ElemType>
 void TestCn(const ConfigParameters& config);
 
+#if 0
+// No multi-network
 template <typename ElemType>
 void DoEvalBeamSearch(const ConfigParameters& config, IDataReader<ElemType>& reader);
+#endif
 
 template <typename T>
 struct compare_second
@@ -150,6 +155,7 @@ void DoEval(const ConfigParameters& config)
     DoEvalBase(config, testDataReader);
 }
 
+#if 0
 // Special early implementation of RNNs by emulating them as a DNN.
 // The code is very restricted to simple RNNs. 
 // The idea can be used for more complicated network but need to know which nodes are stateful or time-dependent so that unroll is done in a correct way to represent recurrent networks. 
@@ -182,6 +188,7 @@ void DoEvalUnroll(const ConfigParameters& config)
     double evalEntropy;
     eval.EvaluateUnroll(&testDataReader, mbSize[0], evalEntropy, path2EvalResults == L"" ? nullptr : path2EvalResults.c_str(), epochSize);
 }
+#endif
 
 template <typename ElemType>
 void DoCrossValidate(const ConfigParameters& config)
@@ -866,6 +873,7 @@ void DoAdapt(const ConfigParameters& config, size_t fullEpochsOffset, size_t ful
     delete cvDataReader;
 }
 
+#if 0
 /**
 This implements sequence to sequence translation paper in
 http://arxiv.org/pdf/1409.3215.pdf
@@ -1164,6 +1172,7 @@ void DoEvalBeamSearch(const ConfigParameters& config, IDataReader<ElemType>& rea
     MultiNetworksEvaluator<ElemType> eval(net, numMBsToShowResult, traceLevel);
     eval.BeamSearch(&reader, testDataWriter, evalNodeNamesVector, outputNodeNamesVector, mbSize[0], beamWidth, epochSize);
 }
+#endif
 
 template <typename ElemType>
 void DoSequenceTrain(const ConfigParameters& config, size_t fullEpochsOffset, size_t fullTotalMaxEpochs)
@@ -1407,7 +1416,8 @@ void DoCommand(const ConfigParameters& config)
             }
             else if (action[j] == "testunroll")
             {
-                DoEvalUnroll<ElemType>(commandParams);
+                assert(0);
+                // DoEvalUnroll<ElemType>(commandParams);
             }
             else if (action[j] == "edit")
             {
@@ -1451,19 +1461,23 @@ void DoCommand(const ConfigParameters& config)
             }
             else if (action[j] == "trainEncoderDecoder")
             {
-                DoEncoderDecoder<ElemType>(commandParams, fullEpochsOffset, fullTotalMaxEpochs);
+                assert(!"No multi-network");
+                //DoEncoderDecoder<ElemType>(commandParams, fullEpochsOffset, fullTotalMaxEpochs);
             }
             else if (action[j] == "testEncoderDecoder")
             {
-                DoEvalEncodingBeamSearchDecoding<ElemType>(commandParams);
+                assert(!"No multi-network");
+                //DoEvalEncodingBeamSearchDecoding<ElemType>(commandParams);
             }
             else if (action[j] == "trainBidirectionEncoderDecoder")
             {
-                DoBidirectionEncoderDecoder<ElemType>(commandParams, fullEpochsOffset, fullTotalMaxEpochs);
+                assert(!"No multi-network");
+                //DoBidirectionEncoderDecoder<ElemType>(commandParams, fullEpochsOffset, fullTotalMaxEpochs);
             }
             else if (action[j] == "beamSearch")
             {
-                DoBeamSearchDecoding<ElemType>(commandParams);
+                assert(!"No multi-network");
+                //DoBeamSearchDecoding<ElemType>(commandParams);
             }
             else
             {
