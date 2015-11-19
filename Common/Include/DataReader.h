@@ -83,7 +83,7 @@ public:
 template<class ElemType>
 ProcessingUnit& MinibatchIterator<ElemType>::operator* ()
 {
-    return *cached;
+    return *cached_;
 }
 
 // Define postfix increment operator.
