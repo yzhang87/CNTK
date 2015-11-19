@@ -62,9 +62,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             //endOfFile(0,0)=0;
 
             // evaluate with minibatches
-            EpochConfiguration ec = {};
-            ec.workerRank = 0;
-            ec.numberOfWorkers = 1;
+            EpochConfiguration ec;
             ec.currentEpoch = 0;
             ec.minibatchSize = mbSize;
             ec.epochSize = numOutputSamples;
@@ -79,9 +77,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t actualMBSize;
             while (DataReaderHelpers::GetMinibatchIntoNetwork(dataReader, m_net, nullptr, false, false, inputMatrices, actualMBSize))
             {
-                ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
-                ComputationNetwork::UpdateEvalTimeStamps(labelNodes);
-
                 //size_t actualMBSize = m_net.SetActualMiniBatchSizeFromFeatures();
                 //dataReader.CopyMBLayoutTo(m_net.GetMBLayoutPtr());
                 //m_net.VerifyActualNumParallelSequences(dataReader.GetNumParallelSequences());
@@ -167,8 +162,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t actualMBSize;
             while (DataReaderHelpers::GetMinibatchIntoNetwork(dataReader, m_net, nullptr, false, false, inputMatrices, actualMBSize))
             {
-                ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
-
                 //size_t actualMBSize = m_net.SetActualMiniBatchSizeFromFeatures();
                 //dataReader.CopyMBLayoutTo(m_net.GetMBLayoutPtr());
                 //m_net.VerifyActualNumParallelSequences(dataReader.GetNumParallelSequences());  // TODO: This was added by my (fseide) but UNTESTED. If this fails, comment out and let me know.

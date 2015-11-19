@@ -115,9 +115,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                             size_t & actualMBSize)
         {
             auto pMBLayout = net.GetMBLayoutPtr();
+            auto & featureNodes = net.FeatureNodes();
+            auto & labelNodes = net.LabelNodes();
+
             // Reading consists of a sequence of Reader API calls:
             //  - GetMinibatch() --fills the inputMatrices
-            //  - SetActualMiniBatchSizeFromFeatures()  --tells Network to resize the nodes' buffers
+            //  - SetActualMiniBatchSizeFromFeatures()  --tells Network to resize the nodes' buffers [NotifyInputNodesFunctionValuesMBSizeModified() / NotifyInputNodesFunctionValuesMBSizeModified) ]
             //  - CopyMBLayoutTo()   --copies the MBLayout from Reader to Network
             //  - VerifyActualNumParallelSequences()  --(refactoring left-over) verify that MBLayout is consistent with #parallel sequences
             // with the special twist that in presence of parallelization, there is some decimation involved.
@@ -125,22 +128,22 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // TODO: how is !wasDataRead semantically different from inputMatrices having zero columns?
             // TODO: The reader does not always resize the input matrices to zero when 
             // no data is read. When it does, 'wasDataRead' can be removed
-            MBLayoutPtr returnLayout(new MBLayout());
-            bool wasDataRead = trainSetDataReader.GetMinibatch(inputMatrices, returnLayout);      // fill in the minibatch data into the Input nodes' buffers directly
+
+            //auto processingUnit = trainSetDataReader.GetMinibatch(); // 
+            bool wasDataRead = trainSetDataReader.GetMinibatch(inputMatrices, pMBLayout);      // fill in the minibatch data into the Input nodes' buffers directly
             // reader will have resized input node's m_functionValues directly. Nodes must be notified to do necessary internal state updates from that.
             net.NotifyInputNodesFunctionValuesMBSizeModified();
-            size_t readMBSize = net.DetermineActualMBSizeFromFeatures();
+            size_t readMBSize = net.DetermineActualMBSizeFromFeatures(); // TODO should be part of processing unit, or easily extractible?
             if (readMBSize == 0)
                 wasDataRead = false;
 
-            // eldak
+            // eldak / mahilleb: filled in directly above now
             //trainSetDataReader.CopyMBLayoutTo(pMBLayout);                           // and layout meta-data
-            pMBLayout->CopyFrom(returnLayout);
+            //pMBLayout->CopyFrom(returnLayout);
 
             // verify some DataReader calls that are redundant since the MBLayout refactoring (keep verifying for a while for cosy feeling)
-            net.VerifyActualNumParallelSequences(trainSetDataReader.GetNumParallelSequences()); // info already contained in MBLayout
+            net.VerifyActualNumParallelSequences(trainSetDataReader.GetNumParallelSequences()); // info already contained in MBLayout // remove
             //assert(trainSetDataReader.RequireSentenceSeg() == pMBLayout->RequireSentenceSeg()); // this one is redundant, too
-
 
             if (criterionNode != nullptr)
             {
@@ -184,6 +187,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             actualMBSize = 0;
             if (wasDataRead)    // TODO: what if we call it always?
                 actualMBSize = net.DetermineActualMBSizeFromFeatures(); // TODO: don't we know the size from reader? Should this be a check instead?
+
+
+            // Comment from TrainOneEpoch():
+            // node data was changed
+            // TODO: move this to that function as well--just tired to pass everything as arguments
+            // TODO: We should do this right after the GetMinibatch() call, since that's where these changed.
+            //       Need to check whether that would cause unintended side effects.
+            // TODO: original code did not call this for actualMBSize == 0
+            // Comment from PreCompute()::
+            // TODO: move these into GetMinibatchIntoNetwork()  --but those are passed around; necessary? Can't we get them from 'net'?
+            ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
+            ComputationNetwork::UpdateEvalTimeStamps(labelNodes);
 
             return true;
         }
