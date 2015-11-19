@@ -31,7 +31,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="biggrowablevectors.h" />
     <ClInclude Include="chunkevalsource.h" />
     <ClInclude Include="htkfeatio.h" />
     <ClInclude Include="HTKMLFReader.h" />
@@ -106,6 +105,9 @@
     </ClInclude>
     <ClInclude Include="Timeline.h">
       <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="biggrowablevectors.h">
+      <Filter>Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
