@@ -5,7 +5,6 @@
 #include <vector>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-
     class Frame
     {
     public:

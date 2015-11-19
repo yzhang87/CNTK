@@ -32,7 +32,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             LogicError("Writer is not a reader!!!.");
         }
         else {
-            source_ = std::shared_ptr<ISource>(new HTKMLFSource<ElemType>(readerConfig));
+            source_ = std::shared_ptr<ISource>(new HTKMLFSource<ElemType>());
         }
     }
 
