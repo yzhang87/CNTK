@@ -46,7 +46,7 @@ void DoCommand(const ConfigParameters& configRoot)
 
     Eval<ElemType> eval(config);
 
-    IDataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig);
+    IDataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig, nullptr);
     eval.LoadModel(modelPath);
 
     EpochConfiguration ec;

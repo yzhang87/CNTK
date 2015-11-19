@@ -76,7 +76,7 @@ public:
 
     }
 
-    virtual void Init(const ConfigParameters& /*config*/)
+    virtual void Init(const ConfigParameters& /*config*/, shared_ptr<IMemoryProvider> /*memoryProvider*/)
     {
     }
 
@@ -92,7 +92,7 @@ public:
     EvalReader(const ConfigParameters& config)
     {
         m_recordCount = m_currentRecord = 0;
-        Init(config);
+        Init(config, nullptr);
     }
 
     // Destructor - free up the matrix values we allocated

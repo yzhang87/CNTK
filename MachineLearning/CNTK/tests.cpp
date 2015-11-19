@@ -106,7 +106,7 @@ void TestReader(const ConfigParameters& configBase)
         epochSize = requestDataSize;
     }
 
-    DataReader<ElemType> dataReader(readerConfig);
+    DataReader<ElemType> dataReader(readerConfig, nullptr);
     IDataReader<ElemType>* reader = &dataReader;
 
     // get names of features and labels

@@ -30,8 +30,6 @@
 #include <vld.h> // for memory leak detection
 #endif
 
-#include "HeapMemoryProvider.h"
-
 #ifdef __unix__
 #include <limits.h>
 typedef unsigned long DWORD;
@@ -53,19 +51,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     template<class ElemType>
     HTKMLFReader<ElemType>::HTKMLFReader() : m_pMBLayout(make_shared<MBLayout>())
     {
-        // eldak should be injected.
-
-        m_provider = std::make_unique<HeapMemoryProvider>();
     }
 
     // Create a Data Reader
     //DATAREADER_API IDataReader* DataReaderFactory(void)
 
     template<class ElemType>
-    void HTKMLFReader<ElemType>::Init(const ConfigParameters& readerConfig)
+    void HTKMLFReader<ElemType>::Init(const ConfigParameters& readerConfig, shared_ptr<IMemoryProvider> Provider)
         {
             m_truncated = readerConfig("Truncated", "false");
             m_convertLabelsToTargets = false;
+            m_provider = Provider;
 
             ConfigArray numberOfuttsPerMinibatchForAllEpochs = readerConfig("nbruttsineachrecurrentiter", "1");
             m_numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;

@@ -33,6 +33,7 @@
 #include "latticesource.h"
 
 #include "../../DataReader/HTKMLFReader/ProcessingUnit.h"
+#include "../../DataReader/HTKMLFReader/IMemoryProvider.h"
 #include <utility>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -170,7 +171,7 @@ public:
     typedef std::string LabelType;
     typedef unsigned int LabelIdType;
 
-    virtual void Init(const ConfigParameters& /*config*/) = 0;
+    virtual void Init(const ConfigParameters& /*config*/, shared_ptr<IMemoryProvider> memoryProvider) = 0;
 
     virtual void Set(const EpochConfiguration& c)
     {
@@ -278,13 +279,17 @@ class DataReader: public IDataReader<ElemType>, protected Plugin
 {
     typedef typename IDataReader<ElemType>::LabelType LabelType;
     typedef typename IDataReader<ElemType>::LabelIdType LabelIdType;
+
+private:
+    shared_ptr<IMemoryProvider> m_memoryProvider;
+
 protected:
     void CopyMBLayoutTo(MBLayoutPtr pMBLayout);
 
 public:
     vector<wstring> m_ioNames;
     map<wstring, IDataReader<ElemType> *> m_dataReader;  // readers
-    map<wstring, ConfigParameters> m_configure; 
+    map<wstring, ConfigParameters> m_configure;
     // Init - Reader Initialize for multiple data sets
     // config - [in] configuration parameters for the datareader
     // Sample format below for UCIReader:
@@ -308,7 +313,7 @@ public:
     //      labelType=Category
     //  ]
     //]
-    virtual void Init(const ConfigParameters& config);
+    virtual void Init(const ConfigParameters& config, shared_ptr<IMemoryProvider> memoryProvider);
 
     void GetDataReader(const ConfigParameters& config);
 
@@ -330,7 +335,7 @@ protected:
 public:
     // DataReader Constructor
     // config - [in] configuration parameters for the datareader 
-    DataReader(const ConfigParameters& config);
+    DataReader(const ConfigParameters& config, shared_ptr<IMemoryProvider> memoryProvider);
     virtual ~DataReader();
 
 protected:
