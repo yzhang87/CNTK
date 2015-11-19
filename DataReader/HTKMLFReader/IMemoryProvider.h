@@ -6,8 +6,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class IMemoryProvider
     {
     public:
-        virtual char* allocate(size_t size) = 0;
-        virtual void deallocate(char* p) = 0;
+        virtual void* allocate(size_t elmentSize, size_t numberOfElements) = 0;
+        virtual void deallocate(void* p) = 0;
         virtual ~IMemoryProvider() = 0 {}
     };
 }}}

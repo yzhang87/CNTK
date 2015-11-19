@@ -117,6 +117,12 @@
     <ClInclude Include="ISource.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
+    <ClInclude Include="HeapMemoryProvider.h">
+      <Filter>MemoryProviders</Filter>
+    </ClInclude>
+    <ClInclude Include="CudaMemoryProvider.h">
+      <Filter>MemoryProviders</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -151,6 +157,9 @@
     </Filter>
     <Filter Include="Writers">
       <UniqueIdentifier>{f919fd36-f898-43ba-8b5f-372eb5bdc425}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MemoryProviders">
+      <UniqueIdentifier>{bc258bfe-af4a-4e7d-b602-426afc8e0e35}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

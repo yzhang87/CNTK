@@ -30,6 +30,8 @@
 #include <vld.h> // for memory leak detection
 #endif
 
+#include "HeapMemoryProvider.h"
+
 #ifdef __unix__
 #include <limits.h>
 typedef unsigned long DWORD;
@@ -48,11 +50,19 @@ namespace msra { namespace lm {
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    template<class ElemType>
+    HTKMLFReader<ElemType>::HTKMLFReader() : m_pMBLayout(make_shared<MBLayout>())
+    {
+        // eldak should be injected.
+
+        m_provider = std::make_unique<HeapMemoryProvider>();
+    }
+
     // Create a Data Reader
     //DATAREADER_API IDataReader* DataReaderFactory(void)
 
     template<class ElemType>
-        void HTKMLFReader<ElemType>::Init(const ConfigParameters& readerConfig)
+    void HTKMLFReader<ElemType>::Init(const ConfigParameters& readerConfig)
         {
             m_truncated = readerConfig("Truncated", "false");
             m_convertLabelsToTargets = false;
@@ -1087,8 +1097,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                             {
                                 // dereference matrix that corresponds to key (input/output name) and 
                                 // populate based on whether its a feature or a label
-                                Matrix<ElemType>& data = *matrices[iter->first]; // can be features or labels
-
                                 if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
                                 {
                                     id = m_featureNameToIdMap[iter->first];
@@ -1097,7 +1105,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                     if ((m_featuresBufferMultiIO[id] == nullptr) ||
                                         (m_featuresBufferAllocatedMultiIO[id] < (dim * m_mbNumTimeSteps * m_numSeqsPerMB)) /*buffer size changed. can be partial minibatch*/)
                                     {
-                                        m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), dim * m_mbNumTimeSteps * m_numSeqsPerMB);
+                                        m_featuresBufferMultiIO[id] = Allocate(dim * m_mbNumTimeSteps * m_numSeqsPerMB);
                                         m_featuresBufferAllocatedMultiIO[id] = dim * m_mbNumTimeSteps * m_numSeqsPerMB;
                                     }
 
@@ -1125,7 +1133,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                     if ((m_labelsBufferMultiIO[id] == nullptr) ||
                                         (m_labelsBufferAllocatedMultiIO[id] < (dim * m_mbNumTimeSteps * m_numSeqsPerMB)))
                                     {
-                                        m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), dim * m_mbNumTimeSteps * m_numSeqsPerMB);
+                                        m_labelsBufferMultiIO[id] = Allocate(dim * m_mbNumTimeSteps * m_numSeqsPerMB);
                                         m_labelsBufferAllocatedMultiIO[id] = dim * m_mbNumTimeSteps * m_numSeqsPerMB;
                                     }
 
@@ -1148,8 +1156,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                             {
                                 // dereference matrix that corresponds to key (input/output name) and 
                                 // populate based on whether its a feature or a label
-                                Matrix<ElemType>& data = *matrices[iter->first]; // can be features or labels
-
                                 if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
                                 {
                                     id = m_featureNameToIdMap[iter->first];
@@ -1158,7 +1164,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                     if ((m_featuresBufferMultiIO[id] == nullptr) ||
                                         (m_featuresBufferAllocatedMultiIO[id] < (dim * m_mbNumTimeSteps * m_numSeqsPerMB)) /*buffer size changed. can be partial minibatch*/)
                                     {
-                                        m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), dim * m_mbNumTimeSteps * m_numSeqsPerMB);
+                                        m_featuresBufferMultiIO[id] = Allocate(dim * m_mbNumTimeSteps * m_numSeqsPerMB);
                                         m_featuresBufferAllocatedMultiIO[id] = dim * m_mbNumTimeSteps * m_numSeqsPerMB;
                                     }
 
@@ -1188,7 +1194,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                     if ((m_labelsBufferMultiIO[id] == nullptr) ||
                                         (m_labelsBufferAllocatedMultiIO[id] < (dim * m_mbNumTimeSteps * m_numSeqsPerMB)))
                                     {
-                                        m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), dim * m_mbNumTimeSteps * m_numSeqsPerMB);
+                                        m_labelsBufferMultiIO[id] = Allocate(dim * m_mbNumTimeSteps * m_numSeqsPerMB);
                                         m_labelsBufferAllocatedMultiIO[id] = dim * m_mbNumTimeSteps * m_numSeqsPerMB;
                                     }
                                     for (size_t j = startFr,k=0; j < endFr; j++,k++)
@@ -1313,8 +1319,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             {
                 // dereference matrix that corresponds to key (input/output name) and 
                 // populate based on whether its a feature or a label
-                Matrix<ElemType>& data = *matrices[iter->first]; // can be features or labels
-
                 if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
                 {
                     id = m_featureNameToIdMap[iter->first];
@@ -1322,7 +1326,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                     if (m_featuresBufferMultiIO[id] == nullptr || m_featuresBufferAllocatedMultiIO[id] < dim*m_mbNumTimeSteps*m_numSeqsPerMB)
                     {
-                        m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), dim*m_mbNumTimeSteps*m_numSeqsPerMB);
+                        m_featuresBufferMultiIO[id] = Allocate(dim*m_mbNumTimeSteps*m_numSeqsPerMB);
                         memset(m_featuresBufferMultiIO[id].get(), 0, sizeof(ElemType)*dim*m_mbNumTimeSteps*m_numSeqsPerMB);
                         m_featuresBufferAllocatedMultiIO[id] = dim*m_mbNumTimeSteps*m_numSeqsPerMB;
                     }
@@ -1352,7 +1356,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     dim = m_labelNameToDimMap[iter->first];
                     if (m_labelsBufferMultiIO[id] == nullptr || m_labelsBufferAllocatedMultiIO[id] < dim*m_mbNumTimeSteps*m_numSeqsPerMB)
                     {
-                        m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), dim*m_mbNumTimeSteps*m_numSeqsPerMB);
+                        m_labelsBufferMultiIO[id] = Allocate(dim*m_mbNumTimeSteps*m_numSeqsPerMB);
                         memset(m_labelsBufferMultiIO[id].get(), 0, sizeof(ElemType)*dim*m_mbNumTimeSteps*m_numSeqsPerMB);
                         m_labelsBufferAllocatedMultiIO[id] = dim*m_mbNumTimeSteps*m_numSeqsPerMB;
                     }
@@ -1447,7 +1451,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                         if ((m_featuresBufferMultiIO[id] == nullptr) ||
                             (m_featuresBufferAllocatedMultiIO[id] < (feat.rows() * feat.cols())) /*buffer size changed. can be partial minibatch*/)
                         {
-                            m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), feat.rows() * feat.cols());
+                            m_featuresBufferMultiIO[id] = Allocate(feat.rows() * feat.cols());
                             m_featuresBufferAllocatedMultiIO[id] = feat.rows() * feat.cols();
                         }
 
@@ -1505,9 +1509,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
             if ((m_featuresBufferMultiUtt[i] == NULL) || (m_featuresBufferAllocatedMultiUtt[i] < totalFeatNum))
             {
-                m_featuresBufferMultiUtt[i] = AllocateIntermediateBuffer(-1 /*CPU*/, totalFeatNum);
+                m_featuresBufferMultiUtt[i] = Allocate(totalFeatNum); 
                 m_featuresBufferAllocatedMultiUtt[i] = totalFeatNum;
-            }                    
+            }
 
             size_t totalLabelsNum = 0;
             for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it) 
@@ -1523,7 +1527,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             if ((m_labelsBufferMultiUtt[i] == NULL) || (m_labelsBufferAllocatedMultiUtt[i] < totalLabelsNum))
             {
-                m_labelsBufferMultiUtt[i] = AllocateIntermediateBuffer(-1 /*CPU */, totalLabelsNum);
+                m_labelsBufferMultiUtt[i] = Allocate(totalLabelsNum);
                 m_labelsBufferAllocatedMultiUtt[i] = totalLabelsNum;
             }
 
@@ -1774,43 +1778,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 featPath = featPath.substr(0, pos) + scpDirCached + featPath.substr(pos + 3);
         }
 
-    template<class ElemType>
-        unique_ptr<CUDAPageLockedMemAllocator>& HTKMLFReader<ElemType>::GetCUDAAllocator(int deviceID)
-        {
-            if (m_cudaAllocator != nullptr)
-            {
-                if (m_cudaAllocator->GetDeviceId() != deviceID)
-                {
-                    m_cudaAllocator.reset(nullptr);
-                }
-            }
-
-            if (m_cudaAllocator == nullptr)
-            {
-                m_cudaAllocator.reset(new CUDAPageLockedMemAllocator(deviceID));
-            }
-
-            return m_cudaAllocator;
-        }
-
-    template<class ElemType>
-        std::shared_ptr<ElemType> HTKMLFReader<ElemType>::AllocateIntermediateBuffer(int deviceID, size_t numElements)
-        {
-            if (deviceID >= 0)
-            {
-                // Use pinned memory for GPU devices for better copy performance
-                size_t totalSize = sizeof(ElemType) * numElements;
-                return std::shared_ptr<ElemType>((ElemType*)GetCUDAAllocator(deviceID)->Malloc(totalSize), [this, deviceID](ElemType* p) {
-                    this->GetCUDAAllocator(deviceID)->Free((char*)p);
-                });
-            }
-            else
-            {
-                return std::shared_ptr<ElemType>(new ElemType[numElements], [](ElemType* p) {
-                    delete[] p;
-                });
-            }
-        }
+        template<class ElemType>
+        std::shared_ptr<ElemType> HTKMLFReader<ElemType>::Allocate(size_t numberOfElements)
+    {
+        return std::shared_ptr<ElemType>(reinterpret_cast<ElemType*>(m_provider->allocate(sizeof(ElemType), numberOfElements)), [this](ElemType* p) {
+                this->m_provider->deallocate(p);
+            });
+    }
 
     template class HTKMLFReader<float>;
     template class HTKMLFReader<double>;

@@ -109,6 +109,8 @@ DataReader<ElemType>::DataReader(const ConfigParameters& config)
     // NOW we can init
     for (size_t i = 0; i < m_ioNames.size(); i++)
     {
+        // eldak - need device id.
+        
         m_dataReader[m_ioNames[i]]->Init(m_configure[m_ioNames[i]]);
         m_dataReader[m_ioNames[i]]->SetNumParallelSequences(mNbrUttPerMinibatch);
     }

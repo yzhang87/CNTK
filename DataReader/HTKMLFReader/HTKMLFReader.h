@@ -8,6 +8,7 @@
 #include "DataReader.h"
 #include "commandArgUtil.h" // for intargvector
 #include "CUDAPageLockedMemAllocator.h"
+#include "IMemoryProvider.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -15,6 +16,10 @@ template<class ElemType>
 class HTKMLFReader : public IDataReader<ElemType>
 {
 private:
+    std::unique_ptr<IMemoryProvider> m_provider;
+
+private:
+    std::shared_ptr<ElemType> Allocate(size_t numberOfElements);
 
     const static size_t m_htkRandomizeAuto = 0;
     const static size_t m_htkRandomizeDisable = (size_t)-1;
@@ -85,7 +90,7 @@ private:
     std::vector<size_t> m_labelDims;
 
     std::vector<std::vector<std::vector<ElemType>>>m_labelToTargetMapMultiIO;
-    
+
     int m_verbosity;
 
     void PrepareForTrainingOrTesting(const ConfigParameters& config);
@@ -118,11 +123,6 @@ private:
         category,
     };
 
-private:
-    // Helper functions
-    unique_ptr<CUDAPageLockedMemAllocator>& GetCUDAAllocator(int deviceID);
-    std::shared_ptr<ElemType> AllocateIntermediateBuffer(int deviceID, size_t numElements);
-
 public:
     MBLayoutPtr m_pMBLayout;
 
@@ -133,9 +133,8 @@ public:
     bool mIgnoreSentenceBeginTag;
     // TODO: this ^^ does not seem to belong here.
 
-    HTKMLFReader() : m_pMBLayout(make_shared<MBLayout>())
-    {
-    }
+    HTKMLFReader();
+
     virtual void Init(const ConfigParameters& config);
     virtual void Destroy() { delete this; }
     virtual ~HTKMLFReader() { }
