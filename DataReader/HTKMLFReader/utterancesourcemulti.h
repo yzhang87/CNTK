@@ -14,6 +14,7 @@
 #include "minibatchsourcehelpers.h"
 #include "minibatchiterator.h"
 #include "unordered_set"
+#include "biggrowablevectors.h"
 
 namespace msra { namespace dbn {
 

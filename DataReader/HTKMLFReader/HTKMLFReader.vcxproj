@@ -67,6 +67,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;HTKMLFREADER_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -101,26 +102,44 @@
   <ItemGroup>
     <ClInclude Include="..\..\Common\Include\DataReader.h" />
     <ClInclude Include="..\..\Common\Include\DataWriter.h" />
+    <ClInclude Include="AugmentingSequencer.h" />
     <ClInclude Include="basetypes.h" />
     <ClInclude Include="biggrowablevectors.h" />
+    <ClInclude Include="BlockRandomizer.h" />
+    <ClInclude Include="BpttPacker.h" />
     <ClInclude Include="chunkevalsource.h" />
     <ClInclude Include="fileutil.h" />
     <ClInclude Include="..\..\Common\Include\DebugUtil.h" />
+    <ClInclude Include="Frame.h" />
     <ClInclude Include="htkfeatio.h" />
     <ClInclude Include="HTKMLFReader.h" />
+    <ClInclude Include="HtkMlfSource.h" />
     <ClInclude Include="HTKMLFWriter.h" />
+    <ClInclude Include="IBlockReader.h" />
+    <ClInclude Include="IMemoryProvider.h" />
+    <ClInclude Include="IPacker.h" />
+    <ClInclude Include="IRandomizer.h" />
+    <ClInclude Include="ISequencer.h" />
+    <ClInclude Include="ISource.h" />
     <ClInclude Include="minibatchiterator.h" />
     <ClInclude Include="minibatchsourcehelpers.h" />
     <ClInclude Include="msra_mgram.h" />
+    <ClInclude Include="NormalPacker.h" />
+    <ClInclude Include="Packer.h" />
+    <ClInclude Include="ProcessingUnit.h" />
+    <ClInclude Include="RollingWindowRandomizer.h" />
     <ClInclude Include="rollingwindowsource.h" />
+    <ClInclude Include="Sequence.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Timeline.h" />
     <ClInclude Include="utterancesourcemulti.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Common\TimerUtility.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="BpttPacker.cpp" />
     <ClCompile Include="DataReader.cpp" />
     <ClCompile Include="DataWriter.cpp" />
     <ClCompile Include="dllmain.cpp">
@@ -133,12 +152,17 @@
     </ClCompile>
     <ClCompile Include="fileutil.cpp" />
     <ClCompile Include="..\..\Common\DebugUtil.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"></PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'"></PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="HTKMLFReader.cpp" />
+    <ClCompile Include="HtkMlfSource.cpp" />
     <ClCompile Include="HTKMLFWriter.cpp" />
     <ClCompile Include="latticearchive.cpp" />
+    <ClCompile Include="NormalPacker.cpp" />
+    <ClCompile Include="Packer.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

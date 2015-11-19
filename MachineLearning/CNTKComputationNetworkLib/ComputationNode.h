@@ -25,7 +25,7 @@
 #include <sstream>
 #include <iostream>
 
-#include "../../DataReader/NewHTKMLFReader/interfaces/ProcessingUnit.h"
+#include "../../DataReader/HTKMLFReader/ProcessingUnit.h"
 
 //#define RNN_DEBUG 1
 #define DEFAULT_HIDDEN_ACTIVATION 0.1

@@ -17,6 +17,18 @@
     <ClCompile Include="..\..\Common\TimerUtility.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="BpttPacker.cpp">
+      <Filter>Packers</Filter>
+    </ClCompile>
+    <ClCompile Include="HtkMlfSource.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="NormalPacker.cpp">
+      <Filter>Packers</Filter>
+    </ClCompile>
+    <ClCompile Include="Packer.cpp">
+      <Filter>Packers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
@@ -46,6 +58,55 @@
     <ClInclude Include="..\..\Common\Include\DataWriter.h">
       <Filter>Common\Include</Filter>
     </ClInclude>
+    <ClInclude Include="ISource.h" />
+    <ClInclude Include="AugmentingSequencer.h">
+      <Filter>Transformations</Filter>
+    </ClInclude>
+    <ClInclude Include="BlockRandomizer.h">
+      <Filter>Randomizers</Filter>
+    </ClInclude>
+    <ClInclude Include="BpttPacker.h">
+      <Filter>Packers</Filter>
+    </ClInclude>
+    <ClInclude Include="Frame.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="HtkMlfSource.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="IBlockReader.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="IMemoryProvider.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="IPacker.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="IRandomizer.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="ISequencer.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Packer.h">
+      <Filter>Packers</Filter>
+    </ClInclude>
+    <ClInclude Include="NormalPacker.h">
+      <Filter>Packers</Filter>
+    </ClInclude>
+    <ClInclude Include="ProcessingUnit.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RollingWindowRandomizer.h">
+      <Filter>Randomizers</Filter>
+    </ClInclude>
+    <ClInclude Include="Sequence.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Timeline.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -59,6 +120,24 @@
     </Filter>
     <Filter Include="Common\Include">
       <UniqueIdentifier>{812d1247-04eb-4693-a0d2-5399a94e6235}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces">
+      <UniqueIdentifier>{7e68ce4e-2f68-48cf-943a-e78720bab979}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Transformations">
+      <UniqueIdentifier>{3f44b6e1-90cb-40eb-a93b-ada281340bfb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utils">
+      <UniqueIdentifier>{90dd1dac-f83d-40f2-b347-e106d24b63df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Randomizers">
+      <UniqueIdentifier>{5c5d1415-57a7-44f7-8ce1-0faa8143af5f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Packers">
+      <UniqueIdentifier>{0321cc4e-0bf8-4d2c-ab37-b03d810afaab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sources">
+      <UniqueIdentifier>{ad54386a-4a69-4c77-a7c1-6f28c1aefaac}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

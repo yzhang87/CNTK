@@ -32,8 +32,7 @@
 #include "simplesenonehmm.h"
 #include "latticesource.h"
 
-#include "../../DataReader/NewHTKMLFReader/interfaces/Data.h"
-#include "../../DataReader/NewHTKMLFReader/interfaces/ProcessingUnit.h"
+#include "../../DataReader/HTKMLFReader/ProcessingUnit.h"
 #include <utility>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
