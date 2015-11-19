@@ -49,9 +49,7 @@ void DoCommand(const ConfigParameters& configRoot)
     IDataReader<ElemType>* dataReader = new DataReader<ElemType>(readerConfig);
     eval.LoadModel(modelPath);
 
-    EpochConfiguration ec = {};
-    ec.workerRank = 0;
-    ec.numberOfWorkers = 1;
+    EpochConfiguration ec;
     ec.currentEpoch = 0;
     ec.minibatchSize = mbSize;
     ec.epochSize = epochSize;

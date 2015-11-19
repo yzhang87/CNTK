@@ -312,6 +312,7 @@ public:
         return actualMBSize;
     }
 
+#if 0 // multi-network
     // only called from MultiNetworksEvaluator
     // a helper function for some places that like to hack the features directly
     // This is for a few places (FindBestPath stuff) that don't follow the normal pattern but instead called the old SetFeaturesMiniBatchSize() function with a value of their choosing.
@@ -326,6 +327,7 @@ public:
             nodeIter->SetDims(nodeIter->GetNumRows(), cols);
         }
     }
+#endif
 
     // When external code (readers, namely) updates InputValue's m_functionValues,
     // calling this function is required to make sure that any internal state gets updated correctly.

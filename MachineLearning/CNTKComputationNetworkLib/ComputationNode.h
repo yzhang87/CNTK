@@ -771,7 +771,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         // reader updated m_functionValue--update our internal state, i.e. m_numCols
-        // This is meant for the case when a new minibatch was read. Hence, theonly change that is allowed if for column dimension.
+        // This is meant for the case when a new minibatch was read. Hence, the only change that is allowed if for column dimension.
         virtual void NotifyFunctionValuesMBSizeModified() override final
         {
             if (m_numRows != FunctionValues().GetNumRows())

@@ -742,7 +742,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             {
                 auto & node = nodes[i];
                 auto * functionValues = &dynamic_pointer_cast<ComputationNode<ElemType>>(node)->FunctionValues();
-                assert(functionValues->GetNumCols() == net.GetMBLayoutPtr()->GetNumTimeSteps());
+                assert(functionValues->GetNumCols() == net.GetMBLayoutPtr()->GetNumTimeSteps()); // mahilleb: why check? will resize anyway later on?
                 (*inputMatrices)[node->NodeName()] = functionValues;
             }
         }
@@ -1223,7 +1223,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return false;
         }
 
-        fprintf(stderr, "\nPrecomputing --> %lu PreCompute nodes found.\n\n", nodes.size());
+        fprintf(stderr, "\nPrecomputing --> %llu PreCompute nodes found.\n\n", nodes.size());
         for (auto nodeIter = nodes.begin(); nodeIter != nodes.end(); nodeIter++)
         {
             auto node = static_pointer_cast<PreComputedNode<ElemType>>(*nodeIter);
@@ -1253,13 +1253,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             auto node = static_pointer_cast<PreComputedNode<ElemType>>(*nodeIter);
             node->MarkComputed(false/*begin accumulating*/);
         }
+
         size_t actualMBSizeDummy;
+
         while (DataReaderHelpers::GetMinibatchIntoNetwork(*trainSetDataReader, net, nullptr, false, false, *inputMatrices, actualMBSizeDummy))
         {
-            // TODO: move these into GetMinibatchIntoNetwork()  --but those are passed around; necessary? Can't we get them from 'net'?
-            ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
-            ComputationNetwork::UpdateEvalTimeStamps(labelNodes);
-
             net.Evaluate(nodes);
         }
         // finalize
@@ -1876,6 +1874,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // --- MAIN MINIBATCH LOOP
 
+#if 0
+        for (auto mbIter = trainSetDataReader->begin(); mbIter != trainSetDataReader->end(); mbIter++)
+        {
+            auto &procUnit = *mbIter;
+            procUnit;
+        }
+#endif
+
         for (;;)
         {
             // get minibatch
@@ -1887,14 +1893,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 break;  // end of epoch
 
             nSamplesSinceLastModelSync += actualMBSize;
-
-            // node data was changed
-            // TODO: move this to that function as well--just tired to pass everything as arguments
-            // TODO: We should do this right after the GetMinibatch() call, since that's where these changed.
-            //       Need to check whether that would cause unintended side effects.
-            // TODO: original code did not call this for actualMBSize == 0
-            ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
-            ComputationNetwork::UpdateEvalTimeStamps(labelNodes);
 
             if (actualMBSize > 0)
             {
