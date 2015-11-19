@@ -1641,23 +1641,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return true;    
         }
 
-    // GetLabelMapping - Gets the label mapping from integer to type in file 
-    // mappingTable - a map from numeric datatype to native label type stored as a string 
-    template<class ElemType>
-        const std::map<typename IDataReader<ElemType>::LabelIdType, typename IDataReader<ElemType>::LabelType>& HTKMLFReader<ElemType>::GetLabelMapping(const std::wstring& /*sectionName*/)
-        {
-            return m_idToLabelMap;
-        }
-
-    // SetLabelMapping - Sets the label mapping from integer index to label 
-    // labelMapping - mapping table from label values to IDs (must be 0-n)
-    // note: for tasks with labels, the mapping table must be the same between a training run and a testing run 
-    template<class ElemType>
-        void HTKMLFReader<ElemType>::SetLabelMapping(const std::wstring& /*sectionName*/, const std::map<typename IDataReader<ElemType>::LabelIdType, typename IDataReader<ElemType>::LabelType>& labelMapping)
-        {
-            m_idToLabelMap = labelMapping;
-        }
-
     template<class ElemType>
         size_t HTKMLFReader<ElemType>::ReadLabelToTargetMappingFile (const std::wstring& labelToTargetMappingFile, const std::wstring& labelListFile, std::vector<std::vector<ElemType>>& labelToTargetMap)
         {
@@ -1711,46 +1694,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 RuntimeError("HTKMLFReader::ReadLabelToTargetMappingFile(): mismatch between lengths of labelMappingFile vs labelToTargetMappingFile");
 
             return targetDim;
-        }
-
-    // GetData - Gets metadata from the specified section (into CPU memory) 
-    // sectionName - section name to retrieve data from
-    // numRecords - number of records to read
-    // data - pointer to data buffer, if NULL, dataBufferSize will be set to size of required buffer to accomidate request
-    // dataBufferSize - [in] size of the databuffer in bytes
-    //                  [out] size of buffer filled with data
-    // recordStart - record to start reading from, defaults to zero (start of data)
-    // returns: true if data remains to be read, false if the end of data was reached
-    template<class ElemType>
-        bool HTKMLFReader<ElemType>::GetData(const std::wstring& /*sectionName*/, size_t /*numRecords*/, void* /*data*/, size_t& /*dataBufferSize*/, size_t /*recordStart*/)
-        {
-            RuntimeError("GetData not supported in HTKMLFReader");
-        }
-
-
-    template<class ElemType>
-        bool HTKMLFReader<ElemType>::DataEnd(EndDataType endDataType) const
-        {
-            // each minibatch is considered a "sentence"
-            // other datatypes not really supported...
-            // assert(endDataType == endDataSentence);
-            // for the truncated BPTT, we need to support check wether it's the end of data
-            bool ret = false;
-            switch (endDataType)
-            {
-                case endDataNull:
-                case endDataEpoch:
-                case endDataSet:
-                    LogicError("DataEnd: does not support endDataTypes: endDataNull, endDataEpoch and endDataSet");
-                    break;
-                case endDataSentence:
-                    if (m_truncated)
-                        ret = m_sentenceEnd[0];
-                    else
-                        ret = true; // useless in current condition
-                    break;
-            }
-            return ret;
         }
 
     template<class ElemType>

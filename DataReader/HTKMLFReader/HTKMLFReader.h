@@ -42,8 +42,6 @@ private:
     using LabelType = typename IDataReader<ElemType>::LabelType;
     using LabelIdType = typename IDataReader<ElemType>::LabelIdType;
  
-    std::map<LabelIdType, LabelType> m_idToLabelMap;
-    
     bool m_partialMinibatch; // allow partial minibatches?
     
     std::vector<std::shared_ptr<ElemType>> m_featuresBufferMultiUtt;
@@ -155,13 +153,9 @@ public:
     virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize) override;
 
     virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices, MBLayoutPtr returnLayout);
-    virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
-    virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping);
-    virtual bool GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart=0);
     virtual bool GetMinibatch4SE(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, vector<size_t> &extrauttmap);
     virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
-    virtual bool DataEnd(EndDataType endDataType) const;
     void CopyMBLayoutTo(MBLayoutPtr);
     void SetSentenceEndInBatch(vector<size_t> &/*sentenceEnd*/);
     void SetSentenceEnd(int /*actualMbSize*/){};
