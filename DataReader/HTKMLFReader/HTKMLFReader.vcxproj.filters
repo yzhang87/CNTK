@@ -4,7 +4,6 @@
     <ClCompile Include="DataWriter.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="HTKMLFReader.cpp" />
-    <ClCompile Include="HTKMLFWriter.cpp" />
     <ClCompile Include="latticearchive.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="fileutil.cpp">
@@ -29,12 +28,13 @@
     <ClCompile Include="Packer.cpp">
       <Filter>Packers</Filter>
     </ClCompile>
+    <ClCompile Include="HTKMLFWriter.cpp">
+      <Filter>Writers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="chunkevalsource.h" />
     <ClInclude Include="htkfeatio.h" />
     <ClInclude Include="HTKMLFReader.h" />
-    <ClInclude Include="HTKMLFWriter.h" />
     <ClInclude Include="minibatchiterator.h" />
     <ClInclude Include="minibatchsourcehelpers.h" />
     <ClInclude Include="msra_mgram.h" />
@@ -57,7 +57,6 @@
     <ClInclude Include="..\..\Common\Include\DataWriter.h">
       <Filter>Common\Include</Filter>
     </ClInclude>
-    <ClInclude Include="ISource.h" />
     <ClInclude Include="AugmentingSequencer.h">
       <Filter>Transformations</Filter>
     </ClInclude>
@@ -109,6 +108,15 @@
     <ClInclude Include="biggrowablevectors.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="chunkevalsource.h">
+      <Filter>Writers</Filter>
+    </ClInclude>
+    <ClInclude Include="HTKMLFWriter.h">
+      <Filter>Writers</Filter>
+    </ClInclude>
+    <ClInclude Include="ISource.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -140,6 +148,9 @@
     </Filter>
     <Filter Include="Sources">
       <UniqueIdentifier>{ad54386a-4a69-4c77-a7c1-6f28c1aefaac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Writers">
+      <UniqueIdentifier>{f919fd36-f898-43ba-8b5f-372eb5bdc425}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

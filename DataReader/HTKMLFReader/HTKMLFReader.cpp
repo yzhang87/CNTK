@@ -405,16 +405,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // load a unigram if needed (this is used for MMI training)
             msra::lm::CSymbolSet unigramsymbols;
             std::unique_ptr<msra::lm::CMGramLM> unigram;
-            size_t silencewordid = SIZE_MAX;
-            size_t startwordid = SIZE_MAX;
-            size_t endwordid = SIZE_MAX;
             if (unigrampath != L"")
             {
                 unigram.reset (new msra::lm::CMGramLM());
                 unigram->read (unigrampath, unigramsymbols, false/*filterVocabulary--false will build the symbol map*/, 1/*maxM--unigram only*/);
-                silencewordid = unigramsymbols["!silence"];     // give this an id (even if not in the LM vocabulary)
-                startwordid = unigramsymbols["<s>"];
-                endwordid = unigramsymbols["</s>"];
             }
 
             if (!unigram)
