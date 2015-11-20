@@ -249,7 +249,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_zeroThresholdFor1Bit = true;
         m_enableDistributedMBReading = false;
         m_parallelizationStartEpochNum = 0;
-        m_nFramesBetweenMASync = 40000; // default 40k frames 
+        m_nFramesBetweenMASync = 40000; // default 40k frames
 
         if ((g_mpi != nullptr) && configSGD.ExistsCurrent("ParallelTrain"))
         {
@@ -273,8 +273,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             if (configParallelTrain.ExistsCurrent("ModelAveragingSGD") )
             {
-                ConfigParameters configMASGD(configParallelTrain("ModelAveragingSGD", "")); 
-                m_nFramesBetweenMASync = configMASGD("SyncFrequencyInFrames", "40000"); 
+                ConfigParameters configMASGD(configParallelTrain("ModelAveragingSGD", ""));
+                m_nFramesBetweenMASync = configMASGD("SyncFrequencyInFrames", "40000");
                 m_iMASyncStatsTrace = configMASGD("MAPerfStats", "0");
             }
         }
@@ -575,7 +575,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Initializes the model from original model.
         ComputationNetwork origNet(deviceID);
-        ComputationNetwork* sequenceNet = 
+        ComputationNetwork* sequenceNet =
             (startEpoch < 0) ? netBuilder->BuildNetworkFromDescription() : &origNet;
         std::vector<ComputationNodeBasePtr> addedFeatureNodes;
         std::vector<ComputationNodeBasePtr> replacedCriterionNodes;
@@ -817,7 +817,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         //precompute mean and invStdDev nodes and save initial model
         if (PreCompute(net, trainSetDataReader, featureNodes, labelNodes, inputMatrices) || startEpoch == 0)
         {
-            // Synchronize all ranks before writing the model to ensure that 
+            // Synchronize all ranks before writing the model to ensure that
             // everyone is done loading the model
             if (g_mpi != nullptr)
                 g_mpi->WaitAll();
@@ -878,7 +878,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // --- MAIN EPOCH LOOP
         for (int i = startEpoch; i < (int)m_maxEpochs; i++) // TODO: why is this an int, and not a size_t?
         {
-            // Synchronize all ranks before proceeding to ensure that 
+            // Synchronize all ranks before proceeding to ensure that
             // rank 0 has finished writing the previous model file
             if (g_mpi != nullptr)
             {
@@ -974,18 +974,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     i + 1, learnRatePerSample, MomentumPerMB(GetMomentumPerSample(i/*BUGBUG workaround:*/, trainSetDataReader->GetNumParallelSequences()), actualMinibatchSize));
 
             TrainOneEpoch(net,
-                          refNet, 
-                          refNode, 
-                          i, 
+                          refNet,
+                          refNode,
+                          i,
                           m_epochSize,
-                          trainSetDataReader, 
-                          learnRatePerSample, 
-                          chosenMinibatchSize, 
+                          trainSetDataReader,
+                          learnRatePerSample,
+                          chosenMinibatchSize,
                           featureNodes,
-                          labelNodes, 
-                          criterionNodes, 
+                          labelNodes,
+                          criterionNodes,
                           evaluationNodes,
-                          inputMatrices, 
+                          inputMatrices,
                           learnableNodes, smoothedGradients,
                           epochCriterion, epochEvalErrors, totalSamplesSeen);
 
@@ -1098,7 +1098,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 if (m_continueReduce)
                 {
-                    if (std::isnan(avgCriterion) || 
+                    if (std::isnan(avgCriterion) ||
                         (prevCriterion - avgCriterion <= m_reduceLearnRateIfImproveLessThan * prevCriterion &&
                         prevCriterion != std::numeric_limits<double>::infinity()))
                     {
@@ -1121,7 +1121,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 }
                 else
                 {
-                    if (std::isnan(avgCriterion) || 
+                    if (std::isnan(avgCriterion) ||
                         (prevCriterion - avgCriterion <= m_reduceLearnRateIfImproveLessThan * prevCriterion &&
                         prevCriterion != std::numeric_limits<double>::infinity()))
                     {
@@ -1150,7 +1150,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 epochsNotCountedInAvgCriterion = 0;
             }
 
-            // Synchronize all ranks before proceeding to ensure that 
+            // Synchronize all ranks before proceeding to ensure that
             // nobody tries reading the checkpoint file at the same time
             // as rank 0 deleting it below
             if (g_mpi != nullptr)
@@ -1178,7 +1178,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
         // --- END OF MAIN EPOCH LOOP
 
-        // Synchronize all ranks before proceeding to ensure that 
+        // Synchronize all ranks before proceeding to ensure that
         // rank 0 has finished writing the model file
         if (g_mpi != nullptr)
         {
@@ -1804,12 +1804,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                        (epochNumber >= m_parallelizationStartEpochNum));
         bool useModelAveraging = ((m_parallelizationMethod == ParallelizationMethod::ModelAveragingSGD) &&
                                   (epochNumber >= m_parallelizationStartEpochNum));
-        bool useParallelTrain = useGradientAggregation || useModelAveraging; 
+        bool useParallelTrain = useGradientAggregation || useModelAveraging;
 
         // MA-related variables
         size_t nSamplesSinceLastModelSync = 0;
-        size_t nSynced = 0; 
-        float  nSecondsOnMASync = 0; 
+        size_t nSynced = 0;
+        float  nSecondsOnMASync = 0;
         float  nSecondsSinceLastMAPerfReport = 0;
 
         std::vector<Matrix<ElemType>*> learnParamsGradients;
@@ -1880,17 +1880,69 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             auto &procUnit = *mbIter;
             procUnit;
         }
-#endif
 
+#endif
         for (;;)
         {
             // get minibatch
             // TODO: is it guaranteed that the GPU is already completed at this point, is it safe to overwrite the buffers?
-            size_t actualMBSize = 0;
-            bool notAtEndOfEpoch = DataReaderHelpers::GetMinibatchIntoNetwork(*trainSetDataReader, net, criterionNodes[0],
-                                                                              useDistributedMBReading, useParallelTrain, *inputMatrices, actualMBSize);
-            if (!notAtEndOfEpoch)
-                break;  // end of epoch
+            size_t actualMBSize;
+            //bool atEndOfEpoch;
+
+            // DataReaderHelpers::GetMinibatchIntoNetwork(*trainSetDataReader, net, criterionNodes[0], useDistributedMBReading, useParallelTrain, *inputMatrices, actualMBSize);
+
+            // Get a new minibatch, filling in the matrices of the input nodes and the minibatch layout directly.
+            bool wasDataRead = trainSetDataReader->GetMinibatch(*inputMatrices, net.GetMBLayoutPtr());
+
+            if (criterionNodes[0] != nullptr)
+            {
+                // eldak: processing unit should be taken from getminibatch.
+                // mahilleb: need to check if this already requires NotifyInputNodesFunctionValuesMBSizeModified();
+                criterionNodes[0]->UpdateWithMinibatch(ProcessingUnit());
+            }
+
+            // Update the network to reflect potentially updated number of columns of the matrices of the input nodes.
+            net.NotifyInputNodesFunctionValuesMBSizeModified();
+
+            // Determine if all feature nodes' input matrices have zero columns now;
+            // this is (currently) a special case of the reader returning no data to process.
+            // TODO should get rid of this in new reader interface? (Instead reader might return end-of-epoch information)
+            actualMBSize = wasDataRead ? net.DetermineActualMBSizeFromFeatures() : 0;
+            if (actualMBSize == 0)
+            {
+                wasDataRead = false;
+            }
+
+            // Check (and return) if at the end of an epoch.
+            if (DataReaderHelpers::AtEndOfEpoch(useDistributedMBReading, wasDataRead))
+            {
+                break;
+            }
+
+            // We are not at the end of epoch.
+            // Note, however, that in case of parallelization, this worker may have received a share of 0 samples. Calling code, beware.
+
+            if (wasDataRead && !useDistributedMBReading && useParallelTrain)
+            {
+                assert(0); // we don't do this yet .. do we need it or should be always done by reader?
+
+                // Decimate (in-place).
+                DataReaderHelpers::DecimateMinibatch(*inputMatrices, g_mpi->NumNodesInUse(), g_mpi->CurrentNodeRank(), net.GetMBLayoutPtr());
+
+                // Reflect reduced column sizes.
+                net.NotifyInputNodesFunctionValuesMBSizeModified();
+
+                // Recompute minibatch size (note: might be 0 now)
+                actualMBSize = net.DetermineActualMBSizeFromFeatures();
+            }
+
+            // left-over TODOs:
+            // TODO: This should be called/callable outside if 'wasDataRead' (GetMinibatch() should fill matrices to empty)
+            // TODO: This will go away, as we will do resizing inside EvaluateThisNode(FrameRange()).
+
+            // Prepare the network for processing the next minibatch
+            // (TODO some of the above functionality should be moved in there)
+            net.PrepareNewMinibatch();
 
             nSamplesSinceLastModelSync += actualMBSize;
 
@@ -1946,7 +1998,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             } // if (actualMBSize > 0)
 
             // Some labels may be missing (e.g. forced alignment failed, or being gaps due to packing parallel sequences).
-            //for now since we share the same label masking flag we call this on the network. 
+            //for now since we share the same label masking flag we call this on the network.
             //Later, when we apply different labels on different nodes
             //we need to add code to call this function multiple times, one for each criteria node
             size_t numSamplesWithLabel = net.GetNumSamplesWithLabel(actualMBSize);
@@ -2043,27 +2095,27 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // TODO: this does not happen each MB, does it?
             if (useModelAveraging && (g_mpi->NumNodesInUse() > 1))
             {
-                size_t processedSamples = 0; 
-                float secondsSinceLastSyncFinished = 0; 
+                size_t processedSamples = 0;
+                float secondsSinceLastSyncFinished = 0;
                 float secondsSpentOnSync = 0;
                 if (ModelAveragingProcessing(nSamplesSinceLastModelSync, learnableNodes, processedSamples,
                                              secondsSinceLastSyncFinished, secondsSpentOnSync))
                 {
                     // if a sync happens, do some extra work
-                    nSamplesSinceLastModelSync = 0; 
+                    nSamplesSinceLastModelSync = 0;
                     nSynced++;
 
-                    nSecondsOnMASync += secondsSpentOnSync; 
-                    nSecondsSinceLastMAPerfReport += secondsSinceLastSyncFinished; 
-                    
+                    nSecondsOnMASync += secondsSpentOnSync;
+                    nSecondsSinceLastMAPerfReport += secondsSinceLastSyncFinished;
+
                     if (m_iMASyncStatsTrace > 0)
                     {
                         if (nSynced % m_iMASyncStatsTrace == 0)
                         {
                             fprintf(stderr, "\t\t-----(model averaging stats) %d-th sync, %8.2f seconds since last report, %5.2f seconds on communication\n",
                                     (int)nSynced, nSecondsSinceLastMAPerfReport, nSecondsOnMASync);
-                            nSecondsOnMASync = 0; 
-                            nSecondsSinceLastMAPerfReport = 0; 
+                            nSecondsOnMASync = 0;
+                            nSecondsSinceLastMAPerfReport = 0;
                         }
                     }
                 }
@@ -2193,10 +2245,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         if (useModelAveraging && (g_mpi->NumNodesInUse() > 1) )
         {
-            // may not be synced after epoch finished, so do the sync here 
+            // may not be synced after epoch finished, so do the sync here
             int residualSampels = (int)nSamplesSinceLastModelSync;
             g_mpi->AllReduce(&residualSampels, 1);
-            totalSamplesSeen += residualSampels; 
+            totalSamplesSeen += residualSampels;
             totalEpochSamples += residualSampels;
             ModelAveragingSync(nSamplesSinceLastModelSync, learnableNodes);
             nSynced++;
@@ -2229,7 +2281,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // in case of model averaging, do one more final aggregation of criteria
         if (useModelAveraging && (g_mpi->NumNodesInUse() > 1))
         {
-            // merge epochCriterion and epochEvalErrors over nodes 
+            // merge epochCriterion and epochEvalErrors over nodes
             g_mpi->AllReduce(&epochCriterion, 1);
             g_mpi->AllReduce(epochEvalErrors);
         }
@@ -2258,45 +2310,45 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                   float& SecondsSinceLastSyncFinished, float& SecondsSpentOnSync)
     {
         //////////////////////////////////////////////////////////////////////////
-        // the current strategy is that after each minibatch, we will sync between processors 
-        // to decide whether a sync need to be performed. This is definitely not optimal, 
-        // which we will fix it later. 
+        // the current strategy is that after each minibatch, we will sync between processors
+        // to decide whether a sync need to be performed. This is definitely not optimal,
+        // which we will fix it later.
 
-        // TODO: the way we handle timer is not very good 
+        // TODO: the way we handle timer is not very good
         //////////////////////////////////////////////////////////////////////////
-        static bool first = true ; 
+        static bool first = true ;
         static Timer MAtimer;
         if (first)
         {
-            MAtimer.Start(); 
-            first = false; 
+            MAtimer.Start();
+            first = false;
         }
-       
-        char bNeedToSync = (char)0; // use char for bool 
+
+        char bNeedToSync = (char)0; // use char for bool
         if (g_mpi->IsMainNode() && nSamplesSinceLastSync >= m_nFramesBetweenMASync)
         {
-            // only the main node can decide whether a sync need to be performed 
-            bNeedToSync = (char)1; 
+            // only the main node can decide whether a sync need to be performed
+            bNeedToSync = (char)1;
         }
         g_mpi->Bcast(&bNeedToSync, 1, g_mpi->MainNodeRank());
         if (bNeedToSync)
         {
             MAtimer.Stop();
-            double elapsedsec = MAtimer.ElapsedSeconds(); 
+            double elapsedsec = MAtimer.ElapsedSeconds();
             SecondsSinceLastSyncFinished = first ?  0  : (float) elapsedsec  ;
             MAtimer.Start();
             nProcessedFrames = ModelAveragingSync((int)nSamplesSinceLastSync, learnableNodes);
             MAtimer.Stop();
             SecondsSpentOnSync = (float)MAtimer.ElapsedSeconds();
-            
+
             MAtimer.Start();
         }
         else
         {
-            nProcessedFrames = 0; 
+            nProcessedFrames = 0;
             return false;
         }
-        return true; 
+        return true;
     }
 
     template<class ElemType>
@@ -2304,58 +2356,58 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         if (g_mpi->NumNodesInUse() <= 1)
         {
-            return nSamplesSinceLastSync; 
+            return nSamplesSinceLastSync;
         }
 
         //========================================
         // Sec. 1 calculate factor
         //========================================
-        float factor = 0; 
-        int   nTotalSamples = nSamplesSinceLastSync; 
+        float factor = 0;
+        int   nTotalSamples = nSamplesSinceLastSync;
         g_mpi->AllReduce(&nTotalSamples, 1);
         if (nTotalSamples <= 0)
         {
-            // prepare for overflow 
-            factor = 1.0f / g_mpi->NumNodesInUse(); 
+            // prepare for overflow
+            factor = 1.0f / g_mpi->NumNodesInUse();
         }
         else
         {
-            factor = (nSamplesSinceLastSync + 0.0f) / nTotalSamples; 
+            factor = (nSamplesSinceLastSync + 0.0f) / nTotalSamples;
         }
 
         //========================================
-        // Sec. 2 sync models based on factor 
-        // Note: this is suboptimal at the moment: 
-        //       we do the averaging for each node in a sequence manner, i.e., 
+        // Sec. 2 sync models based on factor
+        // Note: this is suboptimal at the moment:
+        //       we do the averaging for each node in a sequence manner, i.e.,
         //          (node1) GPU->CPU->MPI_AllReduce -> (node2)GPU->CPU->MPI_AllReduce
-        //       we can improve it by using a pipeline 
+        //       we can improve it by using a pipeline
         //          (node1) GPU ->  CPU  ->  MPI_AllReduce
         //          (node2)         GPU  ->  CPU            -> MPI_AllReduce
         //          (node3)                  GPU            -> CPU              -> MPI_AllReduce
         //========================================
         for (auto iter = learnableNodes.begin(); iter != learnableNodes.end(); iter++)
         {
-            ComputationNodeBasePtr pNode = *iter; 
+            ComputationNodeBasePtr pNode = *iter;
             if (!pNode->IsParameterUpdateRequired())
                 continue;
 
             Matrix<ElemType>& mat = dynamic_pointer_cast<ComputationNode<ElemType>>(pNode)->FunctionValues();
-            // 1. normalize the weight matrix 
+            // 1. normalize the weight matrix
             Matrix<ElemType>::Scale(factor, mat);
-            // 2. send weight matrix over MPI nodes; 
-            ElemType* px = mat.CopyToArray(); 
-            size_t    nx = mat.GetNumElements(); 
+            // 2. send weight matrix over MPI nodes;
+            ElemType* px = mat.CopyToArray();
+            size_t    nx = mat.GetNumElements();
 
-            // 3. inplace sum 
+            // 3. inplace sum
             g_mpi->AllReduce(px, nx);
             mat.SetValue(mat.GetNumRows(), mat.GetNumCols(), mat.GetDeviceId(), px);
-            // 4. clean up 
-            delete []px; 
+            // 4. clean up
+            delete []px;
         }
 
-        return nTotalSamples; 
+        return nTotalSamples;
     }
-    
+
 // public:
     // UpdateWeightsS - static version of UpdateWeights()
     // not static since it wants to access protected methods on the SGD object
