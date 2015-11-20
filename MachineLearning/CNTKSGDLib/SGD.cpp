@@ -1882,17 +1882,24 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
 #endif
+        std::map<std::wstring, Matrix<ElemType>*>* inputMatricesForReader = new std::map<std::wstring, Matrix<ElemType>*>();
+        for (size_t pass = 0; pass < 2; pass++)
+        {
+            auto & nodes = (pass == 0) ? featureNodes : labelNodes;
+            for (auto& node : nodes)
+            {
+                (*inputMatricesForReader)[node->NodeName()] = new Matrix<ElemType>();
+            }
+        }
+
         for (;;)
         {
-            // get minibatch
             // TODO: is it guaranteed that the GPU is already completed at this point, is it safe to overwrite the buffers?
-            size_t actualMBSize;
-            //bool atEndOfEpoch;
 
             // DataReaderHelpers::GetMinibatchIntoNetwork(*trainSetDataReader, net, criterionNodes[0], useDistributedMBReading, useParallelTrain, *inputMatrices, actualMBSize);
 
             // Get a new minibatch, filling in the matrices of the input nodes and the minibatch layout directly.
-            bool wasDataRead = trainSetDataReader->GetMinibatch(*inputMatrices, net.GetMBLayoutPtr());
+            bool wasDataRead = trainSetDataReader->GetMinibatch(*inputMatricesForReader, net.GetMBLayoutPtr());
 
             if (criterionNodes[0] != nullptr)
             {
@@ -1901,13 +1908,20 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 criterionNodes[0]->UpdateWithMinibatch(ProcessingUnit());
             }
 
+            for (auto& entry: *inputMatricesForReader)
+            {
+                ComputationNodeBasePtr  node = net.GetNodeFromName(entry.first);
+                Matrix<ElemType>* nodeMatrix = &dynamic_pointer_cast<ComputationNode<ElemType>>(node)->FunctionValues();
+                *nodeMatrix = *entry.second;
+            }
+
             // Update the network to reflect potentially updated number of columns of the matrices of the input nodes.
             net.NotifyInputNodesFunctionValuesMBSizeModified();
 
             // Determine if all feature nodes' input matrices have zero columns now;
             // this is (currently) a special case of the reader returning no data to process.
             // TODO should get rid of this in new reader interface? (Instead reader might return end-of-epoch information)
-            actualMBSize = wasDataRead ? net.DetermineActualMBSizeFromFeatures() : 0;
+            size_t actualMBSize = wasDataRead ? net.DetermineActualMBSizeFromFeatures() : 0;
             if (actualMBSize == 0)
             {
                 wasDataRead = false;
@@ -1920,7 +1934,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
 
             // We are not at the end of epoch.
-            // Note, however, that in case of parallelization, this worker may have received a share of 0 samples. Calling code, beware.
+            // Note, however, that in case of parallelization, this worker may have received a share of 0 samples.
 
             if (wasDataRead && !useDistributedMBReading && useParallelTrain)
             {
