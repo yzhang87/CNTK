@@ -232,7 +232,7 @@ public:
                             const std::wstring outputFile,
                             const bool validateBeforeDump = true)
     {
-        if (validateBeforeDump) 
+        if (validateBeforeDump)
         {
             //some internal values in the nodes are computed during validation
             ValidateNetwork();
@@ -262,6 +262,20 @@ public:
             ComputationNodeBasePtr nodePtr = *nodeIter;
             nodePtr->DumpNodeInfo(printValues, fstream);
         }
+    }
+
+    void PrepareNewMinibatch()
+    {
+        // Comment from TrainOneEpoch():
+        // node data was changed
+        // TODO: move this to that function as well--just tired to pass everything as arguments
+        // TODO: We should do this right after the GetMinibatch() call, since that's where these changed.
+        //       Need to check whether that would cause unintended side effects.
+        // TODO: original code did not call this for actualMBSize == 0
+        // Comment from PreCompute()::
+        // TODO: move these into GetMinibatchIntoNetwork()  --but those are passed around; necessary? Can't we get them from 'net'?
+        ComputationNetwork::UpdateEvalTimeStamps(FeatureNodes());
+        ComputationNetwork::UpdateEvalTimeStamps(LabelNodes());
     }
 
     // -----------------------------------------------------------------------
@@ -362,7 +376,7 @@ public:
     // -----------------------------------------------------------------------
 
     // TODO: describe what this function does
-    //this is a temp solution since some nodes such as plus can be just aggregate of two scalar values 
+    //this is a temp solution since some nodes such as plus can be just aggregate of two scalar values
     //in which case the packing info is not available (and not meaningful) for them
     // TODO: Does this belong into MBLayout?
     size_t GetNumSamplesWithLabel(const size_t numAllSamples)
@@ -533,7 +547,7 @@ public:
     size_t GetNumParallelSequences() const { return m_pMBLayout->GetNumParallelSequences(); }
     // temporary function: Call this after CopyMBLayoutTo(evalnet->GetMBLayoutPtr()) to ensure everything is consistent as expected
     // It is actually called after every CopyMBLayoutTo() in the entire system (except for multi-reader CopyMBLayoutTo() itself).
-    // Remove this function after a few weeks of not firing.
+    // TODO Remove this function after a few weeks of not firing.
     void VerifyActualNumParallelSequences(const size_t aSize)
     {
         if (GetNumParallelSequences() != aSize)
@@ -959,7 +973,7 @@ protected:
 
     std::vector<std::shared_ptr<SEQTraversalFlowControlNode>> m_recurrentInfo;     // [loopId] cache of SEQTraversalFlowControlNodes to allow itempotence of FormRecurrentLoops()
 
-    // used for sentence boundary information passed from reader to reset RNN state 
+    // used for sentence boundary information passed from reader to reset RNN state
     // specify how the minibatch is packed for each sample
     MBLayoutPtr m_pMBLayout;    // note that this must be installed before doing anything that needs it (default leaves a nullptr)
 

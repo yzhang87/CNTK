@@ -19,7 +19,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // -------------------------------------------------------------------
 
         // We sub-sample the parallel utterances.
-        template<class ElemType> 
+        template<class ElemType>
         static void DecimateMinibatch(std::map<std::wstring, Matrix<ElemType>*> &mb,    // matrix to be decimated
                                       int numprocs, int rank,                           // rank info
                                       MBLayoutPtr pMBLayout)                            // gets decimated as well
@@ -27,16 +27,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             if (numprocs == 1)
                 return;
 
-            // For RNN, a input Matrix is organized in the following way: 
-            //   | x_t^1  x_t^2 ... x_t^N |  .... | x_{t+T-1}^1 ... x_{t+T-1}^N | 
-            //   |<----   block 1    ---->|  .... |<------  block T       ----->| 
+            // For RNN, a input Matrix is organized in the following way:
+            //   | x_t^1  x_t^2 ... x_t^N |  .... | x_{t+T-1}^1 ... x_{t+T-1}^N |
+            //   |<----   block 1    ---->|  .... |<------  block T       ----->|
             // N is the nSlice (input)
-            // The decimation here is to split each block to individual GPUs 
-            // So After decimation 
-            //   | x_t^{st} ... x_t^{en-1}|  .... | x_{t+T-1}^{st} ... x_{t+T-1}^{en-1} | 
-            // Each block now has nSlice/nProcs 
-            // 
-            // Correspondingly, the MBLayout will be revised 
+            // The decimation here is to split each block to individual GPUs
+            // So After decimation
+            //   | x_t^{st} ... x_t^{en-1}|  .... | x_{t+T-1}^{st} ... x_{t+T-1}^{en-1} |
+            // Each block now has nSlice/nProcs
+            //
+            // Correspondingly, the MBLayout will be revised
 
             size_t nOrigParallelUtts = pMBLayout->GetNumParallelSequences();
             size_t T = pMBLayout->GetNumTimeSteps();
@@ -61,7 +61,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 MSR::CNTK::Matrix<ElemType> &mat = *it.second;
                 size_t nCols = mat.GetNumCols();
 
-                // assert the cols are even among nodes 
+                // assert the cols are even among nodes
                 if (rv == 0)
                     rv = nCols;
                 else if (rv != nCols)
@@ -97,6 +97,26 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             pMBLayout->MoveFrom(pNewMBLayout);  // update layout in-place
         }
 
+        static bool AtEndOfEpoch(bool useDistributedMBReading, bool wasDataRead)
+        {
+            // TODO mahilleb: reader should be able to return this information without an MPI AllReduce?
+            if (useDistributedMBReading)
+            {
+                // In case of distributed reading, the current node needs to continue even with a minibatch size of 0 if any
+                // other node in the group has a non-zero size minibatch to process. This is needed to ensure that
+                // the gradient aggregation barriers do not get stuck and also to ensure that all nodes update their weights
+                // properly using the aggregate gradients from other nodes before moving on to the next epoch even though the current
+                // node itself may not have any gradient contribution.
+                // TODO: wasDataRead == false means end of epoch, right? Is this state idempotent?
+                std::array<int, 1> numNodesWithDataToProcess;
+                numNodesWithDataToProcess[0] = wasDataRead ? 1 : 0;
+                g_mpi->AllReduce(numNodesWithDataToProcess);
+
+                return numNodesWithDataToProcess[0] == 0;
+            }
+            return !wasDataRead;
+        }
+
         // -------------------------------------------------------------------
         // GetMinibatchIntoNetwork() -- get one minibatch from Reader (this->trainSetDataReader) into Network (this->net)
         // Returns false if end of epoch has been reached.
@@ -114,91 +134,58 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                             std::map<std::wstring, Matrix<ElemType>*> & inputMatrices,
                                             size_t & actualMBSize)
         {
-            auto pMBLayout = net.GetMBLayoutPtr();
-            auto & featureNodes = net.FeatureNodes();
-            auto & labelNodes = net.LabelNodes();
-
-            // Reading consists of a sequence of Reader API calls:
-            //  - GetMinibatch() --fills the inputMatrices
-            //  - SetActualMiniBatchSizeFromFeatures()  --tells Network to resize the nodes' buffers [NotifyInputNodesFunctionValuesMBSizeModified() / NotifyInputNodesFunctionValuesMBSizeModified) ]
-            //  - CopyMBLayoutTo()   --copies the MBLayout from Reader to Network
-            //  - VerifyActualNumParallelSequences()  --(refactoring left-over) verify that MBLayout is consistent with #parallel sequences
-            // with the special twist that in presence of parallelization, there is some decimation involved.
-
-            // TODO: how is !wasDataRead semantically different from inputMatrices having zero columns?
-            // TODO: The reader does not always resize the input matrices to zero when 
-            // no data is read. When it does, 'wasDataRead' can be removed
-
-            //auto processingUnit = trainSetDataReader.GetMinibatch(); // 
-            bool wasDataRead = trainSetDataReader.GetMinibatch(inputMatrices, pMBLayout);      // fill in the minibatch data into the Input nodes' buffers directly
-            // reader will have resized input node's m_functionValues directly. Nodes must be notified to do necessary internal state updates from that.
-            net.NotifyInputNodesFunctionValuesMBSizeModified();
-            size_t readMBSize = net.DetermineActualMBSizeFromFeatures(); // TODO should be part of processing unit, or easily extractible?
-            if (readMBSize == 0)
-                wasDataRead = false;
-
-            // eldak / mahilleb: filled in directly above now
-            //trainSetDataReader.CopyMBLayoutTo(pMBLayout);                           // and layout meta-data
-            //pMBLayout->CopyFrom(returnLayout);
-
-            // verify some DataReader calls that are redundant since the MBLayout refactoring (keep verifying for a while for cosy feeling)
-            net.VerifyActualNumParallelSequences(trainSetDataReader.GetNumParallelSequences()); // info already contained in MBLayout // remove
-            //assert(trainSetDataReader.RequireSentenceSeg() == pMBLayout->RequireSentenceSeg()); // this one is redundant, too
+            // Get a new minibatch, filling in the matrices of the input nodes and the minibatch layout directly.
+            bool wasDataRead = trainSetDataReader.GetMinibatch(inputMatrices, net.GetMBLayoutPtr());
 
             if (criterionNode != nullptr)
             {
                 // eldak: processing unit should be taken from getminibatch.
+                // mahilleb: need to check if this already requires NotifyInputNodesFunctionValuesMBSizeModified();
                 criterionNode->UpdateWithMinibatch(ProcessingUnit());
             }
 
-            // did we reach end of epoch?
-            if (useDistributedMBReading)
-            {
-                // In case of distributed reading, the current node needs to continue even with a minibatch size of 0 if any
-                // other node in the group has a non-zero size minibatch to process. This is needed to ensure that
-                // the gradient aggregation barriers do not get stuck and also to ensure that all nodes update their weights
-                // properly using the aggregate gradients from other nodes before moving on to the next epoch even though the current
-                // node itself may not have any gradient contribution.
-                // TODO: wasDataRead == false means end of epoch, right? Is this state idempotent?
-                std::array<int, 1> numNodesWithDataToProcess;
-                numNodesWithDataToProcess[0] = wasDataRead ? 1 : 0;
-                g_mpi->AllReduce(numNodesWithDataToProcess);
+            // Update the network to reflect potentially updated number of columns of the matrices of the input nodes.
+            net.NotifyInputNodesFunctionValuesMBSizeModified();
 
-                if (numNodesWithDataToProcess[0] == 0)
-                    return false;   // end of epoch
+            // Determine if all feature nodes' input matrices have zero columns now;
+            // this is (currently) a special case of the reader returning no data to process.
+            // TODO should get rid of this in new reader interface? (Instead reader might return end-of-epoch information)
+            actualMBSize = wasDataRead ? net.DetermineActualMBSizeFromFeatures() : 0;
+            if (actualMBSize == 0)
+            {
+                wasDataRead = false;
             }
-            else if (!wasDataRead)
-                return false;       // end of epoch
+
+            // Check (and return) if at the end of an epoch.
+            if (AtEndOfEpoch(useDistributedMBReading, wasDataRead))
+            {
+                return false;
+            }
 
             // We are not at the end of epoch.
-            // Note, however, that in case of parallelization, this MPI rank may have received a share of 0 samples. Calling code, beware.
+            // Note, however, that in case of parallelization, this worker may have received a share of 0 samples. Calling code, beware.
 
-            // decimate if needed. Decimation happens in-place.
             if (wasDataRead && !useDistributedMBReading && useParallelTrain)
             {
+                assert(0); // we don't do this yet .. do we need it or should be always done by reader?
+
+                // Decimate (in-place).
                 DecimateMinibatch(inputMatrices, g_mpi->NumNodesInUse(), g_mpi->CurrentNodeRank(), net.GetMBLayoutPtr());
-                net.NotifyInputNodesFunctionValuesMBSizeModified(); // need to tell'm again since we modified it again
+
+                // Reflect reduced column sizes.
+                net.NotifyInputNodesFunctionValuesMBSizeModified();
+
+                // Recompute minibatch size (note: might be 0 now)
+                actualMBSize = net.DetermineActualMBSizeFromFeatures();
             }
 
-            // get MB size and tell Network to update its nodes' buffers based on what's in the input matrices
-            // Note: Decimation may have reduced this to 0 frames.
+            // left-over TODOs:
             // TODO: This should be called/callable outside if 'wasDataRead' (GetMinibatch() should fill matrices to empty)
             // TODO: This will go away, as we will do resizing inside EvaluateThisNode(FrameRange()).
-            actualMBSize = 0;
-            if (wasDataRead)    // TODO: what if we call it always?
-                actualMBSize = net.DetermineActualMBSizeFromFeatures(); // TODO: don't we know the size from reader? Should this be a check instead?
 
-
-            // Comment from TrainOneEpoch():
-            // node data was changed
-            // TODO: move this to that function as well--just tired to pass everything as arguments
-            // TODO: We should do this right after the GetMinibatch() call, since that's where these changed.
-            //       Need to check whether that would cause unintended side effects.
-            // TODO: original code did not call this for actualMBSize == 0
-            // Comment from PreCompute()::
-            // TODO: move these into GetMinibatchIntoNetwork()  --but those are passed around; necessary? Can't we get them from 'net'?
-            ComputationNetwork::UpdateEvalTimeStamps(featureNodes);
-            ComputationNetwork::UpdateEvalTimeStamps(labelNodes);
+            // Prepare the network for processing the next minibatch
+            // (TODO some of the above functionality should be moved in there)
+            net.PrepareNewMinibatch();
 
             return true;
         }
