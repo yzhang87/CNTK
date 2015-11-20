@@ -316,6 +316,7 @@ bool BinaryReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType
         }
         gpuData->SetValue(rows, actualmbsize, gpuData->GetDeviceId(), data);
     }
+    m_pMBLayout->Init(actualmbsize, 1, false/*means it is not sequential*/);
 
     // advance to the next minibatch
     m_mbStartSample += actualmbsize;

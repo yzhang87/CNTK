@@ -758,7 +758,9 @@ bool UCIFastReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemTyp
 {
     if (m_cachingReader)
     {
-        return m_cachingReader->GetMinibatch(matrices);
+        bool val = m_cachingReader->GetMinibatch(matrices);
+        m_cachingReader->CopyMBLayoutTo(m_pMBLayout);
+        return val;
     }
     // get the features array
     if (matrices.find(m_featuresName) == matrices.end())
