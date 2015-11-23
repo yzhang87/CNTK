@@ -40,6 +40,12 @@ public:
     virtual std::map<size_t /*input*/, sequence> get_sequence_by_id(size_t id) = 0;
 };
 
+struct augmentation_descriptor
+{
+    size_t context_left;
+    size_t context_right;
+};
+
 class sequencer
 {
 public:
