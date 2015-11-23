@@ -284,6 +284,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CNTKActionsLib", "MachineLe
 		{DE3C54E5-D7D0-47AF-A783-DFDCE59E7937} = {DE3C54E5-D7D0-47AF-A783-DFDCE59E7937}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ReaderInterfaces", "DataReader\ReaderInterfaces\ReaderInterfaces.vcxproj", "{280140DC-01C2-4133-9657-0519EC56153E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -433,6 +435,16 @@ Global
 		{EB2BE26F-6BD4-4274-971F-86D080779DD1}.Release|Win32.ActiveCfg = Release|x64
 		{EB2BE26F-6BD4-4274-971F-86D080779DD1}.Release|x64.ActiveCfg = Release|x64
 		{EB2BE26F-6BD4-4274-971F-86D080779DD1}.Release|x64.Build.0 = Release|x64
+		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|Win32.Build.0 = Debug|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|x64.ActiveCfg = Debug|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Win32.ActiveCfg = Release|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Win32.Build.0 = Release|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -478,5 +490,6 @@ Global
 		{6F19321A-65E7-4829-B00C-3886CD6C6EDE} = {D45DF403-6781-444E-B654-A96868C5BE68}
 		{4701E678-5E6F-470D-B348-9CD1A2C095D1} = {6F19321A-65E7-4829-B00C-3886CD6C6EDE}
 		{EB2BE26F-6BD4-4274-971F-86D080779DD1} = {DD043083-71A4-409A-AA91-F9C548DCF7EC}
+		{280140DC-01C2-4133-9657-0519EC56153E} = {33EBFE78-A1A8-4961-8938-92A271941F94}
 	EndGlobalSection
 EndGlobal
