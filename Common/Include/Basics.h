@@ -151,7 +151,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             void *handle = dlopen(soName.c_str(), RTLD_LAZY);
             if (handle == NULL)
                 RuntimeError("Plugin not found: %s (error: %s)", soName.c_str(), dlerror());
-            return dlsym(handle, proc.c_str());
+
+            dlerror();
+            void* ret = dlsym(handle, proc.c_str());
+            char* error = dlerror();
+            if( error != NULL ) 
+                RuntimeError("dlsym error in plugin %s: %s", soName.c_str(), error );
+
+            return ret;
         }
         ~Plugin() { if (handle != NULL) dlclose(handle); }
     };
