@@ -3,26 +3,32 @@
 #include <vector>
 #include "reader_interface.h"
 
+// Defines the encoding of a frame.
 struct frame_description
 {
     std::vector<size_t> frame_dimensions;
     size_t element_size;
 };
 
-struct sequence_description // for randomization
+// Defines identifier and length of a sequence.
+struct sequence_description
 {
     size_t id;
     size_t length;
 };
 
-struct sequence // real data
+// Defines a sequences, which consists of sequences description and a number
+// of frames, which have the same encoding and are layed out in memory contiguously.
+struct sequence
 {
+    sequence_description* description;
+    frame_description* frame_description;
     char* data;
     size_t number_of_frames;
-    frame_description* frame_description;
-    sequence_description* description;
 };
 
+// Low-level input interface (for file, network, etc.).
+// Memory buffers to fill data into are provided by the caller.
 class block_reader
 {
 public:
@@ -30,10 +36,16 @@ public:
     virtual ~block_reader() = 0 {}
 };
 
+// Timeline specifies a vector of sequence IDs and lengths.
+// This information is exposed by a source, e.g., to be used by the randomizer.
 typedef std::vector<sequence_description> timeline;
 
+// Timeline offsets specify file offset of sequences. These are used internally
+// to sources in a reader-specific way.
 typedef std::vector<size_t> timeline_offsets;
 
+// A source composes timeline information and a number of sequence readers, providing
+// random-access to the timeline as well as the composed sequence readers.
 class source
 {
 public:
@@ -43,6 +55,8 @@ public:
     virtual ~source() = 0 {};
 };
 
+// Defines context augmentation (to the left and to the right).
+// Augmentation is implemented
 struct augmentation_descriptor
 {
     size_t context_left;
@@ -57,6 +71,11 @@ public:
     virtual ~sequencer() = 0 {}
 };
 
+
+// A randomizer implements a sequence randomization for a source and
+// additional parameters given at construction time.
+// Note: chunk-level randomization can be implemented based on sequence lengths
+// exposed through the source's timeline method.
 class randomizer : sequencer
 {
 };
