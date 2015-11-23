@@ -32,6 +32,8 @@ public:
 
 typedef std::vector<sequence_description> timeline;
 
+typedef std::vector<size_t> timeline_offsets;
+
 class source
 {
 public:
