@@ -9,12 +9,12 @@ public:
     virtual ~epoch_impl() = 0 {};
 };
 
-
 class htkmlf_reader : reader
 {
 public:
-    htkmlf_reader(const config_parameters& parameters, memory_provider_ptr memory_provider) 
-    {}
+    htkmlf_reader(const config_parameters& parameters, memory_provider_ptr memory_provider)
+    {
+    }
 
     virtual std::vector<input_description_ptr> get_inputs()
     {

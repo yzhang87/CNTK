@@ -1,13 +1,9 @@
-// ConsoleApplication1.cpp : Defines the entry point for the console application.
-//
-
 #include "stdafx.h"
 
 #include "implementations.h"
 
 void main()
 {
-
     const size_t number_of_epochs = 3;
     const size_t minibatch_size = 50;
 
@@ -27,7 +23,6 @@ void main()
     {
         epoch_config.minibatch_size = minibatch_size;
         epoch_ptr epoch = reader->start_next_epoch(epoch_config);
-
 
         std::map<size_t, input_ptr> mb;
         while (epoch->read_minibatch(mb))

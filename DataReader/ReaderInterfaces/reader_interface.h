@@ -7,9 +7,10 @@
 class layout;
 typedef std::shared_ptr<layout> layout_ptr;
 
-class config_parameters {};
+class config_parameters
+{
+};
 
-// utility classes:
 struct epoch_configuration
 {
     size_t worker_rank;
@@ -38,8 +39,6 @@ class input
 };
 typedef std::shared_ptr<input> input_ptr;
 
-/////////////////////////////////////////////////////////////
-// used interfaces:
 class memory_provider
 {
 public:
@@ -48,9 +47,6 @@ public:
 };
 typedef std::shared_ptr<memory_provider> memory_provider_ptr;
 
-/////////////////////////////////////////////////////////////
-
-// for the reader writer:
 class epoch
 {
 public:
@@ -71,7 +67,7 @@ typedef std::unique_ptr<reader> reader_ptr;
 
 reader_ptr create_reader(const config_parameters& parameters, memory_provider_ptr memory_provider);
 
-class mb_layout
+class minibatch_layout
 {
 };
 
@@ -81,7 +77,7 @@ class tensor_layout
 
 class layout
 {
-    mb_layout columns;
+    minibatch_layout columns;
     tensor_layout rows;
 };
 
