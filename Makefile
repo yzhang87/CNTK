@@ -239,16 +239,16 @@ $(CNTKMATH_LIB): $(MATH_OBJ)
 ########################################
 
 BINARYREADER_SRC =\
+	DataReader/BinaryReader/Exports.cpp \
 	DataReader/BinaryReader/BinaryFile.cpp \
 	DataReader/BinaryReader/BinaryReader.cpp \
 	DataReader/BinaryReader/BinaryWriter.cpp \
 
 BINARYREADER_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(BINARYREADER_SRC))
 
-BINARY_READER:= $(LIBDIR)/BinaryReader.so
-
-#ALL += $(BINARY_READER)
-#SRC+=$(BINARYREADER_SRC)
+BINARY_READER:=$(LIBDIR)/BinaryReader.so
+ALL+=$(BINARY_READER)
+SRC+=$(BINARYREADER_SRC)
 
 $(BINARY_READER): $(BINARYREADER_OBJ) | $(CNTKMATH_LIB)
 	@echo $(SEPARATOR)
