@@ -26,9 +26,6 @@ struct sequence // real data
 class block_reader
 {
 public:
-    virtual void open() = 0;
-    virtual void close() = 0;
-
     virtual char* get(size_t offset, size_t size) = 0;
     virtual ~block_reader() = 0 {}
 };
@@ -41,6 +38,12 @@ public:
     virtual timeline& get_timeline() const = 0;
     virtual std::vector<input_description_ptr> get_inputs() const = 0;
     virtual std::map<size_t /*input*/, sequence> get_sequence_by_id(size_t id) = 0;
+};
+
+struct augmentation_descriptor
+{
+    size_t context_left;
+    size_t context_right;
 };
 
 class sequencer
