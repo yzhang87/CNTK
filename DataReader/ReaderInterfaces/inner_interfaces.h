@@ -12,7 +12,7 @@ struct frame_description
 struct sequence_description // for randomization
 {
     size_t id;
-    size_t weight;
+    size_t length;
 };
 
 struct sequence // real data
