@@ -37,49 +37,50 @@ public:
 };
 
 // Timeline specifies a vector of sequence IDs and lengths.
-// This information is exposed by a source, e.g., to be used by the randomizer.
+// This information is exposed by a sequencer, e.g., to be used by the randomizer.
 typedef std::vector<sequence_description> timeline;
 
 // Timeline offsets specify file offset of sequences. These are used internally
-// to sources in a reader-specific way.
+// of a sequence reader or a sequencer.
 typedef std::vector<size_t> timeline_offsets;
 
-// A source composes timeline information and a number of sequence readers, providing
+// A sequencer composes timeline information and a number of sequence readers, providing
 // random-access to the timeline as well as the composed sequence readers.
-class source
+class sequencer
 {
 public:
     virtual timeline& get_timeline() const = 0;
     virtual std::vector<input_description_ptr> get_inputs() const = 0;
     virtual std::map<size_t /*input*/, sequence> get_sequence_by_id(size_t id) = 0;
-    virtual ~source() = 0 {};
+    virtual ~sequencer() = 0 {};
 };
 
 // Defines context augmentation (to the left and to the right).
-// Augmentation is implemented
+// This will be specified as a construction parameter to sequence reader.
 struct augmentation_descriptor
 {
     size_t context_left;
     size_t context_right;
 };
 
-class sequencer
+// Provides input descriptions and sequential access to sequences.
+class sequence_provider
 {
 public:
     virtual std::vector<input_description_ptr> get_inputs() const = 0;
     virtual std::map<size_t /*per input descriptor*/, sequence> get_next_sequence() = 0;
-    virtual ~sequencer() = 0 {}
+    virtual ~sequence_provider() = 0 {}
 };
 
 
-// A randomizer implements a sequence randomization for a source and
+// A randomizer implements sequence randomization for a sequencer and
 // additional parameters given at construction time.
 // Note: chunk-level randomization can be implemented based on sequence lengths
-// exposed through the source's timeline method.
-class randomizer : sequencer
+// exposed through the sequencer's timeline method.
+class randomizer : sequence_provider
 {
 };
 
-class image_cropper : sequencer
+class image_cropper : sequence_provider
 {
 };
