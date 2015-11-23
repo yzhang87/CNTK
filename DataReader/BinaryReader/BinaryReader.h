@@ -126,8 +126,13 @@ struct ViewPosition
 class BinaryFile
 {
 protected:
+#ifdef _WIN32
     HANDLE m_hndFile;  // handle to the file
     HANDLE m_hndMapped;  // handle to the mapped file object
+#else
+    int m_hndFile;  // handle to the file
+    int m_hndMapped;  // handle to the mapped file object
+#endif
     size_t m_mappedSize; // size of mapped file (zero for size of file being read)
     size_t m_maxViewSize; // maximum size we want a single view to contain
     size_t m_viewAlignment; // address alignment required by views

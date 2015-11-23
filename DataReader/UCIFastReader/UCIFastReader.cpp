@@ -279,6 +279,8 @@ void UCIFastReader<ElemType>::Init(const ConfigParameters& readerConfig)
     m_cachingReader = NULL;
     m_cachingWriter = NULL;
 
+    mOneLinePerFile = false;
+
     // initialize the cache
     InitCache(readerConfig);
     readerConfig.CopyTo(m_readerConfig);
@@ -425,6 +427,7 @@ void UCIFastReader<ElemType>::Init(const ConfigParameters& readerConfig)
     mOneLinePerFile = false;
     mOneLinePerFile = readerConfig("onelineperfile", "false");
 
+    fprintf( stderr, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX one line per file: %d\n", mOneLinePerFile );
 }
 
 // InitCache - Initialize the caching reader if cache files exist, otherwise the writer
@@ -645,6 +648,7 @@ void UCIFastReader<ElemType>::SetNumParallelSequences(const size_t sz)
 template<class ElemType>
 void UCIFastReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
 {
+    fprintf( stderr, "UCIReader start, mbSize: %lu\tepoch: %lu\trequestedEpochSamples: %lu\tbool: %d\n", mbSize, epoch, requestedEpochSamples, mOneLinePerFile );
     if (mOneLinePerFile)
         mbSize = mBlgSize; /// each file has only one observation, therefore the number of data to read is the number of files
 
@@ -659,6 +663,7 @@ void UCIFastReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, si
     // if we are reading from the cache, do so now and return
     if (m_cachingReader)
     {
+        fprintf( stderr, "caching reader, mbSize: %lu\tepoch: %lu\trequestedEpochSamples: %lu\n", mbSize, epoch, requestedEpochSamples );
         m_cachingReader->StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
         return;
     } 

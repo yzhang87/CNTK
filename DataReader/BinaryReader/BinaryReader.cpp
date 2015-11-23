@@ -79,7 +79,7 @@ void BinaryReader<ElemType>::Init(const ConfigParameters& readerConfig)
             if (secFile != nullptr)
                 m_fStream.push_back(secFile);
             else
-                LogicError("BinaryReader::init cannot find %s to read", files[i]);
+                LogicError("BinaryReader::init cannot find %s to read", files[i].c_str());
         }
     }
     else
@@ -132,7 +132,7 @@ void BinaryReader<ElemType>::DisplayProperties()
     for (SectionFile* file : m_secFiles)
     {
         Section* section = file->FileSection();
-        fprintf(stderr,"File: %ls, Records: %lld\n", file->GetName().c_str(), section->GetElementCount());
+        fprintf(stderr,"File: %ls, Records: %lu\n", file->GetName().c_str(), section->GetElementCount());
     }
 
     for (auto pair : m_sections)
@@ -183,6 +183,7 @@ template<class ElemType>
 void BinaryReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
 {
     m_mbSize = mbSize;
+    //fprintf( stderr, "epoch: %lu\tmbsize: %lu\tsamples: %lu\n", m_totalSamples, m_mbSize, requestedEpochSamples );
     if (requestedEpochSamples == requestDataSize)
     {
         // if they want the dataset size, get the first file, and return the dataset size
@@ -248,6 +249,7 @@ bool BinaryReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType
 
     // actual size is either what requested, or total number of samples read so far
     size_t actualmbsize = min(m_totalSamples, m_mbSize);   // it may still return less if at end of sweep
+    //fprintf( stderr, "total samples: %lu\tmbsize: %lu\tactual: %lu\n", m_totalSamples, m_mbSize, actualmbsize );
     size_t epochStartSample = m_mbStartSample%m_totalSamples;
 
     bool endOfDataset = CheckEndDataset(actualmbsize);
@@ -312,9 +314,11 @@ bool BinaryReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType
         // make sure that the data is as expected
         if (!!(section->GetFlags() & flagAuxilarySection) || section->GetElementSize() != sizeof(ElemType))
         {
-            RuntimeError("GetMinibatch: Section %ls Auxilary section specified, and/or element size %lld mismatch", section->GetName().c_str(), section->GetElementSize());
+            RuntimeError("GetMinibatch: Section %ls Auxilary section specified, and/or element size %lu mismatch", section->GetName().c_str(), section->GetElementSize());
         }
         gpuData->SetValue(rows, actualmbsize, gpuData->GetDeviceId(), data);
+        //fprintf( stderr, "actualmbsize: %lu\n", actualmbsize );
+        //gpuData->Print( "GPU Data" );
     }
     m_pMBLayout->Init(actualmbsize, 1, false/*means it is not sequential*/);
 
@@ -336,7 +340,7 @@ void BinaryReader<ElemType>::SetupEpoch()
     size_t mbStartSample = m_epoch * m_epochSize;
 
     size_t fileRecord = mbStartSample % m_totalSamples;
-    fprintf(stderr, "starting epoch %lld at record count %lld, and file position %lld\n", m_epoch, mbStartSample, fileRecord);
+    //fprintf(stderr, "starting epoch %lu at record count %lu, and file position %lu\n", m_epoch, mbStartSample, fileRecord);
 
     // reset the original read sample
     m_epochStartSample = m_mbStartSample = mbStartSample;

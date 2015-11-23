@@ -11,8 +11,24 @@
 #include "BinaryReader.h"
 #include <limits.h>
 #include <stdint.h>
+#include <float.h>
+#ifndef _WIN32
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#endif
+
+
 
 namespace Microsoft { namespace MSR { namespace CNTK {
+
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
 
     // HIGH and LOW DWORD functions
     DWORD HIDWORD(size_t size) {return size>>32;}
@@ -25,14 +41,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     BinaryFile::BinaryFile(std::wstring fileName, FileOptions options, size_t size)
     {
 
+        m_writeFile = options==fileOptionsReadWrite;
+        m_name = fileName;
+        m_maxViewSize = 0x10000000; // 256MB initial max size
+
+#ifdef _WIN32
         SYSTEM_INFO sysInfo;
         GetSystemInfo(&sysInfo); 
         m_viewAlignment = sysInfo.dwAllocationGranularity;
     /* If file created, continue to map file. */
 
-        m_writeFile = options==fileOptionsReadWrite;
-        m_name = fileName;
-        m_maxViewSize = 0x10000000; // 256MB initial max size
         m_hndFile = CreateFile (fileName.c_str(), m_writeFile?(GENERIC_WRITE | GENERIC_READ):GENERIC_READ,
             FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (m_hndFile == INVALID_HANDLE_VALUE)
@@ -70,22 +88,48 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError(message);
         }
         m_mappedSize = size;
+#else
+        m_viewAlignment = sysconf(_SC_PAGESIZE);
+        
+        m_hndFile = open(msra::strfun::utf8(fileName).c_str(), m_writeFile ? O_RDWR:O_RDONLY, O_CREAT);
+        if (m_hndFile < 0)
+        {
+            char message[256];
+            sprintf(message, "Unable to Open/Create file %s, error %d", msra::strfun::utf8(fileName).c_str(), errno);
+            RuntimeError(message);
+        }
 
+        
+        if (size == 0)
+        {
+            struct stat filestatus;
+            stat( msra::strfun::utf8(fileName).c_str(), &filestatus );
+            size = filestatus.st_size;
+            //GetFileSizeEx(m_hndFile, (PLARGE_INTEGER)&size);
+        }
+        m_filePositionMax = size;
+
+        m_mappedSize = size;
+
+#endif
         // if writing the file, the inital size of the file is zero
         if (m_writeFile)
         {
             m_filePositionMax = 0;
         }
+
     }
 
     // Destructor - destroy the BinaryFile
     BinaryFile::~BinaryFile() 
     {
+
         for(auto iter=m_views.begin(); iter != m_views.end();)
         {
             // the view
             iter = ReleaseView(iter, true);
         }
+#ifdef _WIN32
         CloseHandle(m_hndMapped);
 
         // if we are writing the file, truncate to actual size
@@ -95,6 +139,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             SetEndOfFile(m_hndFile);
         }
         CloseHandle(m_hndFile);
+#else
+        close(m_hndFile);
+#endif
+
     }
 
     void BinaryFile::SetFilePositionMax(size_t filePositionMax)
@@ -103,7 +151,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (m_filePositionMax > m_mappedSize)
         {
             char message[128];
-            sprintf_s(message, "Setting max position larger than mapped file size: %ld > %ld", m_filePositionMax, m_mappedSize);
+
+#ifdef _WIN32
+            sprintf_s(message, "Setting max position larger than mapped file size: %lu > %lu", m_filePositionMax, m_mappedSize);
+#else
+            sprintf(message, "Setting max position larger than mapped file size: %lu > %lu", m_filePositionMax, m_mappedSize);
+#endif
             RuntimeError(message);
         }
     }
@@ -188,8 +241,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         else
         {
             if (m_writeFile)
+            {
+#ifdef _WIN32
                 FlushViewOfFile(iter->view, iter->size);
+#else
+#endif
+            }
+
+#ifdef _WIN32
             bool ret = UnmapViewOfFile(iter->view)!=FALSE; ret;
+#else
+            munmap(iter->view, iter->size);
+#endif
             iter = m_views.erase(iter);
         }
         return iter;
@@ -201,15 +264,24 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // returns - pointer to the view
     void* BinaryFile::GetView(size_t filePosition, size_t size)
     {
+#ifdef _WIN32
         void* pBuf = MapViewOfFile(m_hndMapped,   // handle to map object
                             m_writeFile?FILE_MAP_WRITE:FILE_MAP_READ, // get correct permissions
                             HIDWORD(filePosition),
                             LODWORD(filePosition),
                             size);
+        
+#else
+        void* pBuf = mmap(0, size, m_writeFile? (PROT_READ | PROT_WRITE ) : PROT_READ, MAP_SHARED, m_hndFile, filePosition);
+#endif
         if (pBuf == NULL)
         {
             char message[128];
-            sprintf_s(message, "Unable to map file %ls @ %lld, error %x", m_name.c_str(), filePosition, GetLastError());
+#ifdef _WIN32
+            sprintf_s(message, "Unable to map file %ls @ %lu, error %x", m_name.c_str(), filePosition, GetLastError());
+#else
+            sprintf(message, "Unable to map file %ls @ %lu, error %x", m_name.c_str(), filePosition, errno);
+#endif
             RuntimeError(message);
         }
         m_views.push_back(ViewPosition(pBuf, filePosition, size));
@@ -335,7 +407,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // size - size of the file to map, will expand/contract existing files to given size. zero means keep current size
     SectionFile::SectionFile(std::wstring fileName, FileOptions options, size_t size) : BinaryFile(fileName, options, size)
     {
-        m_fileSection = new Section(this, 0, NULL, mappingFile, sectionHeaderMin);
+        m_fileSection = new Section(this, 0, 0, mappingFile, sectionHeaderMin);
         if (m_writeFile)
         {
             m_fileSection->InitHeader(sectionTypeFile, string("Binary Data File"), sectionDataNone, 0);
@@ -345,7 +417,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (!m_fileSection->ValidateHeader(m_writeFile))
         {
             char message[128];
+#ifdef _WIN32
             sprintf_s(message, "Invalid File format for binary file %ls", fileName.c_str());
+#else
+            sprintf(message, "Invalid File format for binary file %ls", fileName.c_str());
+#endif
             RuntimeError(message);
         }
     }
@@ -385,7 +461,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_sectionHeader->flags = flagNone; // bit flags, dependent on sectionType
         m_sectionHeader->elementsCount = 0; // number of total elements stored
         memset(m_sectionHeader->nameDescription, 0, descriptionSize);  // clear out the string buffer to all zeros first
-        strcpy_s(m_sectionHeader->nameDescription, description.c_str()); // name and description of section contents in this format (name: description) (string, with extra bytes zeroed out, at least one null terminator required)
+        strcpy_s(m_sectionHeader->nameDescription, descriptionSize, description.c_str()); // name and description of section contents in this format (name: description) (string, with extra bytes zeroed out, at least one null terminator required)
         m_sectionHeader->size = sectionHeaderMin; // size of this section (including header)
         m_sectionHeader->sizeAll = sectionHeaderMin; // size of this section (including header and all sub-sections)
         m_sectionHeader->sectionFilePosition[0] = 0; // sub-section file offsets (if needed), assumed to be in File Position order
@@ -494,7 +570,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (!section->ValidateHeader())
         {
             char message[256];
+#ifdef _WIN32
             sprintf_s(message, "Invalid header in file %ls, in header %s\n", m_file->GetName(), section->GetName());
+#else
+            sprintf(message, "Invalid header in file %ls, in header %ls\n", m_file->GetName().c_str(), section->GetName().c_str());
+#endif
             RuntimeError(message);
         }
 
@@ -534,7 +614,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (element+elementsRequested > GetElementCount())
         {
             char message[256];
-            sprintf_s(message, "Element out of range, error accesing element %lld, size=%lld\n", element, bytesRequested);
+#ifdef _WIN32
+            sprintf_s(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
+#else
+            sprintf(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
+#endif
             RuntimeError(message);
         }
 
@@ -557,7 +641,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (!m_file->Writing() && element >= GetElementCount())
         {
             char message[256];
-            sprintf_s(message, "Element out of range, error accesing element %lld, max element=%lld\n", element, GetElementCount());
+#ifdef _WIN32
+            sprintf_s(message, "Element out of range, error accesing element %lu, max element=%lu\n", element, GetElementCount());
+#else
+            sprintf(message, "Element out of range, error accesing element %lu, max element=%lu\n", element, GetElementCount());
+#endif
             RuntimeError(message);
         }
 
@@ -1066,7 +1154,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             if (iter == labelMapping.end())
             {
                 char message[256];
+#ifdef _WIN32
                 sprintf_s(message, "Mapping table doesn't contain an entry for label Id#%d\n", i);
+#else
+                sprintf(message, "Mapping table doesn't contain an entry for label Id#%d\n", i);
+#endif
                 RuntimeError(message);
             }
 
@@ -1078,7 +1170,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             if (err)
             {
                 char message[256];
-                sprintf_s(message, "Not enough room in mapping buffer, %lld bytes insufficient for string %d - %s\n", originalSize, i, str.c_str());
+#ifdef _WIN32
+                sprintf_s(message, "Not enough room in mapping buffer, %lu bytes insufficient for string %d - %s\n", originalSize, i, str.c_str());
+#else
+                sprintf(message, "Not enough room in mapping buffer, %lu bytes insufficient for string %d - %s\n", originalSize, i, str.c_str());
+#endif
                 RuntimeError(message);
             }
             size_t len = str.length()+1; // don't forget the null
@@ -1100,7 +1196,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (index >= GetElementCount())
         {
             char message[256];
-            sprintf_s(message, "GetElement: invalid index, %lld requested when there are only %lld elements\n", index, GetElementCount());
+#ifdef _WIN32
+            sprintf_s(message, "GetElement: invalid index, %lu requested when there are only %lu elements\n", index, GetElementCount());
+#else
+            sprintf(message, "GetElement: invalid index, %lu requested when there are only %lu elements\n", index, GetElementCount());
+#endif
             RuntimeError(message);
         }
 
@@ -1126,7 +1226,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (element >= GetElementCount())
         {
             char message[256];
-            sprintf_s(message, "Element out of range, error accesing element %lld, size=%lld\n", element, bytesRequested);
+#ifdef _WIN32
+            sprintf_s(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
+#else
+            sprintf(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
+#endif
             RuntimeError(message);
         }
 
@@ -1212,7 +1316,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             std::string name = compute[i];
             auto stat = GetElement<NumericStatistics>(i);
-            strcpy_s(stat->statistic, name.c_str());
+            strcpy_s(stat->statistic, name.size(), name.c_str());
             stat->value=0.0;
         }
 

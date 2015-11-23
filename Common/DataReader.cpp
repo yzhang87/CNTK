@@ -133,6 +133,7 @@ DataReader<ElemType>::~DataReader()
 template<class ElemType>
 void DataReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
 {
+    fprintf( stderr, "startminibatch loop big: %lu\n", mbSize );
     for (size_t i = 0; i < m_ioNames.size(); i++)
         m_dataReader[m_ioNames[i]]->StartMinibatchLoop(mbSize, epoch, requestedEpochSamples);
 }
