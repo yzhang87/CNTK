@@ -72,7 +72,6 @@ public:
     virtual ~sequence_provider() = 0 {}
 };
 
-
 // A randomizer implements sequence randomization for a sequencer and
 // additional parameters given at construction time.
 // Note: chunk-level randomization can be implemented based on sequence lengths

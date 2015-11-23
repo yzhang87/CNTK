@@ -4,9 +4,6 @@
 #include <memory>
 #include <map>
 
-class layout;
-typedef std::shared_ptr<layout> layout_ptr;
-
 class config_parameters
 {
 };
@@ -30,6 +27,22 @@ struct input_description
     std::map<std::string, std::string> properties;
 };
 typedef std::shared_ptr<input_description> input_description_ptr;
+
+class minibatch_layout
+{
+};
+
+class tensor_layout
+{
+};
+
+class layout
+{
+    minibatch_layout columns;
+    tensor_layout rows;
+};
+
+typedef std::shared_ptr<layout> layout_ptr;
 
 class input
 {
@@ -66,18 +79,3 @@ public:
 typedef std::unique_ptr<reader> reader_ptr;
 
 reader_ptr create_reader(const config_parameters& parameters, memory_provider_ptr memory_provider);
-
-class minibatch_layout
-{
-};
-
-class tensor_layout
-{
-};
-
-class layout
-{
-    minibatch_layout columns;
-    tensor_layout rows;
-};
-
