@@ -54,7 +54,7 @@ typedef std::shared_ptr<memory_provider> memory_provider_ptr;
 class epoch
 {
 public:
-    virtual std::map<size_t /*id from the input description*/, input_ptr> read_minibatch();
+    virtual bool read_minibatch(std::map<size_t /*id from the input description*/, input_ptr> minibatch);
     virtual ~epoch() = 0 {};
 };
 typedef std::unique_ptr<epoch> epoch_ptr;
