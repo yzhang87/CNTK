@@ -26,9 +26,6 @@ struct sequence // real data
 class block_reader
 {
 public:
-    virtual void open() = 0;
-    virtual void close() = 0;
-
     virtual char* get(size_t offset, size_t size) = 0;
     virtual ~block_reader() = 0 {}
 };
