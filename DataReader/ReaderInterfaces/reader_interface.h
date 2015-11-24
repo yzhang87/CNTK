@@ -20,11 +20,13 @@ struct epoch_configuration
     size_t number_of_sequences;
 };
 
+typedef size_t input_id;
+
 // Input description.
 struct input_description
 {
     std::string name;
-    size_t id;
+    input_id id;
     std::string target_layout_type;
     std::map<std::string, std::string> properties;
 };
@@ -68,7 +70,7 @@ typedef std::shared_ptr<memory_provider> memory_provider_ptr;
 class epoch
 {
 public:
-    virtual bool read_minibatch(std::map<size_t /*id from the input description*/, input_ptr> minibatch);
+    virtual bool read_minibatch(std::map<input_id, input_ptr> minibatch);
     virtual ~epoch() = 0 {};
 };
 typedef std::unique_ptr<epoch> epoch_ptr;

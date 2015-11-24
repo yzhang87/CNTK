@@ -24,7 +24,7 @@ void main()
         epoch_config.minibatch_size = minibatch_size;
         epoch_ptr epoch = reader->start_next_epoch(epoch_config);
 
-        std::map<size_t, input_ptr> mb;
+        std::map<input_id, input_ptr> mb;
         while (epoch->read_minibatch(mb))
         {
             mb.clear();

@@ -51,7 +51,7 @@ class sequencer
 public:
     virtual timeline& get_timeline() const = 0;
     virtual std::vector<input_description_ptr> get_inputs() const = 0;
-    virtual std::map<size_t /*input*/, sequence> get_sequence_by_id(size_t id) = 0;
+    virtual std::map<input_id, sequence> get_sequence_by_id(size_t id) = 0;
     virtual ~sequencer() = 0 {};
 };
 
@@ -68,7 +68,7 @@ class sequence_provider
 {
 public:
     virtual std::vector<input_description_ptr> get_inputs() const = 0;
-    virtual std::map<size_t /*per input descriptor*/, sequence> get_next_sequence() = 0;
+    virtual std::map<input_id, sequence> get_next_sequence() = 0;
     virtual ~sequence_provider() = 0 {}
 };
 
