@@ -20,11 +20,13 @@ struct epoch_configuration
     size_t number_of_sequences;
 };
 
+typedef size_t input_id;
+
 // Input description.
 struct input_description
 {
     std::string name;
-    size_t id;
+    input_id id;
     std::string target_layout_type;
     std::map<std::string, std::string> properties;
 };

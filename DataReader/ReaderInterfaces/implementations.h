@@ -6,7 +6,7 @@
 class epoch_impl : epoch
 {
 public:
-    virtual std::map<size_t /*id from the input description*/, input_ptr> read_minibatch();
+    virtual std::map<input_id, input_ptr> read_minibatch();
     virtual ~epoch_impl() = 0 {};
 };
 
