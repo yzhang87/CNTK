@@ -4,7 +4,7 @@
 #include <memory>
 #include <map>
 
-class config_parameters
+class config_parameters : public std::map<std::wstring, std::wstring>
 {
 };
 
@@ -38,7 +38,7 @@ class tensor_layout
 {
 };
 
-class layout
+struct layout
 {
     minibatch_layout columns;
     tensor_layout rows;
@@ -49,9 +49,32 @@ typedef std::shared_ptr<layout> layout_ptr;
 // Input data.
 class input
 {
-    const char* get_data() const;
-    const size_t get_data_size() const;
-    const layout_ptr get_layout() const;
+    char* data_;
+    size_t data_size_;
+    layout_ptr layout_;
+
+public:
+    input(char* data, size_t data_size, layout_ptr layout)
+        : data_(data)
+        , data_size_(data_size)
+        , layout_(layout)
+    {
+    }
+
+    const char* get_data() const
+    {
+        return data_;
+    }
+
+    size_t get_data_size() const
+    {
+        return data_size_;
+    }
+
+    layout_ptr get_layout() const
+    {
+        return layout_;
+    }
 };
 typedef std::shared_ptr<input> input_ptr;
 
@@ -65,10 +88,19 @@ public:
 typedef std::shared_ptr<memory_provider> memory_provider_ptr;
 
 // Represents a single epoch.
+class minibatch
+{
+public:
+    std::map<size_t /*id from the input description*/, input_ptr> mb;
+
+    bool operator!()
+    {}
+};
+
 class epoch
 {
 public:
-    virtual bool read_minibatch(std::map<size_t /*id from the input description*/, input_ptr> minibatch);
+    virtual minibatch read_minibatch() = 0;
     virtual ~epoch() = 0 {};
 };
 typedef std::unique_ptr<epoch> epoch_ptr;
@@ -82,7 +114,6 @@ public:
     virtual ~reader() = 0 {};
 };
 typedef std::unique_ptr<reader> reader_ptr;
-
 
 // Factory function for creating a reader.
 reader_ptr create_reader(const config_parameters& parameters, memory_provider_ptr memory_provider);

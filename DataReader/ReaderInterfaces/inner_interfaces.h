@@ -55,6 +55,8 @@ public:
     virtual ~sequencer() = 0 {};
 };
 
+typedef std::shared_ptr<sequencer> sequencer_ptr;
+
 // Defines context augmentation (to the left and to the right).
 // This will be specified as a construction parameter to sequence reader.
 struct augmentation_descriptor
@@ -64,22 +66,24 @@ struct augmentation_descriptor
 };
 
 // Provides input descriptions and sequential access to sequences.
-class sequence_provider
+class transformer
 {
 public:
     virtual std::vector<input_description_ptr> get_inputs() const = 0;
     virtual std::map<size_t /*per input descriptor*/, sequence> get_next_sequence() = 0;
-    virtual ~sequence_provider() = 0 {}
+    virtual ~transformer() = 0 {}
 };
+
+typedef std::shared_ptr<transformer> transformer_ptr;
 
 // A randomizer implements sequence randomization for a sequencer and
 // additional parameters given at construction time.
 // Note: chunk-level randomization can be implemented based on sequence lengths
 // exposed through the sequencer's timeline method.
-class randomizer : sequence_provider
+class randomizer : transformer
 {
 };
 
-class image_cropper : sequence_provider
+class image_cropper : transformer
 {
 };
