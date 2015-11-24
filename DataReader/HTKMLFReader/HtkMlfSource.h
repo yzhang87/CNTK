@@ -8,7 +8,6 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    template<class ElemType>
     class HTKMLFSource : public ISource
     {
         unique_ptr<msra::dbn::minibatchiterator> m_mbiter;
@@ -36,9 +35,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         bool m_partialMinibatch; // allow partial minibatches?
 
-        std::vector<std::shared_ptr<ElemType>> m_featuresBufferMultiUtt;
         std::vector<size_t> m_featuresBufferAllocatedMultiUtt;
-        std::vector<std::shared_ptr<ElemType>> m_labelsBufferMultiUtt;
         std::vector<size_t> m_labelsBufferAllocatedMultiUtt;
         std::vector<size_t> m_featuresStartIndexMultiUtt;
         std::vector<size_t> m_labelsStartIndexMultiUtt;
@@ -72,14 +69,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<size_t> m_featDims;
         std::vector<size_t> m_labelDims;
 
-        std::vector<std::vector<std::vector<ElemType>>>m_labelToTargetMapMultiIO;
-
         int m_verbosity;
-
-        bool GetMinibatch4SEToTrainOrTest(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput, vector<size_t> &uids, vector<size_t> &boundaries, std::vector<size_t> &extrauttmap);
-
-
-        void StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize);
 
         enum InputOutputTypes
         {
@@ -98,20 +88,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void Init(const ConfigParameters& config);
         virtual void Destroy() { delete this; }
         virtual ~HTKMLFSource() { }
-
-        virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize)
-        {
-            return StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, requestedEpochSamples);
-        }
-
-        virtual bool SupportsDistributedMBRead() const
-        {
-            return m_frameSource && m_frameSource->supportsbatchsubsetting();
-        }
-
-        virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize);
-
-        virtual bool GetHmmData(msra::asr::simplesenonehmm * hmm);
 
         virtual Timeline& getTimeline() override;
         virtual std::map<size_t, Sequence> getSequenceById(sequenceId id) override;

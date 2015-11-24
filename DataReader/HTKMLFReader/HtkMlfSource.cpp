@@ -45,8 +45,7 @@ namespace Microsoft {
     namespace MSR {
         namespace CNTK {
 
-            template<class ElemType>
-            void HTKMLFSource<ElemType>::Init(const ConfigParameters& readerConfig)
+            void HTKMLFSource::Init(const ConfigParameters& readerConfig)
             {
                 ConfigArray numberOfuttsPerMinibatchForAllEpochs = readerConfig("nbruttsineachrecurrentiter", "1");
 
@@ -68,7 +67,6 @@ namespace Microsoft {
                 std::vector<std::wstring> featureNames;
                 std::vector<std::wstring> labelNames;
 
-                // for hmm and lattice 
                 std::vector<std::wstring> hmmNames;
                 std::vector<std::wstring> latticeNames;
                 GetDataNamesFromConfig(readerConfig, featureNames, labelNames, hmmNames, latticeNames);
@@ -123,7 +121,7 @@ namespace Microsoft {
                     input.name = featureNames[i];
                     input.id = m_inputs.size();
                     input.dimensions.push_back(m_featDims[i]);
-                    input.elementSize = sizeof(ElemType);
+                    input.elementSize = sizeof(float); // should be parameterized with.
                     m_inputs.push_back(input);
 
                     iFeat++;
@@ -177,7 +175,7 @@ namespace Microsoft {
                     input.name = labelNames[i];
                     input.id = m_inputs.size();
                     input.dimensions.push_back(m_labelDims[i]);
-                    input.elementSize = sizeof(ElemType);
+                    input.elementSize = sizeof(float); // should be parameterized with.
                     m_inputs.push_back(input);
 
                     iLabel++;
@@ -372,98 +370,17 @@ namespace Microsoft {
                 // now get the frame source. This has better randomization and doesn't create temp files
                 m_frameSource.reset(new msra::dbn::minibatchutterancesourcemulti(infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomizeNone, *m_lattices, m_latticeMap, m_frameMode));
                 m_frameSource->setverbosity(m_verbosity);
-            }
 
-            //StartMinibatchLoop - Startup a minibatch loop 
-            // requestedMBSize - [in] size of the minibatch (number of frames, etc.)
-            // epoch - [in] epoch number for this loop
-            // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
-            template<class ElemType>
-            void HTKMLFSource<ElemType>::StartDistributedMinibatchLoop(size_t requestedMBSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples /*= requestDataSize*/)
-            {
-                assert(subsetNum < numSubsets);
-                assert(((subsetNum == 0) && (numSubsets == 1)) || this->SupportsDistributedMBRead());
-
-                m_mbNumTimeSteps = requestedMBSize;       // note: ignored in frame mode and full-sequence mode
-
-                // BUGBUG: in BPTT and sequence mode, we should pass 1 or 2 instead of requestedMBSize to ensure we only get one utterance back at a time
-                StartMinibatchLoopToTrainOrTest(requestedMBSize, epoch, subsetNum, numSubsets, requestedEpochSamples);
-
-            }
-
-            template<class ElemType>
-            void HTKMLFSource<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples)
-            {
-                size_t totalFrames = m_frameSource->totalframes();
-
-                size_t extraFrames = totalFrames%mbSize;
-                size_t minibatches = totalFrames / mbSize;
-
-                // if we are allowing partial minibatches, do nothing, and let it go through
-                if (!m_partialMinibatch)
-                {
-                    // we don't want any partial frames, so round total frames to be an even multiple of our mbSize
-                    if (totalFrames > mbSize)
-                        totalFrames -= extraFrames;
-
-                    if (requestedEpochSamples == requestDataSize)
-                    {
-                        requestedEpochSamples = totalFrames;
-                    }
-                    else if (minibatches > 0)   // if we have any full minibatches
-                    {
-                        // since we skip the extraFrames, we need to add them to the total to get the actual number of frames requested
-                        size_t sweeps = (requestedEpochSamples - 1) / totalFrames; // want the number of sweeps we will skip the extra, so subtract 1 and divide
-                        requestedEpochSamples += extraFrames*sweeps;
-                    }
-                }
-                else if (requestedEpochSamples == requestDataSize)
-                {
-                    requestedEpochSamples = totalFrames;
-                }
-
-                m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, epoch, requestedEpochSamples, mbSize, subsetNum, numSubsets, 1));
+                m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, 0, 10000000, 1, 0, 1, 1));
                 AdvanceIteratorToNextDataPortion();
-
-                m_noData = false;
-                if (!*m_mbiter)
-                    m_noData = true;
             }
 
-            template<class ElemType>
-            bool HTKMLFSource<ElemType>::GetMinibatch4SEToTrainOrTest(std::vector<shared_ptr<const msra::dbn::latticesource::latticepair>> & latticeinput,
-                std::vector<size_t> &uids, std::vector<size_t> &boundaries, std::vector<size_t> &extrauttmap)
-            {
-                latticeinput.clear();
-                uids.clear();
-                boundaries.clear();
-                extrauttmap.clear();
-                for (size_t i = 0; i < m_extraSeqsPerMB.size(); i++)
-                {
-                    latticeinput.push_back(m_extraLatticeBufferMultiUtt[i]);
-                    uids.insert(uids.end(), m_extraLabelsIDBufferMultiUtt[i].begin(), m_extraLabelsIDBufferMultiUtt[i].end());
-                    boundaries.insert(boundaries.end(), m_extraPhoneboundaryIDBufferMultiUtt[i].begin(), m_extraPhoneboundaryIDBufferMultiUtt[i].end());
-                }
-
-                extrauttmap.insert(extrauttmap.end(), m_extraSeqsPerMB.begin(), m_extraSeqsPerMB.end());
-                return true;
-            }
-
-            template<class ElemType>
-            bool HTKMLFSource<ElemType>::GetHmmData(msra::asr::simplesenonehmm * hmm)
-            {
-                *hmm = m_hset;
-                return true;
-            }
-
-            template<class ElemType>
-            Timeline& HTKMLFSource<ElemType>::getTimeline()
+            Timeline& HTKMLFSource::getTimeline()
             {
                 throw std::logic_error("The method or operation is not implemented.");
             }
 
-            template<class ElemType>
-            std::map<size_t, Sequence> HTKMLFSource<ElemType>::getSequenceById(sequenceId /*id*/)
+            std::map<size_t, Sequence> HTKMLFSource::getSequenceById(sequenceId /*id*/)
             {
                 // Currently get the next sequence.
                 AdvanceIteratorToNextDataPortion();
@@ -534,8 +451,7 @@ namespace Microsoft {
                 return result;
             }
 
-            template<class ElemType>
-            void HTKMLFSource<ElemType>::AdvanceIteratorToNextDataPortion()
+            void HTKMLFSource::AdvanceIteratorToNextDataPortion()
             {
                 // Advance the MB iterator until we find some data or reach the end of epoch
                 while ((m_mbiter->currentmbframes() == 0) && *m_mbiter)
@@ -544,15 +460,10 @@ namespace Microsoft {
                 }
             }
 
-            template<class ElemType>
-            std::vector<InputDefinition> HTKMLFSource<ElemType>::getInputs()
+            std::vector<InputDefinition> HTKMLFSource::getInputs()
             {
                 return m_inputs;
             }
-
-
-            template class HTKMLFSource<float>;
-            template class HTKMLFSource<double>;
         }
     }
 }
