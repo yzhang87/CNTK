@@ -4,121 +4,120 @@
 #include <memory>
 #include <map>
 
-class config_parameters : public std::map<std::string, std::string>
+class ConfigParameters : public std::map<std::string, std::string>
 {
 };
 
 // Epoch configuration.
-struct epoch_configuration
+struct EpochConfiguration
 {
-    size_t worker_rank;
-    size_t number_of_workers;
+    size_t workerRank;
+    size_t numberOfWorkers;
 
-    size_t minibatch_size;
-    size_t total_size;
+    size_t minibatchSize;
+    size_t totalSize;
 
-    size_t number_of_sequences;
+    size_t numberOfSequences;
 };
 
-typedef size_t input_id;
+typedef size_t InputId;
 
 // Input description.
-struct input_description
+struct InputDescription
 {
     std::string name;
-    input_id id;
-    std::string target_layout_type;
+    InputId id;
+    std::string targetLayoutType;
     std::map<std::string, std::string> properties;
 };
-typedef std::shared_ptr<input_description> input_description_ptr;
+typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
 
-class minibatch_layout
+class MinibatchLayout
 {
 };
 
-class tensor_layout
+class TensorLayout
 {
 };
 
-struct layout
+struct Layout
 {
-    minibatch_layout columns;
-    tensor_layout rows;
+    MinibatchLayout columns;
+    TensorLayout rows;
 };
 
-typedef std::shared_ptr<layout> layout_ptr;
+typedef std::shared_ptr<Layout> LayoutPtr;
 
 // Input data.
-class input
+class Input
 {
     char* data_;
     size_t data_size_;
-    layout_ptr layout_;
+    LayoutPtr layout_;
 
 public:
-    input(char* data, size_t data_size, layout_ptr layout)
+    Input(char* data, size_t dataSize, LayoutPtr layout)
         : data_(data)
-        , data_size_(data_size)
+        , data_size_(dataSize)
         , layout_(layout)
     {
     }
 
-    const char* get_data() const
+    const char* getData() const
     {
         return data_;
     }
 
-    size_t get_data_size() const
+    size_t getDataSize() const
     {
         return data_size_;
     }
 
-    layout_ptr get_layout() const
+    LayoutPtr getLayout() const
     {
         return layout_;
     }
 };
-typedef std::shared_ptr<input> input_ptr;
+typedef std::shared_ptr<Input> InputPtr;
 
-// Memory provider. Should be used for allocating storage according to the layout.
-class memory_provider
+// Memory provider. Should be used for allocating storage according to the Layout.
+class MemoryProvider
 {
 public:
-    void* alloc(size_t element, size_t number_of_elements);
+    void* alloc(size_t element, size_t numberOfElements);
     void free(void* ptr);
 };
-typedef std::shared_ptr<memory_provider> memory_provider_ptr;
+typedef std::shared_ptr<MemoryProvider> MemoryProviderPtr;
 
-// Represents a single epoch.
-class minibatch
+// Represents a single minibatch.
+struct Minibatch
 {
-public:
-    std::map<size_t /*id from the input description*/, input_ptr> mb;
+    bool notAtEndOfEpoch;
+    std::map<size_t /*id from the Input description*/, InputPtr> minibatch;
 
     operator bool() const
     {
-        return true; // TODO
+        return notAtEndOfEpoch;
     }
-
 };
 
-class epoch
+class Epoch
 {
 public:
-    virtual minibatch read_minibatch() = 0;
-    virtual ~epoch() = 0 {};
+    virtual Minibatch readMinibatch() = 0;
+    virtual ~Epoch() = 0 {};
 };
-typedef std::unique_ptr<epoch> epoch_ptr;
+typedef std::unique_ptr<Epoch> EpochPtr;
 
-// Main reader interface. The border interface between the CNTK and reader.
-class reader
+// Main Reader interface. The border interface between the CNTK and Reader.
+class Reader
 {
 public:
-    virtual std::vector<input_description_ptr> get_inputs() = 0;
-    virtual epoch_ptr start_next_epoch(const epoch_configuration& config) = 0;
-    virtual ~reader() = 0 {};
+    virtual std::vector<InputDescriptionPtr> getInputs() = 0;
+    virtual EpochPtr startNextEpoch(const EpochConfiguration& config) = 0;
+    virtual ~Reader() = 0 {};
 };
-typedef std::unique_ptr<reader> reader_ptr;
+typedef std::unique_ptr<Reader> ReaderPtr;
 
-// Factory function for creating a reader.
-reader_ptr create_reader(const config_parameters& parameters, memory_provider_ptr memory_provider);
+// Factory function for creating a Reader.
+ReaderPtr createReader(const ConfigParameters& parameters, MemoryProviderPtr memory_provider);

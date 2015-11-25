@@ -4,28 +4,28 @@
 
 void main()
 {
-    const size_t number_of_epochs = 3;
-    const size_t minibatch_size = 50;
+    const size_t numberOfEpochs = 3;
+    const size_t minibatchSize = 50;
 
-    config_parameters parameters;
-    memory_provider_ptr provider(new memory_provider);
+    ConfigParameters parameters;
+    MemoryProviderPtr provider(new MemoryProvider);
 
-    epoch_configuration epoch_config;
-    epoch_config.worker_rank = 0;
-    epoch_config.number_of_workers = 1;
-    epoch_config.total_size = 1066;
+    EpochConfiguration epochConfig;
+    epochConfig.workerRank = 0;
+    epochConfig.numberOfWorkers = 1;
+    epochConfig.totalSize = 1066;
 
-    reader_ptr reader = create_reader(parameters, provider);
+    ReaderPtr reader = createReader(parameters, provider);
 
-    auto inputs = reader->get_inputs();
+    auto inputs = reader->getInputs();
 
-    for (size_t current_epoch = 0; current_epoch < number_of_epochs; ++current_epoch)
+    for (size_t current_epoch = 0; current_epoch < numberOfEpochs; ++current_epoch)
     {
-        epoch_config.minibatch_size = minibatch_size;
-        epoch_ptr epoch = reader->start_next_epoch(epoch_config);
+        epochConfig.minibatchSize = minibatchSize;
+        EpochPtr epoch = reader->startNextEpoch(epochConfig);
 
-        minibatch mb;
-        while (mb = epoch->read_minibatch())
+        Minibatch mb;
+        while (mb = epoch->readMinibatch())
         {
             // TODO
         }

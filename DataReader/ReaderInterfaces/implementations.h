@@ -5,46 +5,46 @@
 
 #include <string>
 
-class epoch_impl : epoch
+class EpochImplementation : Epoch
 {
 public:
-    virtual minibatch read_minibatch();
-    virtual ~epoch_impl() = 0 {};
+    virtual Minibatch readMinibatch();
+    virtual ~EpochImplementation() = 0 {};
 };
 
-class htkmlf_reader : reader
+class HtkmlfReader : Reader
 {
 public:
-    htkmlf_reader(const config_parameters& parameters, memory_provider_ptr memory_provider)
+    HtkmlfReader(const ConfigParameters& parameters, MemoryProviderPtr memoryProvider)
     {
     }
 
-    virtual std::vector<input_description_ptr> get_inputs()
+    virtual std::vector<InputDescriptionPtr> getInputs()
     {
         throw std::logic_error("not implemented");
     }
 
-    virtual epoch_ptr start_next_epoch(const epoch_configuration& config)
+    virtual EpochPtr startNextEpoch(const EpochConfiguration& config)
     {
         throw std::logic_error("not implemented");
     }
 
-    virtual ~htkmlf_reader(){};
+    virtual ~HtkmlfReader(){};
 };
 
-struct physical_timeline : timeline
+struct PhysicalTimeline : Timeline
 {
-    // Specific physical location per file format sequence
+    // Specific physical location per file format Sequence
 };
 
-class sequence_reader
+class SequenceReader
 {};
 
-class file_reader : public block_reader
+class FileReader : public BlockReader
 {
 public:
-    file_reader(std::string file_name);
-    virtual ~file_reader() override
+    FileReader(std::string fileName);
+    virtual ~FileReader() override
     {
     }
 
@@ -55,105 +55,105 @@ public:
 
 };
 
-typedef std::shared_ptr<block_reader> block_reader_ptr;
-typedef std::shared_ptr<file_reader> file_reader_ptr;
+typedef std::shared_ptr<BlockReader> BlockReaderPtr;
+typedef std::shared_ptr<FileReader> FileReaderPtr;
 
-class scp_reader
+class ScpReader
 {
 public:
-    scp_reader(block_reader_ptr scp);
-    physical_timeline get_timeline();
+    ScpReader(BlockReaderPtr scp);
+    PhysicalTimeline getTimeline();
 };
 
-typedef std::shared_ptr<scp_reader> scp_reader_ptr;
+typedef std::shared_ptr<ScpReader> ScpReaderPtr;
 
-class htk_sequence_reader : public sequence_reader
+class HtkSequenceReader : public SequenceReader
 {
 public:
-    htk_sequence_reader(block_reader_ptr features, augmentation_descriptor, const physical_timeline& timeline);
+    HtkSequenceReader(BlockReaderPtr features, AugmentationDescriptor augmentationDescriptor, const PhysicalTimeline& timeline);
 };
 
-typedef std::shared_ptr<htk_sequence_reader> htk_sequence_reader_ptr;
+typedef std::shared_ptr<HtkSequenceReader> HtkSequenceReaderPtr;
 
-class mlf_sequence_reader : public sequence_reader
+class MlfSequenceReader : public SequenceReader
 {
 public:
-    mlf_sequence_reader(block_reader_ptr lables, block_reader_ptr states, const physical_timeline& timeline);
+    MlfSequenceReader(BlockReaderPtr lables, BlockReaderPtr states, const PhysicalTimeline& timeline);
 };
 
-typedef std::shared_ptr<mlf_sequence_reader> mlf_sequence_reader_ptr;
+typedef std::shared_ptr<MlfSequenceReader> MlfSequenceReaderPtr;
 
-class htkmlf_sequencer : public sequencer
+class HtkMlfSequencer : public Sequencer
 {
 public:
-    htkmlf_sequencer(htk_sequence_reader_ptr, mlf_sequence_reader_ptr, scp_reader_ptr);
+    HtkMlfSequencer(HtkSequenceReaderPtr, MlfSequenceReaderPtr, ScpReaderPtr);
 
-    virtual timeline& get_timeline() const override;
-    virtual std::vector<input_description_ptr> get_inputs() const override;
-    virtual std::map<size_t, sequence> get_sequence_by_id(size_t id) override;
+    virtual Timeline& getTimeline() const override;
+    virtual std::vector<InputDescriptionPtr> getInputs() const override;
+    virtual std::map<size_t, Sequence> getSequenceById(size_t id) override;
 };
 
-typedef std::shared_ptr<htk_sequence_reader> htk_sequence_reader_ptr;
+typedef std::shared_ptr<HtkSequenceReader> HtkSequenceReaderPtr;
 
-class packer {};
+class Packer {};
 
-class chunk_randomizer : public randomizer
+class ChunkRandomizer : public Randomizer
 {
 public:
-    chunk_randomizer(sequencer_ptr, size_t chunk_size, int seed);
+    ChunkRandomizer(SequencerPtr, size_t chunkSize, int seed);
 
-    virtual std::vector<input_description_ptr> get_inputs() const override;
-    virtual std::map<size_t, sequence> get_next_sequence() override;
+    virtual std::vector<InputDescriptionPtr> getInputs() const override;
+    virtual std::map<size_t, Sequence> getNextSequence() override;
 };
 
-class rolling_window_randomizer : public randomizer
+class RollingWindowRandomizer : public Randomizer
 {
 };
 
-class normal_packer : public reader
+class NormalPacker : public Reader
 {
 public:
-    normal_packer(memory_provider_ptr, transformer_ptr, const config_parameters& config) {}
+    NormalPacker(MemoryProviderPtr memoryProvider, TransformerPtr transformer, const ConfigParameters& config) {}
 
-    virtual std::vector<input_description_ptr> get_inputs() override;
-    virtual epoch_ptr start_next_epoch(const epoch_configuration& config) override;
+    virtual std::vector<InputDescriptionPtr> getInputs() override;
+    virtual EpochPtr startNextEpoch(const EpochConfiguration& config) override;
 };
 
-class bptt_packer : public packer
+class BpttPacker : public Packer
 {};
 
 
-reader_ptr create_reader(config_parameters& parameters, memory_provider_ptr memory_provider)
+ReaderPtr createReader(ConfigParameters& parameters, MemoryProviderPtr memoryProvider)
 {
     // The code below will be split between the corresponding factory methods with appropriate
     // extraction of required parameters from the config.
     // Parameters will also be combined in the appropriate structures when needed.
 
     // Read parameters from config
-    const int chunk_size = std::stoi(parameters["..."]);
+    const int chunkSize = std::stoi(parameters["..."]);
     const int seed = std::stoi(parameters["..."]);
 
-    // Read scp and form initial timeline
+    // Read scp and form initial Timeline
     auto scpFilename = parameters["scpFilename"];
-    block_reader_ptr scp(new file_reader(scpFilename));
-    scp_reader_ptr t(new scp_reader(scp));
+    BlockReaderPtr scp(new FileReader(scpFilename));
+    ScpReaderPtr t(new ScpReader(scp));
 
-    // Create sequence readers to be combined by the sequencer.
+    // Create Sequence readers to be combined by the Sequencer.
     auto featureFilename = parameters["featureFilename"];
-    block_reader_ptr features_reader(new file_reader(featureFilename));
-    htk_sequence_reader_ptr features(new htk_sequence_reader(features_reader, augmentation_descriptor(), t->get_timeline()));
+    BlockReaderPtr featureReader(new FileReader(featureFilename));
+    HtkSequenceReaderPtr feature(new HtkSequenceReader(featureReader, AugmentationDescriptor(), t->getTimeline()));
 
     auto labelsFilename = parameters["labelsFilename"];
-    block_reader_ptr labels_reader(new file_reader(labelsFilename));
+    BlockReaderPtr labelReader(new FileReader(labelsFilename));
     auto statesFilename = parameters["statesFilename"];
-    block_reader_ptr states_reader(new file_reader(statesFilename));
-    mlf_sequence_reader_ptr labels(new mlf_sequence_reader(labels_reader, states_reader, t->get_timeline()));
-    sequencer_ptr sequencer(new htkmlf_sequencer(features, labels, t));
+    BlockReaderPtr statesReader(new FileReader(statesFilename));
+    MlfSequenceReaderPtr labels(new MlfSequenceReader(labelReader, statesReader, t->getTimeline()));
+    SequencerPtr sequencer(new HtkMlfSequencer(feature, labels, t));
 
-    // Create randomizer and form randomized timeline.
-    transformer_ptr randomizer(new chunk_randomizer(sequencer, chunk_size, seed));
+    // Create Randomizer and form randomized Timeline.
+    TransformerPtr randomizer(new ChunkRandomizer(sequencer, chunkSize, seed));
 
-    // Create the packer that will consume the sequences from the randomizer and will
+    // Create the Packer that will consume the sequences from the Randomizer and will
     // pack them into efficient representation using the memory provider.
-    return reader_ptr(new normal_packer(memory_provider, randomizer, parameters));
+    return ReaderPtr(new NormalPacker(memoryProvider, randomizer, parameters));
 }
