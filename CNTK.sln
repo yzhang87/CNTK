@@ -440,11 +440,13 @@ Global
 		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|Win32.ActiveCfg = Debug|Win32
 		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|Win32.Build.0 = Debug|Win32
 		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|x64.ActiveCfg = Debug|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Debug|x64.Build.0 = Debug|Win32
 		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Mixed Platforms.ActiveCfg = Release|Win32
 		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Win32.ActiveCfg = Release|Win32
 		{280140DC-01C2-4133-9657-0519EC56153E}.Release|Win32.Build.0 = Release|Win32
 		{280140DC-01C2-4133-9657-0519EC56153E}.Release|x64.ActiveCfg = Release|Win32
+		{280140DC-01C2-4133-9657-0519EC56153E}.Release|x64.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

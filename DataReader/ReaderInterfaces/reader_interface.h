@@ -95,7 +95,7 @@ class minibatch
 public:
     std::map<size_t /*id from the input description*/, input_ptr> mb;
 
-    operator bool()
+    operator bool() const
     {
         return true; // TODO
     }
