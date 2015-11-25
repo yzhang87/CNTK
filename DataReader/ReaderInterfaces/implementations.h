@@ -83,7 +83,7 @@ public:
 
 typedef std::shared_ptr<mlf_sequence_reader> mlf_sequence_reader_ptr;
 
-class htkmlf_sequencer : sequencer
+class htkmlf_sequencer : public sequencer
 {
 public:
     htkmlf_sequencer(htk_sequence_reader_ptr, mlf_sequence_reader_ptr, scp_reader_ptr);
@@ -97,7 +97,7 @@ typedef std::shared_ptr<htk_sequence_reader> htk_sequence_reader_ptr;
 
 class packer {};
 
-class chunk_randomizer : randomizer
+class chunk_randomizer : public randomizer
 {
 public:
     chunk_randomizer(sequencer_ptr, size_t chunk_size, int seed);
@@ -106,7 +106,7 @@ public:
     virtual std::map<size_t, sequence> get_next_sequence() override;
 };
 
-class rolling_window_randomizer : randomizer
+class rolling_window_randomizer : public randomizer
 {
 };
 
@@ -119,7 +119,7 @@ public:
     virtual epoch_ptr start_next_epoch(const epoch_configuration& config) override;
 };
 
-class bptt_packer : packer
+class bptt_packer : public packer
 {};
 
 

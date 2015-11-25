@@ -80,10 +80,10 @@ typedef std::shared_ptr<transformer> transformer_ptr;
 // additional parameters given at construction time.
 // Note: chunk-level randomization can be implemented based on sequence lengths
 // exposed through the sequencer's timeline method.
-class randomizer : transformer
+class randomizer : public transformer
 {
 };
 
-class image_cropper : transformer
+class image_cropper : public transformer
 {
 };
