@@ -32,18 +32,18 @@ struct InputDescription
 };
 typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
 
-class MinibatchLayout
+class MbLayout
 {
 };
 
-class TensorLayout
+class SampleLayout
 {
 };
 
 struct Layout
 {
-    MinibatchLayout columns;
-    TensorLayout rows;
+    MbLayout columns;
+    SampleLayout rows;
 };
 
 typedef std::shared_ptr<Layout> LayoutPtr;
