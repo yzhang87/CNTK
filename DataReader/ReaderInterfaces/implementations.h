@@ -8,41 +8,20 @@
 class EpochImplementation : public Epoch
 {
 public:
-    virtual Minibatch readMinibatch()
+    virtual Minibatch readMinibatch() override
     {
+        throw std::logic_error("The method or operation is not implemented.");
         return Minibatch();
     };
     virtual ~EpochImplementation() {};
 };
 
 
-class HtkmlfReader : public Reader
-{
-public:
-    HtkmlfReader(const ConfigParameters& parameters, MemoryProviderPtr memoryProvider)
-    {
-    }
-
-    virtual std::vector<InputDescriptionPtr> getInputs()
-    {
-        throw std::logic_error("not implemented");
-    }
-
-    virtual EpochPtr startNextEpoch(const EpochConfiguration& config)
-    {
-        throw std::logic_error("not implemented");
-    }
-
-    virtual ~HtkmlfReader(){};
-};
-
+// TODO we don't use this yet
 struct PhysicalTimeline : Timeline
 {
     // Specific physical location per file format Sequence
 };
-
-class SequenceReader
-{};
 
 class FileReader : public BlockReader
 {
@@ -62,42 +41,42 @@ public:
 typedef std::shared_ptr<BlockReader> BlockReaderPtr;
 typedef std::shared_ptr<FileReader> FileReaderPtr;
 
-class ScpReader
+class ScpDataDerserializer
 {
 public:
-    ScpReader(BlockReaderPtr scp);
+    ScpDataDerserializer(BlockReaderPtr scp);
     PhysicalTimeline getTimeline();
 };
 
-typedef std::shared_ptr<ScpReader> ScpReaderPtr;
+typedef std::shared_ptr<ScpDataDerserializer> ScpDataDeserializerPtr;
 
-class HtkSequenceReader : public SequenceReader
+class HtkDataDeserializer : public DataDeserializer
 {
 public:
-    HtkSequenceReader(BlockReaderPtr features, AugmentationDescriptor augmentationDescriptor, const PhysicalTimeline& timeline);
+    HtkDataDeserializer(BlockReaderPtr features, AugmentationDescriptor augmentationDescriptor, const PhysicalTimeline& timeline);
 };
 
-typedef std::shared_ptr<HtkSequenceReader> HtkSequenceReaderPtr;
+typedef std::shared_ptr<HtkDataDeserializer> HtkDataDeserializerPtr;
 
-class MlfSequenceReader : public SequenceReader
+class MlfDataDeserializer : public DataDeserializer
 {
 public:
-    MlfSequenceReader(BlockReaderPtr lables, BlockReaderPtr states, const PhysicalTimeline& timeline);
+    MlfDataDeserializer(BlockReaderPtr lables, BlockReaderPtr states, const PhysicalTimeline& timeline);
 };
 
-typedef std::shared_ptr<MlfSequenceReader> MlfSequenceReaderPtr;
+typedef std::shared_ptr<MlfDataDeserializer> MlfDataDeserializerPtr;
 
-class HtkMlfSequencer : public Sequencer
+class HtkMlfBundler : public Sequencer
 {
 public:
-    HtkMlfSequencer(HtkSequenceReaderPtr, MlfSequenceReaderPtr, ScpReaderPtr);
+    HtkMlfBundler(HtkDataDeserializerPtr, MlfDataDeserializerPtr, ScpDataDeserializerPtr);
 
     virtual Timeline& getTimeline() const override;
     virtual std::vector<InputDescriptionPtr> getInputs() const override;
     virtual std::map<size_t, Sequence> getSequenceById(size_t id) override;
 };
 
-typedef std::shared_ptr<HtkSequenceReader> HtkSequenceReaderPtr;
+typedef std::shared_ptr<HtkDataDeserializer> HtkDataDeserializerPtr;
 
 class ChunkRandomizer : public Randomizer
 {
@@ -106,10 +85,6 @@ public:
 
     virtual std::vector<InputDescriptionPtr> getInputs() const override;
     virtual std::map<size_t, Sequence> getNextSequence() override;
-};
-
-class RollingWindowRandomizer : public Randomizer
-{
 };
 
 class NormalPacker : public Packer
@@ -154,19 +129,19 @@ ReaderPtr createReader(ConfigParameters& parameters, MemoryProviderPtr memoryPro
     // Read scp and form initial Timeline
     auto scpFilename = parameters["scpFilename"];
     BlockReaderPtr scp(new FileReader(scpFilename));
-    ScpReaderPtr t(new ScpReader(scp));
+    ScpDataDeserializerPtr t(new ScpDataDerserializer(scp));
 
     // Create Sequence readers to be combined by the Sequencer.
     auto featureFilename = parameters["featureFilename"];
     BlockReaderPtr featureReader(new FileReader(featureFilename));
-    HtkSequenceReaderPtr feature(new HtkSequenceReader(featureReader, AugmentationDescriptor(), t->getTimeline()));
+    HtkDataDeserializerPtr feature(new HtkDataDeserializer(featureReader, AugmentationDescriptor(), t->getTimeline()));
 
     auto labelsFilename = parameters["labelsFilename"];
     BlockReaderPtr labelReader(new FileReader(labelsFilename));
     auto statesFilename = parameters["statesFilename"];
     BlockReaderPtr statesReader(new FileReader(statesFilename));
-    MlfSequenceReaderPtr labels(new MlfSequenceReader(labelReader, statesReader, t->getTimeline()));
-    SequencerPtr sequencer(new HtkMlfSequencer(feature, labels, t));
+    MlfDataDeserializerPtr labels(new MlfDataDeserializer(labelReader, statesReader, t->getTimeline()));
+    SequencerPtr sequencer(new HtkMlfBundler(feature, labels, t));
 
     // Create Randomizer and form randomized Timeline.
     TransformerPtr randomizer(new ChunkRandomizer(sequencer, chunkSize, seed));

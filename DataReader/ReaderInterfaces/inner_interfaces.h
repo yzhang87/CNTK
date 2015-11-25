@@ -27,13 +27,18 @@ struct Sequence
     size_t numberOfFrames;
 };
 
-// Low-level Input interface (for file, network, etc.).
+// Low-level input interface (for file, network, etc.).
 // Memory buffers to fill data into are provided by the caller.
 class BlockReader
 {
 public:
     virtual void get(char* buffer, size_t offset, size_t size) = 0;
     virtual ~BlockReader() = 0 {}
+};
+
+// Interface to for structured reading from a single datasource
+class DataDeserializer
+{
 };
 
 // Timeline specifies a vector of Sequence IDs and lengths.
