@@ -5,14 +5,18 @@
 
 #include <string>
 
-class EpochImplementation : Epoch
+class EpochImplementation : public Epoch
 {
 public:
-    virtual Minibatch readMinibatch();
-    virtual ~EpochImplementation() = 0 {};
+    virtual Minibatch readMinibatch()
+    {
+        return Minibatch();
+    };
+    virtual ~EpochImplementation() {};
 };
 
-class HtkmlfReader : Reader
+
+class HtkmlfReader : public Reader
 {
 public:
     HtkmlfReader(const ConfigParameters& parameters, MemoryProviderPtr memoryProvider)
@@ -95,8 +99,6 @@ public:
 
 typedef std::shared_ptr<HtkSequenceReader> HtkSequenceReaderPtr;
 
-class Packer {};
-
 class ChunkRandomizer : public Randomizer
 {
 public:
@@ -110,7 +112,7 @@ class RollingWindowRandomizer : public Randomizer
 {
 };
 
-class NormalPacker : public Reader
+class NormalPacker : public Packer
 {
 public:
     NormalPacker(MemoryProviderPtr memoryProvider, TransformerPtr transformer, const ConfigParameters& config) {}
@@ -120,8 +122,24 @@ public:
 };
 
 class BpttPacker : public Packer
-{};
+{
+};
 
+class ReaderFacade : public Reader
+{
+public:
+    ReaderFacade(PackerPtr packer) {}
+    virtual std::vector<InputDescriptionPtr> getInputs()
+    {
+        std::vector<InputDescriptionPtr> result;
+        return result;
+    };
+    virtual EpochPtr startNextEpoch(const EpochConfiguration& config)
+    {
+        return std::make_unique<EpochImplementation>();
+    };
+    virtual ~ReaderFacade() { }
+};
 
 ReaderPtr createReader(ConfigParameters& parameters, MemoryProviderPtr memoryProvider)
 {
@@ -155,5 +173,7 @@ ReaderPtr createReader(ConfigParameters& parameters, MemoryProviderPtr memoryPro
 
     // Create the Packer that will consume the sequences from the Randomizer and will
     // pack them into efficient representation using the memory provider.
-    return ReaderPtr(new NormalPacker(memoryProvider, randomizer, parameters));
+    PackerPtr packer = PackerPtr(new NormalPacker(memoryProvider, randomizer, parameters));
+
+    return std::make_unique<ReaderFacade>(std::move(packer));
 }
