@@ -4,7 +4,7 @@
 #include <memory>
 #include <map>
 
-class config_parameters : public std::map<std::wstring, std::wstring>
+class config_parameters : public std::map<std::string, std::string>
 {
 };
 
@@ -97,6 +97,7 @@ public:
 
     bool operator!()
     {}
+
 };
 
 class epoch
