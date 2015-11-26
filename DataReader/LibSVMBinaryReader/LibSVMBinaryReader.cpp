@@ -10,717 +10,616 @@
 #define DATAREADER_EXPORTS  // creating the exports here
 #include "DataReader.h"
 #include "LibSVMBinaryReader.h"
-#ifdef LEAKDETECT
-#include <vld.h> // leak detection
-#endif
 #include "fileutil.h"   // for fexists()
+#include <random>
+#include <map>
+#include <ctime>
+#include "basetypes.h"
 
-namespace Microsoft { namespace MSR { namespace CNTK {
+namespace Microsoft {
+    namespace MSR {
+        namespace CNTK {
 
-DWORD HIDWORD(size_t size) {return size>>32;}
-DWORD LODWORD(size_t size) {return size&0xFFFFFFFF;}
+            DWORD HIDWORD(size_t size) { return size >> 32; }
+            DWORD LODWORD(size_t size) { return size & 0xFFFFFFFF; }
 
-std::string ws2s(const std::wstring& wstr)
-{
-    int size_needed = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), int(wstr.length() + 1), 0, 0, 0, 0);
-    std::string strTo(size_needed, 0);
-    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), int(wstr.length() + 1), &strTo[0], size_needed, 0, 0);
-    return strTo;
-}
+            template<class ElemType>
+            SparseBinaryInput<ElemType>::SparseBinaryInput(){}
 
-template<class ElemType>
-size_t LibSVMBinaryReader<ElemType>::RandomizeSweep(size_t mbStartSample)
-{
-    //size_t randomRangePerEpoch = (m_epochSize+m_randomizeRange-1)/m_randomizeRange;
-    //return m_epoch*randomRangePerEpoch + epochSample/m_randomizeRange;
-    return mbStartSample/m_randomizeRange;
-}
-
-// ReadLine - Read a line
-// readSample - sample to read in global sample space
-// returns - true if we successfully read a record, otherwise false
-template<class ElemType>
-bool LibSVMBinaryReader<ElemType>::ReadRecord(size_t /*readSample*/)
-{
-    return false; // not used
-}
-
-// RecordsToRead - Determine number of records to read to populate record buffers
-// mbStartSample - the starting sample from which to read
-// tail - we are checking for possible remainer records to read (default false)
-// returns - true if we have more to read, false if we hit the end of the dataset
-template<class ElemType>
-size_t LibSVMBinaryReader<ElemType>::RecordsToRead(size_t mbStartSample, bool tail)
-{
-    assert(mbStartSample >= m_epochStartSample);
-    // determine how far ahead we need to read
-    bool randomize = Randomize();
-    // need to read to the end of the next minibatch
-    size_t epochSample = mbStartSample;
-    epochSample %= m_epochSize;
-
-    // determine number left to read for this epoch
-    size_t numberToEpoch = m_epochSize - epochSample;
-    // we will take either a minibatch or the number left in the epoch
-    size_t numberToRead = min(numberToEpoch, m_mbSize);
-    if (numberToRead == 0 && !tail)
-        numberToRead = m_mbSize;
-
-    if (randomize)
-    {
-        size_t randomizeSweep = RandomizeSweep(mbStartSample);
-        // if first read or read takes us to another randomization range
-        // we need to read at least randomization range records
-        if (randomizeSweep != m_randomordering.CurrentSeed()) // the range has changed since last time
-        {
-            numberToRead = RoundUp(epochSample, m_randomizeRange) - epochSample;
-            if (numberToRead == 0 && !tail)
-                numberToRead = m_randomizeRange;
-        }
-    }
-    return numberToRead;
-}
-
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::WriteLabelFile()
-{
-    // write out the label file if they don't have one
-    if (!m_labelFileToWrite.empty())
-    {
-        if (m_mapIdToLabel.size() > 0)
-        {
-            File labelFile(m_labelFileToWrite, fileOptionsWrite | fileOptionsText);
-            for (int i=0; i < m_mapIdToLabel.size(); ++i)
-            {
-                labelFile << m_mapIdToLabel[i] << '\n';
+            template<class ElemType>
+            SparseBinaryInput<ElemType>::~SparseBinaryInput(){
+                Dispose();
             }
-            fprintf(stderr, "label file %ls written to disk\n", m_labelFileToWrite.c_str());
-            m_labelFileToWrite.clear();
-        }
-        else if (!m_cachingWriter)
-        {
-            fprintf(stderr, "WARNING: file %ls NOT written to disk yet, will be written the first time the end of the entire dataset is found.\n", m_labelFileToWrite.c_str());
-        }
-    }
-}
 
-// Destroy - cleanup and remove this class
-// NOTE: this destroys the object, and it can't be used past this point
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::Destroy()
-{
-    delete this;
-}
+            template<class ElemType>
+            //void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels)
+            void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename, size_t windowSize )
+            {
+#ifdef _WIN32
+                m_hndl = CreateFile(fileName.c_str(), GENERIC_READ,
+                    FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                if (m_hndl == INVALID_HANDLE_VALUE)
+                {
+                    RuntimeError("Unable to Open/Create file %ls, error %x", fileName.c_str(), GetLastError());
+                    /*
+                    char message[1024];
+                    sprintf_s(message, 1024, "Unable to Open/Create file %ls, error %x", fileName.c_str(), GetLastError());
+                    throw runtime_error(message);
+					*/
+                }
 
-// Init - Reader Initialize for multiple data sets
-// config - [in] configuration parameters for the datareader
-// Sample format below:
-//# Parameter values for the reader
-//reader=[
-//  # reader to use
-//  readerType=LibSVMBinaryReader
-//  miniBatchMode=Partial
-//  randomize=None
-//  features=[
-//    dim=784
-//    start=1
-//    file=c:\speech\mnist\mnist_test.txt
-//  ]
-//  labels=[
-//    dim=1
-//      start=0
-//      file=c:\speech\mnist\mnist_test.txt
-//      labelMappingFile=c:\speech\mnist\labels.txt
-//      labelDim=10
-//      labelType=Category
-//  ]
-//]
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::Init(const ConfigParameters& readerConfig)
-{
-    m_labelDim = 2; // maximum label ID we will ever see (used for array dimensions)
-    std::vector<std::wstring> features;
-    std::vector<std::wstring> labels;
+                m_filemap = CreateFileMapping(m_hndl, NULL, PAGE_READONLY, 0, 0, NULL);
 
-    // Determine the names of the features and lables sections in the config file.
-    // features - [in,out] a vector of feature name strings
-    // labels - [in,out] a vector of label name strings
-    // For LibSVMBinary dataset, we only need features. No label is necessary. The following "labels" just serves as a place holder
-    GetFileConfigNames(readerConfig, features, labels);
+                SYSTEM_INFO sysinfo;
+                GetSystemInfo(&sysinfo);
+                sysGran = sysinfo.dwAllocationGranularity;
 
-    // For LibSVMBinary dataset, it must have exactly two features
-    // In the config file, we must specify query features first, then document features. The sequence is different here. Pay attention
-    if (features.size() == 1 && labels.size() == 1)
-    {
-        m_featuresName = features[0];
-        m_labelsName = labels[0];
-    }
-    else
-    {
-        RuntimeError("LibSVMBinary requires exactly one feature and one label. Their names should match those in NDL definition");
-        return;
-    }
+                header_buffer = MapViewOfFile(m_filemap,   // handle to map object
+                    FILE_MAP_READ, // get correct permissions
+                    HIDWORD(0),
+                    LODWORD(0),
+                    sizeof(int64_t) * 2 + sizeof(int32_t) * 2);
+#else
+                sysGran = sysconf(_SC_PAGESIZE);
+                m_hndFile = open(msra::strfun::utf8(fileName).c_str(), m_writeFile ? O_RDWR : O_RDONLY, O_CREAT);
+                if (m_hndFile < 0)
+                {
+                    RuntimeError("Unable to Open/Create file %s, error %d", msra::strfun:utf8(fileName).c_str(), errno);
+                }
+                header_buffer = mmap(0, sizeof(int64_t) * 2000000, PROT_READ, MAP_SHARED, m_hndFile, 0);
+#endif
+
+                //cout << "After mapviewoffile" << endl;
+
+                int64_t base_offset = 0;
+
+                numRows = *(int64_t*)((char*)header_buffer + base_offset);
+                base_offset += sizeof(int64_t);
+
+                numBatches = *(int64_t*)((char*)header_buffer + base_offset);
+                base_offset += sizeof(int64_t);
+
+                numFeatures = *(int32_t*)((char*)header_buffer + base_offset);
+                base_offset += sizeof(int32_t);
+
+                numLabels = *(int32_t*)((char*)header_buffer + base_offset);
+                base_offset += sizeof(int32_t);
+
+                int32_t len;
+                int32_t numCols;
+                for (int32_t c = 0; c < numFeatures; c++)
+                {
+                    len = *(int32_t*)((char*)header_buffer + base_offset);
+                    base_offset += sizeof(int32_t);
+
+                    std::string name((char*)header_buffer + base_offset, len);
+                    std::wstring wname = msra::strfun::utf16(name);
+                    if (rename.find(wname) == rename.end())
+                    {
+                        m_features.emplace_back(wname);
+                    }
+                    else
+                    {
+                        m_features.emplace_back(rename[wname]);
+                    }
+                    base_offset += sizeof(int8_t)*len;
+
+                    numCols = *(int32_t*)((char*)header_buffer + base_offset);
+                    //numCols = (int32_t)49292;
+                    base_offset += sizeof(int32_t);
+                    mappedNumCols[m_features.back()] = numCols;
+
+                }
+                for (int32_t c = 0; c < numLabels; c++)
+                {
+                    len = *(int32_t*)((char*)header_buffer + base_offset);
+                    base_offset += sizeof(int32_t);
+
+                    std::string name((char*)header_buffer + base_offset, len);
+                    std::wstring wname = msra::strfun::utf16(name);
+                    if (rename.find(wname) == rename.end())
+                    {
+                        m_labels.emplace_back(wname);
+                    }
+                    else
+                    {
+                        //m_features.emplace_back(rename[wname]);
+                        m_labels.emplace_back(rename[wname]);
+                    }
+                    base_offset += sizeof(int8_t)*len;
+
+                    numCols = *(int32_t*)((char*)header_buffer + base_offset);
+                    base_offset += sizeof(int32_t);
+                    mappedNumCols[m_labels.back()] = numCols;
+
+                }
+
+                int64_t offsets_padding = base_offset % sysGran;
+                base_offset -= offsets_padding;
+
+                int64_t header_size = numBatches*sizeof(int64_t) + offsets_padding;
+
+#ifdef _WIN32
+                offsets_orig = MapViewOfFile(m_filemap,   // handle to map object
+                    FILE_MAP_READ, // get correct permissions
+                    HIDWORD(base_offset),
+                    LODWORD(base_offset),
+                    header_size);
+#else
+                offsets_orig = mmap(0, header_size, PROT_READ, MAP_SHARED, m_hndFile, base_offset);
+#endif
+
+                offsets_buffer = (int64_t*)((char*)offsets_orig + offsets_padding);
+
+                int64_t header_offset = base_offset + offsets_padding + numBatches * sizeof(int64_t);
+
+                m_dataPadding = header_offset % sysGran;
+                header_offset -= m_dataPadding;
+
+                m_dataOffset = header_offset;
+
+                m_windowSize = min((int64_t)windowSize, numBatches);
+
+                data_orig = NULL;
+
+                m_numWindows = (size_t)ceil((double)numBatches / m_windowSize);
+                m_curWindow = 1;
+#ifdef _WIN32
+#else
+				struct stat stat_buf;
+				fstat( m_hndFile, &stat_buf );
+				m_fileSize = stat_buf.st_size;
+#endif
+
+                Load_Window(0);
+
+            }
+            
+            template<class ElemType>
+            void SparseBinaryInput<ElemType>::Unload_Window() {
+
+                if (data_orig != NULL) {
+#ifdef _WIN32
+                    UnmapViewOfFile(data_orig);
+#else
+                    munmap(data_orig,m_windowSizeBytes);
+                    m_windowSizeBytes = 0;
+#endif
+                }
+				data_orig = NULL;
+                data_buffer = NULL;
+            }
+
+            template<class ElemType>
+            void SparseBinaryInput<ElemType>::LoadNextWindow() {
+                Load_Window( ( m_curWindow + 1 ) % m_numWindows );
+            }
+            
+            template<class ElemType>
+            void SparseBinaryInput<ElemType>::Load_Window(size_t cur_window) {
+                if (m_curWindow == cur_window) {
+                    return;
+                }
+                Unload_Window();
+                m_curWindow = cur_window;
+                int64_t upper = (cur_window + 1) * m_windowSize + 1;
+                m_lower = cur_window * m_windowSize;
+                if (upper > numBatches) {
+#ifdef _WIN32
+                    m_windowSizeBytes = 0;
+#else
+                    m_windowSizeBytes = m_FileSize - offsets_buffer[m_lower];
+#endif
+                }
+                else {
+                    m_windowSizeBytes = offsets_buffer[upper] - offsets_buffer[m_lower];
+                }
+#ifdef _WIN32
+                data_orig = MapViewOfFile(m_filemap,   // handle to map object
+                    FILE_MAP_READ, // get correct permissions
+                    HIDWORD(m_dataOffset),
+                    LODWORD(m_dataOffset),
+                    m_windowSizeBytes);
+#else
+
+                data_orig = mmap(0, m_windowSizeBytes, PROT_READ, MAP_SHARED, m_hndFile, m_dataOffset);
+#endif
+                data_buffer = (char*)data_orig + m_dataPadding;
+            }
+
+            template<class ElemType>
+            size_t SparseBinaryInput<ElemType>::Next_Batch(std::map<std::wstring, Matrix<ElemType>*>& matrices, size_t cur_batch){
+
+                int64_t buffer_offset = offsets_buffer[m_lower + cur_batch] - offsets_buffer[m_lower];
+                int32_t nnz;
+                int32_t curMBSize;
+
+                curMBSize = *(int32_t*)((char*)data_buffer + buffer_offset);
+                buffer_offset += sizeof(int32_t);
+
+                for (int32_t c = 0; c < m_features.size(); c++)
+                {
+                    nnz = *(int32_t*)((char*)data_buffer + buffer_offset);
+                    buffer_offset += sizeof(int32_t);
+
+                    ElemType* values = (ElemType*)((char*)data_buffer + buffer_offset);
+                    buffer_offset += sizeof(ElemType)*nnz;
+
+                    /**/
+                    int32_t* rowIndices = (int32_t*)((char*)data_buffer + buffer_offset);
+                    buffer_offset += sizeof(int32_t)*nnz;
+                    /**/
+                    /*
+                    int32_t* rowIndices = (int32_t*)malloc(sizeof(int32_t)*nnz);
+                    memcpy(rowIndices, (char*)data_buffer + buffer_offset, nnz*sizeof(int32_t));
+                    for (int32_t d = 0; d < nnz; d++)
+                    {
+                    if (rowIndices[d] > 49291)
+                    {
+                    fprintf(stderr, "fixing index %d = %d\n", d, rowIndices[d]);
+                    rowIndices[d] = 1;
+                    }
+                    }
+                    buffer_offset += sizeof(int32_t)*nnz;
+                    */
+
+                    int32_t* colIndices = (int32_t*)((char*)data_buffer + buffer_offset);
+                    buffer_offset += sizeof(int32_t)*(curMBSize + 1);
+
+                    auto findMat = matrices.find(m_features[c]);
+                    if (findMat != matrices.end())
+                    {
+                        auto mat = findMat->second;
+                        mat->SetMatrixFromCSCFormat(colIndices, rowIndices, values, nnz, mappedNumCols[m_features[c]], curMBSize);
+#ifdef DEBUG
+                        mat->Print("features");
+#endif
+                    }
+                    //free(rowIndices);
+                }
+
+                for (int32_t c = 0; c < m_labels.size(); c++)
+                {
+                    int32_t numCols = mappedNumCols[m_labels[c]];
+
+                    ElemType* m_labelsBuffer = (ElemType*)((char*)data_buffer + buffer_offset);
+                    buffer_offset += sizeof(ElemType)*(curMBSize* numCols);
+
+                    auto findMat = matrices.find(m_labels[c]);
+                    if (findMat != matrices.end())
+                    {
+                        auto mat = findMat->second;
+                        mat->SetValue(numCols, curMBSize, mat->GetDeviceId(), m_labelsBuffer, matrixFlagNormal);
+#ifdef DEBUG
+                        mat->Print("labels");
+#endif
+                    }
+                }
+                return (size_t)curMBSize;
+            }
+
+            template<class ElemType>
+            void SparseBinaryInput<ElemType>::Dispose(){
+                if (offsets_orig != NULL){
+                    UnmapViewOfFile(offsets_orig);
+                }
+                if (data_orig != NULL)
+                {
+                    UnmapViewOfFile(data_orig);
+                }
+
+            }
 
 
-    m_mbStartSample = m_epoch = m_totalSamples = m_epochStartSample = 0;
-    m_labelIdMax = m_labelDim = 2;
-    m_partialMinibatch = m_endReached = false;
-    m_labelType = labelCategory;
-    m_readNextSample = 0;
-    m_traceLevel = readerConfig("traceLevel", "0");
+            // Init - Reader Initialize for multiple data sets
+            // config - [in] configuration parameters for the datareader
+            // Sample format below:
+            //# Parameter values for the reader
+            //reader=[
+            //  # reader to use
+            //  readerType=LibSVMBinaryReader
+            //  miniBatchMode=Partial
+            //  randomize=None
+            //  features=[
+            //    dim=784
+            //    start=1
+            //    file=c:\speech\mnist\mnist_test.txt
+            //  ]
+            //  labels=[
+            //    dim=1
+            //      start=0
+            //      file=c:\speech\mnist\mnist_test.txt
+            //      labelMappingFile=c:\speech\mnist\labels.txt
+            //      labelDim=10
+            //      labelType=Category
+            //  ]
+            //]
 
-    if (readerConfig.Exists("randomize"))
-    {
-        string randomizeString = readerConfig("randomize");
-        if (randomizeString == "None")
-        {
-            m_randomizeRange = randomizeNone;
-        }
-        else if (randomizeString == "Auto")
-        {
-            m_randomizeRange = randomizeAuto;
-        }
-        else
-        {
-            m_randomizeRange = readerConfig("randomize");
-        }
-    }
-    else
-    {
-        m_randomizeRange = randomizeNone;
-    }
-
-    std::string minibatchMode(readerConfig("minibatchMode", "Partial"));
-    m_partialMinibatch = !_stricmp(minibatchMode.c_str(), "Partial");
-
-
-    // Get the config parameters for query feature and doc feature
-    ConfigParameters configFeatures = readerConfig(m_featuresName, "");
-
-    if (configFeatures.size() == 0)
-        RuntimeError("features file not found, required in configuration: i.e. 'features=[file=c:\\myfile.txt;start=1;dim=123]'");
-
-    // Read in feature size information
-    // This information will be used to handle OOVs
-    m_featuresDim= configFeatures(L"dim");
-
-    std::wstring file = configFeatures("file");
-
-    featuresInput.Init(file, m_featuresDim);
-
-    m_totalSamples = featuresInput.numRows;
-    if (read_order == NULL)
-    {
-        read_order = new int[featuresInput.numBatches];
-        for (int c = 0; c < featuresInput.numBatches; c++)
-        {
-            read_order[c] = c;
-        }
-    }
-    m_mbSize = 0;
-
-}
-// destructor - virtual so it gets called properly 
-template<class ElemType>
-LibSVMBinaryReader<ElemType>::~LibSVMBinaryReader()
-{
-    ReleaseMemory();
-}
-
-// ReleaseMemory - release the memory footprint of LibSVMBinaryReader
-// used when the caching reader is taking over
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::ReleaseMemory()
-{
-    if (m_qfeaturesBuffer!=NULL)
-        delete[] m_qfeaturesBuffer;
-    m_qfeaturesBuffer=NULL;
-    if (m_dfeaturesBuffer!=NULL)
-        delete[] m_dfeaturesBuffer;
-    m_dfeaturesBuffer=NULL;
-    if (m_labelsBuffer!=NULL)
-        delete[] m_labelsBuffer;
-    m_labelsBuffer=NULL;
-    if (m_labelsIdBuffer!=NULL)
-        delete[] m_labelsIdBuffer;
-    m_labelsIdBuffer=NULL;
-    m_featureData.clear();
-    m_labelIdData.clear();
-    m_labelData.clear();
-}
-
-//SetupEpoch - Setup the proper position in the file, and other variable settings to start a particular epoch
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::SetupEpoch()
-{
-}
-
-// utility function to round an integer up to a multiple of size
-size_t RoundUp(size_t value, size_t size) 
-{
-    return ((value + size -1)/size)*size;
-}
-
-//StartMinibatchLoop - Startup a minibatch loop 
-// mbSize - [in] size of the minibatch (number of Samples, etc.)
-// epoch - [in] epoch number for this loop, if > 0 the requestedEpochSamples must be specified (unless epoch zero was completed this run)
-// requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
-//   this value must be a multiple of mbSize, if it is not, it will be rounded up to one.
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
-{
-    m_epoch = epoch;
-    size_t mbStartSample = m_epoch * m_epochSize;
-    if (m_totalSamples == 0)
-    {
-        m_totalSamples = featuresInput.numRows;
-    }
-
-    size_t fileRecord = m_totalSamples ? mbStartSample % m_totalSamples : 0;
-    fprintf(stderr, "starting epoch %lld at record count %lld, and file position %lld\n", m_epoch, mbStartSample, fileRecord);
-    //size_t currentFileRecord = m_mbStartSample % m_totalSamples;
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::RenamedMatrices(const ConfigParameters& readerConfig, std::map<std::wstring, std::wstring>& rename)
+            {
+                for (auto iter = readerConfig.begin(); iter != readerConfig.end(); ++iter)
+                {
+                    auto pair = *iter;
+                    ConfigParameters temp(iter->second);
+                    // see if we have a config parameters that contains a "dim" element, it's a sub key, use it
+                    if (temp.ExistsCurrent("rename"))
+                    {
+                        rename.emplace(msra::strfun::utf16(iter->first), msra::strfun::utf16(temp("rename")));
+                    }
+                }
+            }
 
 
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::Init(const ConfigParameters& readerConfig)
+            {
+                // Determine the names of the features and lables sections in the config file.
+                // features - [in,out] a vector of feature name strings
+                // labels - [in,out] a vector of label name strings
+                // For SparseBinary dataset, we only need features. No label is necessary. The following "labels" just serves as a place holder
+                GetFileConfigNames(readerConfig, m_features, m_labels);
+                RenamedMatrices(readerConfig, m_rename);
 
-    // reset the next read sample
-    m_processedMinibatches = 0;
-    m_readNextSample = 0;
-    m_epochStartSample = m_mbStartSample = mbStartSample;
-    m_mbSize = mbSize;
-    m_epochSize = requestedEpochSamples;
-    featuresInput.SetupEpoch(mbSize);
-    if (m_epochSize > (size_t)featuresInput.numRows)
-    {
-        m_epochSize = (size_t)featuresInput.numRows;
-    }
-    if (Randomize())
-    {
-        random_shuffle(&read_order[0], &read_order[featuresInput.numBatches]);
-    }
-    m_epoch = epoch;
-    m_mbStartSample = epoch*m_epochSize;
+                m_epoch = 0;
 
-}
+                m_partialMinibatch = false;
+                m_traceLevel = (size_t)readerConfig("traceLevel", "0");
 
-// function to store the LabelType in an ElemType
-// required for string labels, which can't be stored in ElemType arrays
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::StoreLabel(ElemType& labelStore, const LabelType& labelValue)
-{
-    labelStore = (ElemType)m_mapLabelToId[labelValue];
-}
-
-// GetMinibatch - Get the next minibatch (features and labels)
-// matrices - [in] a map with named matrix types (i.e. 'features', 'labels') mapped to the corresponing matrix, 
-//             [out] each matrix resized if necessary containing data. 
-// returns - true if there are more minibatches, false if no more minibatchs remain
-template<class ElemType>
-bool LibSVMBinaryReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
-{
-    if (m_processedMinibatches >= featuresInput.numBatches )
-    {
-        return false;
-    }
-    // In my unit test example, the input matrices contain 5: N, S, fD, fQ and labels
-    // Both N and S serve as a pre-set constant values, no need to change them
-    // In this node, we only need to fill in these matrices: fD, fQ, labels
-    Matrix<ElemType>& features = *matrices[m_featuresName];
-    Matrix<ElemType>& labels = *matrices[m_labelsName]; // will change this part later.
-    
-    size_t actualMBSize = ( m_readNextSample + m_mbSize > m_totalSamples ) ? m_totalSamples - m_readNextSample : m_mbSize;
+                if (readerConfig.Exists("randomize"))
+                {
+                    string randomizeString = readerConfig("randomize");
+                    if (randomizeString == "None")
+                    {
+                        m_randomize = 0L;
+                    }
+                    else if (randomizeString == "Auto")
+                    {
+                        //m_randomize = randomizeAuto;
+                        time_t rawtime;
+                        struct tm* timeinfo;
+                        time(&rawtime);
+                        timeinfo = localtime(&rawtime);
+                        m_randomize = (unsigned long)(timeinfo->tm_sec + timeinfo->tm_min * 60 + timeinfo->tm_hour * 60 * 60);
+                    }
+                    else
+                    {
+                        m_randomize = (unsigned long)readerConfig("randomize");
+                    }
+                }
+                else
+                {
+                    m_randomize = 0L;
+                }
 
 
-    //features.SwitchToMatrixType(MatrixType::SPARSE, MatrixFormat::matrixFormatSparseCSC);
+                std::string minibatchMode(readerConfig("minibatchMode", "Partial"));
+                m_partialMinibatch = !_stricmp(minibatchMode.c_str(), "Partial");
 
-    /*
-    featuresQ.Resize(dssm_queryInput.numRows, actualMBSize);
-    featuresD.Resize(dssm_docInput.numRows, actualMBSize);
-    */
+                std::wstring file = readerConfig("file");
 
-    //fprintf(stderr, "featuresQ\n");
-    featuresInput.Next_Batch(features, labels, actualMBSize, read_order[m_processedMinibatches]);
-    //fprintf(stderr, "\n\n\nfeaturesD\n");
-    //fprintf(stderr, "\n\n\n\n\n");
-    m_readNextSample += actualMBSize;
-    m_processedMinibatches++;
-    //fprintf(stderr, "mbs: %d\tsamples: %d\n", m_processedMinibatches, m_readNextSample);
-    /*
-                featuresQ.Print("featuresQ");
-                fprintf(stderr, "\n");
-                featuresD.Print("featuresD");
-                fprintf(stderr, "\n");
+                m_windowSize = readerConfig("windowSize", "10000");
+
+                dataInput.Init(file, m_rename, m_windowSize);
+
+                m_mbSize = (size_t)readerConfig("minibatch", "0");
+                if (m_mbSize > 0)
+                {
+                    if (dataInput.getMBSize() != m_mbSize)
+                    {
+                        RuntimeError("Data file and config file have mismatched minibatch sizes.\n");
+                        return;
+                    }
+                }
+                else
+                {
+                    m_mbSize = dataInput.getMBSize();
+                }
+
+                m_numBatches = dataInput.getNumMB();
+
+                m_epochSize = readerConfig("epochMinibatches", "0");
+                if (m_epochSize > 0)
+                {
+                    if (m_numBatches < m_epochSize)
+                    {
+                        if (m_traceLevel > 0)
+                        {
+                            fprintf(stderr, "Warning: epoch size is larger than input data size. Data will be reused.\n");
+                        }
+                    }
+                }
+                else {
+                    m_epochSize = (size_t)dataInput.getNumMB();
+                }
+
+                if (read_order == nullptr)
+                {
+                    read_order = new size_t[m_windowSize];
+                    for (size_t c = 0; c < m_windowSize; c++)
+                    {
+                        read_order[c] = c;
+                    }
+                }
+
+            }
+
+            // Destroy - cleanup and remove this class
+            // NOTE: this destroys the object, and it can't be used past this point
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::Destroy()
+            {
+                delete this;
+            }
+
+            // destructor - virtual so it gets called properly 
+            template<class ElemType>
+            LibSVMBinaryReader<ElemType>::~LibSVMBinaryReader()
+            {
+                ReleaseMemory();
+            }
+            
+            //StartMinibatchLoop - Startup a minibatch loop 
+            // mbSize - [in] size of the minibatch (number of Samples, etc.)
+            // epoch - [in] epoch number for this loop, if > 0 the requestedEpochSamples must be specified (unless epoch zero was completed this run)
+            // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
+            //   this value must be a multiple of mbSize, if it is not, it will be rounded up to one.
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
+            {
+                StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, requestedEpochSamples);
+            }
+
+            //StartMinibatchLoop - Startup a minibatch loop 
+            // mbSize - [in] size of the minibatch (number of Samples, etc.)
+            // epoch - [in] epoch number for this loop, if > 0 the requestedEpochSamples must be specified (unless epoch zero was completed this run)
+            // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
+            //   this value must be a multiple of mbSize, if it is not, it will be rounded up to one.
+            template<class ElemType>
+				void LibSVMBinaryReader<ElemType>::StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t /*requestedEpochSamples*/ )
+				//void LibSVMBinaryReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t /*requestedEpochSamples*/)
+            {
+
+                m_readMB = subsetNum;
+                Shuffle();
+
+                m_epoch = epoch;
+
+                m_mbSize = mbSize;
+
+                m_subsetNum = subsetNum;
+                m_numSubsets = numSubsets;
+                
+                dataInput.Load_Window(0);
+                /*
+                if (mbSize != m_mbSize)
+                {
+                RuntimeError("Data file and config file have mismatched minibatch sizes.\n");
+                }
                 */
 
-    /*
-    GPUSPARSE_INDEX_TYPE* h_CSCCol;
-    GPUSPARSE_INDEX_TYPE* h_Row;
-    ElemType* h_val;
-    size_t nz;
-    size_t nrs;
-    size_t ncols;
-    featuresQ.GetMatrixFromCSCFormat(&h_CSCCol, &h_Row, &h_val, &nz, &nrs, &ncols);
+                //m_epochSize = requestedEpochSamples / m_mbSize;
+            }
 
-    for (int j = 0, k=0; j < nz; j++)
-    {
-        if (h_CSCCol[k] >= j)
-        {
-            fprintf(stderr, "\n");
-            k++;
-        }
-        fprintf(stderr, "%d:%.f ", h_Row[j], h_val[j]);
+            // GetMinibatch - Get the next minibatch (features and labels)
+            // matrices - [in] a map with named matrix types (i.e. 'features', 'labels') mapped to the corresponing matrix, 
+            //             [out] each matrix resized if necessary containing data. 
+            // returns - true if there are more minibatches, false if no more minibatchs remain
+            template<class ElemType>
+            bool LibSVMBinaryReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
+            {
+                if (m_readMB >= m_epochSize)
+                {
+                    return false;
+                }
 
-    }
-    */
+                size_t actualmbsize = dataInput.Next_Batch(matrices, read_order[m_nextMB ]);
+				m_pMBLayout->Init(actualmbsize, 1, false/*means it is not sequential*/);
 
-    /*
-    featuresQ.TransferFromDeviceToDevice(featuresQ.GetDeviceId(), -1);
-    featuresQ.SwitchToMatrixType(MatrixType::DENSE, MatrixFormat::matrixFormatDense);
-    featuresQ.Print("featuresQ");
-    
-    featuresD.TransferFromDeviceToDevice(featuresD.GetDeviceId(), -1);
-    featuresD.SwitchToMatrixType(MatrixType::DENSE, MatrixFormat::matrixFormatDense);
-    featuresD.Print("featuresD");
+                m_readMB += m_numSubsets;
+                m_nextMB += m_numSubsets;
 
-    exit(1);
-    */
+                if (m_nextMB >= m_windowSize)
+                {
+                    dataInput.LoadNextWindow();
+                    m_nextMB = m_subsetNum;
+                    Shuffle();
+                }
+                /*
+                m_readMB++;
 
-    /*
-    if (actualMBSize > m_mbSize || m_labelsBuffer == NULL) {
-        size_t rows = labels.GetNumRows();
-        labels.Resize(rows, actualMBSize);
-        labels.SetValue(0.0);
-        m_labelsBuffer = new ElemType[rows * actualMBSize];
-        memset(m_labelsBuffer, 0, sizeof(ElemType)* rows * actualMBSize);
-        for (int i = 0; i < actualMBSize; i++)
-        {
-            m_labelsBuffer[i * rows] = 1;
-        }
-        labels.SetValue(rows, actualMBSize, m_labelsBuffer, 0, labels.GetDeviceId());
+                m_nextMB++;
+                if (m_nextMB >= m_numBatches)
+                {
+                    m_nextMB = 0;
+                    Shuffle();
+                }
+				*/
 
-    }
-    */
-    /*
-    featuresQ.Print("featuresQ");
-    featuresD.Print("featuresD");
-    labels.print("labels");
-    */
+                return true;
+            }
 
-    return true;
-}
+            // GetLabelMapping - Gets the label mapping from integer index to label type 
+            // returns - a map from numeric datatype to native label type 
+            template<class ElemType>
+            const std::map<typename IDataReader<ElemType>::LabelIdType, typename IDataReader<ElemType>::LabelType>& LibSVMBinaryReader<ElemType>::GetLabelMapping(const std::wstring&)
+            {
+                return m_mapIdToLabel;
+            }
 
+            // SetLabelMapping - Sets the label mapping from integer index to label 
+            // labelMapping - mapping table from label values to IDs (must be 0-n)
+            // note: for tasks with labels, the mapping table must be the same between a training run and a testing run 
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::SetLabelMapping(const std::wstring& /*sectionName*/, const std::map<typename IDataReader<ElemType>::LabelIdType, typename LabelType>& labelMapping)
+            {
+                m_mapIdToLabel = labelMapping;
+                m_mapLabelToId.clear();
+                for (std::pair<unsigned, LabelType> var : labelMapping)
+                {
+                    m_mapLabelToId[var.second] = var.first;
+                }
+            }
 
-// GetLabelMapping - Gets the label mapping from integer index to label type 
-// returns - a map from numeric datatype to native label type 
-template<class ElemType>
-const std::map<typename IDataReader<ElemType>::LabelIdType, typename IDataReader<ElemType>::LabelType>& LibSVMBinaryReader<ElemType>::GetLabelMapping(const std::wstring& sectionName)
-{
-    if (m_cachingReader)
-    {
-        return m_cachingReader->GetLabelMapping(sectionName);
-    }
-    return m_mapIdToLabel;
-}
+            template<class ElemType>
+            bool LibSVMBinaryReader<ElemType>::DataEnd(EndDataType endDataType)
+            {
+                bool ret = false;
+                switch (endDataType)
+                {
+                case endDataNull:
+                    assert(false);
+                    break;
+                case endDataEpoch:
+                    ret = (m_nextMB >= m_epochSize);
+                    break;
+                case endDataSet:
+                    ret = (m_nextMB >= m_numBatches);
+                    break;
+                case endDataSentence:  // for fast reader each minibatch is considered a "sentence", so always true
+                    ret = true;
+                    break;
+                }
+                return ret;
+            }
 
-// SetLabelMapping - Sets the label mapping from integer index to label 
-// labelMapping - mapping table from label values to IDs (must be 0-n)
-// note: for tasks with labels, the mapping table must be the same between a training run and a testing run 
-template<class ElemType>
-void LibSVMBinaryReader<ElemType>::SetLabelMapping(const std::wstring& /*sectionName*/, const std::map<typename IDataReader<ElemType>::LabelIdType, typename LabelType>& labelMapping)
-{
-    if (m_cachingReader)
-    {
-        RuntimeError("Cannot set mapping table when the caching reader is being used");
-    }
-    m_mapIdToLabel = labelMapping;
-    m_mapLabelToId.clear();
-    for (std::pair<unsigned, LabelType> var : labelMapping)
-    {
-        m_mapLabelToId[var.second] = var.first;
-    }
-}
+            // ReleaseMemory - release the memory footprint of LibSVMBinaryReader
+            // used when the caching reader is taking over
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::ReleaseMemory()
+            {
+            }
 
-template<class ElemType>
-bool LibSVMBinaryReader<ElemType>::DataEnd(EndDataType endDataType)
-{
-    bool ret = false;
-    switch (endDataType)
-    {
-    case endDataNull:
-        assert(false);
-        break;
-    case endDataEpoch:
-        //ret = (m_mbStartSample / m_epochSize < m_epoch);
-        //ret = (m_readNextSample >= m_totalSamples);
-        ret = (m_processedMinibatches >= featuresInput.numBatches);
-        break;
-    case endDataSet:
-        //ret = (m_readNextSample >= m_totalSamples);
-        ret = (m_processedMinibatches >= featuresInput.numBatches);
-        break;
-    case endDataSentence:  // for fast reader each minibatch is considered a "sentence", so always true
-        ret = true;
-        break;
-    }
-    return ret;
-}
-    
-template<class ElemType>
-LibSVM_BinaryInput<ElemType>::LibSVM_BinaryInput(){
-}
-template<class ElemType>
-LibSVM_BinaryInput<ElemType>::~LibSVM_BinaryInput(){
-    Dispose();
-}
-template<class ElemType>
-void LibSVM_BinaryInput<ElemType>::Init(wstring fileName, size_t dim)
-{
-    m_labelDim = 2;
-    m_dim = dim;
-    mbSize = 0;
-    /*
-    m_hndl = CreateFileA(fileName.c_str(), GENERIC_READ,
-        FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    */
-    m_hndl = CreateFile(fileName.c_str(), GENERIC_READ,
-        FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (m_hndl == INVALID_HANDLE_VALUE)
-    {
-        char message[256];
-        sprintf_s(message, "Unable to Open/Create file %ls, error %x", fileName.c_str(), GetLastError());
-        RuntimeError(message);
-    }
-
-    m_filemap = CreateFileMapping(m_hndl, NULL, PAGE_READONLY, 0, 0, NULL);
-
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    DWORD sysGran = sysinfo.dwAllocationGranularity;
-
-    header_buffer = MapViewOfFile(m_filemap,   // handle to map object
-        FILE_MAP_READ, // get correct permissions
-        HIDWORD(0),
-        LODWORD(0),
-        sizeof(int64_t) * 3 + sizeof(int32_t));
-
-    //cout << "After mapviewoffile" << endl;
-
-    memcpy(&numRows, header_buffer, sizeof(int64_t));
-    memcpy(&numBatches, (char*)header_buffer + sizeof(int64_t), sizeof(int64_t));
-    memcpy(&numCols, (char*)header_buffer + 2*sizeof(int64_t), sizeof(int32_t));
-    memcpy(&totalNNz, (char*)header_buffer + 2*sizeof(int64_t)+sizeof(int32_t), sizeof(int64_t));
-
-    //cout << "After gotvalues" << endl;
-    int64_t base_offset = sizeof(int64_t)* 3 + sizeof(int32_t);
-
-    int64_t offsets_padding = base_offset % sysGran;
-    base_offset -= offsets_padding;
-
-    int64_t header_size = numBatches*sizeof(int64_t)+offsets_padding;
-
-    offsets_orig = MapViewOfFile(m_filemap,   // handle to map object
-        FILE_MAP_READ, // get correct permissions
-        HIDWORD(base_offset),
-        LODWORD(base_offset),
-        header_size);
-
-    offsets_buffer = (char*)offsets_orig + offsets_padding;
-    
-    if (offsets != NULL){
-        free(offsets);
-    }
-    offsets = (int64_t*)malloc(sizeof(int64_t)*numBatches);
-    memcpy(offsets, offsets_buffer, numBatches*sizeof(int64_t));
+            template<class ElemType>
+            bool LibSVMBinaryReader<ElemType>::Randomize()
+            {
+                if (m_randomize > 0)
+                {
+                    return true;
+                }
+                return false;
+            }
 
 
-    int64_t header_offset = base_offset + offsets_padding + numBatches * sizeof(int64_t);
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::Shuffle()
+            {
+                if (Randomize())
+                {
+                    int useLast = (m_partialMinibatch) ? 1 : 0;
+                    shuffle(&read_order[0], &read_order[m_windowSize - useLast], random_engine);
+                }
+            }
 
-    int64_t data_padding = header_offset % sysGran;
-    header_offset -= data_padding;
+            template<class ElemType>
+            bool LibSVMBinaryReader<ElemType>::GetData(const std::wstring&, size_t, void*, size_t&, size_t)
+            {
+                throw runtime_error("GetData not supported in LibSVMBinaryReader");
+            }
 
-    data_orig = MapViewOfFile(m_filemap,   // handle to map object
-        FILE_MAP_READ, // get correct permissions
-        HIDWORD(header_offset),
-        LODWORD(header_offset),
-        0);
-    data_buffer = (char*)data_orig + data_padding;
-
-}
-template<class ElemType>
-bool LibSVM_BinaryInput<ElemType>::SetupEpoch( size_t minibatchSize){
-    if (values == NULL || mbSize < minibatchSize)
-    {
-        if (values != NULL)
-        {
-            free(values);
-            free(colIndices);
-            free(rowIndices);
-            free(classIndex);
-            free(classWeight);
-            free(m_labelsBuffer);
-        }
-        
-        m_labelsBuffer = (ElemType*)malloc(sizeof(ElemType)*m_labelDim*minibatchSize);
-        values = (ElemType*)malloc(sizeof(ElemType)*MAX_BUFFER*minibatchSize);
-        rowIndices = (int32_t*)malloc(sizeof(int32_t)*MAX_BUFFER*minibatchSize);
-        colIndices = (int32_t*)malloc(sizeof(int32_t)*(minibatchSize+1));
-        classIndex = (int32_t*)malloc(sizeof(int32_t)*MAX_BUFFER*minibatchSize);
-        classWeight = (ElemType*)malloc(sizeof(ElemType)*MAX_BUFFER*minibatchSize);
-        //fprintf(stderr, "values  size: %d",sizeof(ElemType)*MAX_BUFFER*minibatchSize);
-        //fprintf(stderr, "colindi size: %d",sizeof(int32_t)*MAX_BUFFER*(1+minibatchSize));
-        //fprintf(stderr, "rowindi size: %d",sizeof(int32_t)*MAX_BUFFER*minibatchSize);
-    }
-    if (minibatchSize > mbSize)
-    {
-        mbSize = minibatchSize;
-    }
-
-    return true;
-}
-template<class ElemType>
-bool LibSVM_BinaryInput<ElemType>::Next_Batch(Matrix<ElemType>& features, Matrix<ElemType>& labels, size_t actualmbsize, int cur_batch){
-    /*
-    int devId = matrices.GetDeviceId();
-    matrices.TransferFromDeviceToDevice(devId, -1);
-    */
-
-    //int64_t cur_offset = offsets[ordering[cur]];
-    int64_t cur_offset = offsets[cur_batch];
-    //int64_t cur_offset = offsets[ordering[c]];
-    int32_t nnz;
-
-    size_t buffer_offset = cur_offset;
-
-    memcpy(&nnz, (char*)data_buffer + buffer_offset, sizeof(int32_t));
-    buffer_offset += sizeof(int32_t);
-
-    memcpy(values, (char*)data_buffer + buffer_offset, sizeof(ElemType)*nnz);
-    buffer_offset += sizeof(ElemType)*nnz;
-
-    memcpy(rowIndices, (char*)data_buffer + buffer_offset, sizeof(int32_t)*nnz);
-    buffer_offset += sizeof(int32_t)*nnz;
-
-    colIndices[0] = (int32_t)0;
-    memcpy((char*)colIndices + sizeof(int32_t), (char*)data_buffer + buffer_offset, sizeof(int32_t)*actualmbsize);
-    buffer_offset += sizeof(int32_t)*actualmbsize;
-
-    memcpy(classIndex, (char*)data_buffer + buffer_offset, sizeof(int32_t)*actualmbsize);
-    buffer_offset += sizeof(int32_t)*actualmbsize;
-    
-    memcpy(classWeight, (char*)data_buffer + buffer_offset, sizeof(ElemType)*actualmbsize);
-
-    /**
-    fprintf(stderr, "%4d (%3d, %6d): ", c, nnz, cur_index + nnz);
-    for (int i = 0; i < nnz; i++)
-    {
-        fprintf(stderr, "%d:%.f ", rowIndices[cur_index+i], values[cur_index+i]);
-        //matrices.SetValue(rowIndices[cur_index + i], c, values[cur_index + i]);
-    }
-    fprintf(stderr, "\n");
-    **/
-        
-    /**
-    int col = 0;
-    for (int c = 0; c < nnz; c++)
-    {
-        if (colIndices[col] == c)
-        {
-            fprintf(stderr, "\n%4d: ", col);
-            col++;
-        }
-        fprintf(stderr, "%d:%.lf ", rowIndices[c], values[c]);
-    }
-    **/
-    /*
-    fprintf(stderr, "\nXXXX nnz: %d\n", nnz);
-    fprintf(stderr, "XXXX max values read: %d vs %d\n", sizeof(ElemType)*nnz, sizeof(ElemType)*MAX_BUFFER*actualmbsize);
-    fprintf(stderr, "XXXX max indices read: %d vs %d\n", sizeof(int32_t)*nnz, sizeof(int32_t)*MAX_BUFFER*actualmbsize);
-    */
-    /*
-        values = (ElemType*)malloc(sizeof(ElemType)*MAX_BUFFER*minibatchSize);
-        colIndices = (int32_t*)malloc(sizeof(int32_t)*MAX_BUFFER*(minibatchSize+1));
-        rowIndices = (int32_t*)malloc(sizeof(int32_t)*MAX_BUFFER*minibatchSize);
-        */
-
-    features.SetMatrixFromCSCFormat(colIndices, rowIndices, values, nnz, m_dim, actualmbsize);
-    //features.Print("actual values");
-        
-    // For Single Class
-    /**/
-    memset(m_labelsBuffer,0,sizeof(ElemType)*m_labelDim*actualmbsize);
-
-    for (int j = 0; j < actualmbsize; j++)
-    {
-        if (classIndex[j] > 0)
-        {
-            m_labelsBuffer[j] = (ElemType)1;
+            // instantiate all the combinations we expect to be used
+            template class LibSVMBinaryReader<double>;
+            template class LibSVMBinaryReader<float>;
         }
     }
-    labels.SetValue(1, actualmbsize, labels.GetDeviceId(), m_labelsBuffer, matrixFlagNormal);
-    /**/
-
-
-    // For Multi Class
-    /**
-    memset(m_labelsBuffer,0,sizeof(ElemType)*m_labelDim*actualmbsize);
-
-    for (int j = 0; j < actualmbsize; j++)
-    {
-        m_labelsBuffer[j*m_labelDim + classIndex[j]] = 1;// classWeight[j];
-    }
-    labels.SetValue(m_labelDim, actualmbsize, m_labelsBuffer, matrixFlagNormal);
-    /**/
-    //exit(1);
-    /*
-    matrices.SwitchToMatrixType(MatrixType::DENSE, MatrixFormat::matrixFormatDense);
-    matrices.Print("featuresQ");
-    exit(1);
-    matrices.TransferFromDeviceToDevice(-1,devId);
-    */
-    return true;
 }
-
-template<class ElemType>
-void LibSVM_BinaryInput<ElemType>::Dispose(){
-    if (offsets_orig != NULL){
-        UnmapViewOfFile(offsets_orig);
-    }
-    if (data_orig != NULL)
-    {
-        UnmapViewOfFile(data_orig);
-    }
-
-    if (offsets!= NULL)
-    {
-        free(offsets);// = (ElemType*)malloc(sizeof(float)* 230 * 1024);
-    }
-    if (values != NULL)
-    {
-        free(values);// = (ElemType*)malloc(sizeof(float)* 230 * 1024);
-    }
-    if (rowIndices != NULL){
-        free(rowIndices);// = (int*)malloc(sizeof(float)* 230 * 1024);
-    }
-    if (colIndices != NULL){
-        free(colIndices);// = (int*)malloc(sizeof(float)* 230 * 1024);
-    }
-    if (classIndex != NULL){
-        free(classIndex);// = (int*)malloc(sizeof(float)* 230 * 1024);
-    }
-    if (classWeight != NULL){
-        free(classWeight);// = (int*)malloc(sizeof(float)* 230 * 1024);
-    }
-}
-
-template<class ElemType>
-bool LibSVMBinaryReader<ElemType>::GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart)
-{
-    if (m_cachingReader)
-    {
-        return m_cachingReader->GetData(sectionName, numRecords, data, dataBufferSize, recordStart);
-    }
-    RuntimeError("GetData not supported in LibSVMBinaryReader");
-}
-// instantiate all the combinations we expect to be used
-template class LibSVMBinaryReader<double>; 
-template class LibSVMBinaryReader<float>;
-}}}

@@ -340,7 +340,7 @@ void BinaryReader<ElemType>::SetupEpoch()
     size_t mbStartSample = m_epoch * m_epochSize;
 
     size_t fileRecord = mbStartSample % m_totalSamples;
-    //fprintf(stderr, "starting epoch %lu at record count %lu, and file position %lu\n", m_epoch, mbStartSample, fileRecord);
+    fprintf(stderr, "starting epoch %lu at record count %lu, and file position %lu\n", m_epoch, mbStartSample, fileRecord);
 
     // reset the original read sample
     m_epochStartSample = m_mbStartSample = mbStartSample;
