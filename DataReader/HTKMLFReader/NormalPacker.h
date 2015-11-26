@@ -11,7 +11,7 @@ namespace Microsoft {
         namespace CNTK {
 
             template<class ElemType>
-            class NormalPacker : public reader
+            class NormalPacker : public Reader
             {
             private:
                 std::shared_ptr<IMemoryProvider> m_provider;
@@ -66,7 +66,7 @@ namespace Microsoft {
                 std::vector<std::vector<size_t>> m_extraLabelsIDBufferMultiUtt;
                 std::vector<std::vector<size_t>> m_extraPhoneboundaryIDBufferMultiUtt;
 
-                //hmm 
+                //hmm
                 msra::asr::simplesenonehmm m_hset;
 
                 std::map<std::wstring, size_t> m_featureNameToIdMap;
@@ -124,7 +124,7 @@ namespace Microsoft {
 
                 /// by default it is false
                 /// if true, reader will set to ((int) MinibatchPackingFlags::None) for time positions that are orignally correspond to ((int) MinibatchPackingFlags::SequenceStart)
-                /// set to true so that a current minibatch can uses state activities from the previous minibatch. 
+                /// set to true so that a current minibatch can uses state activities from the previous minibatch.
                 /// default will have truncated BPTT, which only does BPTT inside a minibatch
                 bool mIgnoreSentenceBeginTag;
                 // TODO: this ^^ does not seem to belong here.
@@ -156,30 +156,30 @@ namespace Microsoft {
                 void SetSentenceEnd(int /*actualMbSize*/){};
                 void SetRandomSeed(int){ NOT_IMPLEMENTED };
 
-                virtual std::vector<input_description_ptr> get_inputs() override
+                virtual std::vector<InputDescriptionPtr> getInputs() override
                 {
-                    std::vector<input_description_ptr> result;
-                    input_description_ptr features(new input_description);
+                    std::vector<InputDescriptionPtr> result;
+                    InputDescriptionPtr features(new input_description);
                     features->name = "features";
                     features->id = 0;
                     result.push_back(features);
 
-                    input_description_ptr labels(new input_description);
-                    features->name = "lables";
+                    InputDescriptionPtr labels(new input_description);
+                    features->name = "labels";
                     features->id = 1;
                     result.push_back(labels);
 
                     return result;
                 }
 
-                virtual epoch_ptr start_next_epoch(const epoch_configuration& config) override
+                virtual EpochPtr startNextEpoch(const EpochConfiguration& config) override
                 {
                     this->StartDistributedMinibatchLoop(config.minibatch_size, 0, config.worker_rank, config.number_of_workers, config.total_size);
                     return epoch_ptr(new epoch_impl(this));
                 }
 
             private:
-                class epoch_impl : public epoch
+                class epoch_impl : public Epoch
                 {
                     NormalPacker<ElemType>* packer_;
 
@@ -189,7 +189,7 @@ namespace Microsoft {
                         packer_ = packer;
                     }
 
-                    virtual minibatch read_minibatch() override;
+                    virtual Minibatch readMinibatch() override;
                 };
             };
 

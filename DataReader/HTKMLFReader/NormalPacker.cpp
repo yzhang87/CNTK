@@ -89,9 +89,9 @@ namespace Microsoft {
 
             }
 
-            // Load all input and output data. 
-            // Note that the terms features imply be real-valued quanities and 
-            // labels imply categorical quantities, irrespective of whether they 
+            // Load all input and output data.
+            // Note that the terms features imply be real-valued quanities and
+            // labels imply categorical quantities, irrespective of whether they
             // are inputs or targets for the network
             template<class ElemType>
             void NormalPacker<ElemType>::PrepareForTrainingOrTesting(const ConfigParameters& readerConfig)
@@ -114,7 +114,7 @@ namespace Microsoft {
 
                 std::vector<std::wstring> featureNames;
                 std::vector<std::wstring> labelNames;
-                // for hmm and lattice 
+                // for hmm and lattice
                 std::vector<std::wstring> hmmNames;
                 std::vector<std::wstring> latticeNames;
                 GetDataNamesFromConfig(readerConfig, featureNames, labelNames, hmmNames, latticeNames);
@@ -243,7 +243,7 @@ namespace Microsoft {
                     }
                 }
 
-                //get lattice toc file names 
+                //get lattice toc file names
                 std::pair<std::vector<wstring>, std::vector<wstring>> latticetocs;
                 foreach_index(i, latticeNames)
                     //only support one set of lattice now
@@ -275,7 +275,7 @@ namespace Microsoft {
                     transPspaths.push_back(thishmm("transpFile", L""));
                 }
 
-                // mmf files 
+                // mmf files
                 //only support one set now
                 if (cdphonetyingpaths.size() > 0 && statelistpaths.size() > 0 && transPspaths.size() > 0)
                     m_hset.loadfromfile(cdphonetyingpaths[0], statelistpaths[0], transPspaths[0]);
@@ -338,18 +338,18 @@ namespace Microsoft {
                         if (n != numFiles)
                             RuntimeError(msra::strfun::strprintf("number of files in each scriptfile inconsistent (%d vs. %d)", numFiles, n));
 
-                    // post processing file list : 
+                    // post processing file list :
                     //  - if users specified PrefixPath, add the prefix to each of path in filelist
-                    //  - else do the dotdotdot expansion if necessary 
+                    //  - else do the dotdotdot expansion if necessary
                     wstring rootpath = RootPathInScripts[i];
-                    if (!rootpath.empty()) // use has specified a path prefix for this  feature 
+                    if (!rootpath.empty()) // use has specified a path prefix for this  feature
                     {
                         // first make slash consistent (sorry for linux users:this is not necessary for you)
                         std::replace(rootpath.begin(), rootpath.end(), L'\\', L'/');
-                        // second, remove trailling slash if there is any 
+                        // second, remove trailling slash if there is any
                         std::wregex trailer(L"/+$");
                         rootpath = std::regex_replace(rootpath, trailer, wstring(L""));
-                        // third, join the rootpath with each entry in filelist 
+                        // third, join the rootpath with each entry in filelist
                         if (!rootpath.empty())
                         {
                             for (wstring & path : filelist)
@@ -359,7 +359,7 @@ namespace Microsoft {
                                     vector<wstring> strarr = msra::strfun::split(path, L"=");
 #ifdef WIN32
                                     replace(strarr[1].begin(), strarr[1].end(), L'\\', L'/');
-#endif 
+#endif
 
                                     path = strarr[0] + L"=" + rootpath + L"/" + strarr[1];
                                 }
@@ -367,7 +367,7 @@ namespace Microsoft {
                                 {
 #ifdef WIN32
                                     replace(path.begin(), path.end(), L'\\', L'/');
-#endif 
+#endif
                                     path = rootpath + L"/" + path;
                                 }
                             }
@@ -430,7 +430,7 @@ namespace Microsoft {
                 //if (readerConfig.Exists("statelist"))
                 //    statelistpath = readerConfig("statelist");
 
-                double htktimetoframe = 100000.0;           // default is 10ms 
+                double htktimetoframe = 100000.0;           // default is 10ms
                 //std::vector<msra::asr::htkmlfreader<msra::asr::htkmlfentry,msra::lattices::lattice::htkmlfwordsequence>> labelsmulti;
                 std::vector<std::map<std::wstring, std::vector<msra::asr::htkmlfentry>>> labelsmulti;
                 //std::vector<std::wstring> pagepath;
@@ -471,7 +471,7 @@ namespace Microsoft {
 
                         // replace any '/' with '\' for compat with default path
                         std::replace(pageFilePath.begin(), pageFilePath.end(), '/', '\\');
-#ifdef _WIN32               
+#ifdef _WIN32
                         // verify path exists
                         DWORD attrib = GetFileAttributes(pageFilePath.c_str());
                         if (attrib == INVALID_FILE_ATTRIBUTES || !(attrib & FILE_ATTRIBUTE_DIRECTORY))
@@ -537,9 +537,9 @@ namespace Microsoft {
 
             }
 
-            // Load all input and output data. 
-            // Note that the terms features imply be real-valued quanities and 
-            // labels imply categorical quantities, irrespective of whether they 
+            // Load all input and output data.
+            // Note that the terms features imply be real-valued quanities and
+            // labels imply categorical quantities, irrespective of whether they
             // are inputs or targets for the network
             template<class ElemType>
             void NormalPacker<ElemType>::PrepareForWriting(const ConfigParameters& readerConfig)
@@ -637,7 +637,7 @@ namespace Microsoft {
                 m_fileEvalSource.reset(new msra::dbn::FileEvalSource(realDims, numContextLeft, numContextRight, evalchunksize));
             }
 
-            //StartMinibatchLoop - Startup a minibatch loop 
+            //StartMinibatchLoop - Startup a minibatch loop
             // requestedMBSize - [in] size of the minibatch (number of frames, etc.)
             // epoch - [in] epoch number for this loop
             // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
@@ -753,7 +753,7 @@ namespace Microsoft {
 
                 if (!m_featuresBufferMultiIO.empty())
                 {
-                    if (m_featuresBufferMultiIO[0] != nullptr) // check first feature, if it isn't NULL, safe to assume all are not NULL? 
+                    if (m_featuresBufferMultiIO[0] != nullptr) // check first feature, if it isn't NULL, safe to assume all are not NULL?
                     {
                         foreach_index(i, m_featuresBufferMultiIO)
                         {
@@ -810,7 +810,7 @@ namespace Microsoft {
                 m_fileEvalSource->SetMinibatchSize(mbSize);
                 m_inputFileIndex = 0;
 
-                if (m_featuresBufferMultiIO[0] != nullptr) // check first feature, if it isn't NULL, safe to assume all are not NULL? 
+                if (m_featuresBufferMultiIO[0] != nullptr) // check first feature, if it isn't NULL, safe to assume all are not NULL?
                 {
                     foreach_index(i, m_featuresBufferMultiIO)
                     {
@@ -859,8 +859,8 @@ namespace Microsoft {
                 return true;
             }
             // GetMinibatch - Get the next minibatch (features and labels)
-            // matrices - [in] a map with named matrix types (i.e. 'features', 'labels') mapped to the corresponing matrix, 
-            //             [out] each matrix resized if necessary containing data. 
+            // matrices - [in] a map with named matrix types (i.e. 'features', 'labels') mapped to the corresponing matrix,
+            //             [out] each matrix resized if necessary containing data.
             // returns - true if there are more minibatches, false if no more minibatchs remain
             // TODO: Why do we have two read functions? Is one not a superset of the other?
             template<class ElemType>
@@ -910,7 +910,7 @@ namespace Microsoft {
                         m_extraLabelsIDBufferMultiUtt.clear();
                         m_extraPhoneboundaryIDBufferMultiUtt.clear();
                         m_extraSeqsPerMB.clear();
-                        if (m_noData && m_numFramesToProcess[0] == 0)    //no data left for the first channel of this minibatch, 
+                        if (m_noData && m_numFramesToProcess[0] == 0)    //no data left for the first channel of this minibatch,
                         {
                             return false;
                         }
@@ -1023,7 +1023,7 @@ namespace Microsoft {
                             typename std::map<std::wstring, Matrix<ElemType>*>::iterator iter;
                             for (iter = matrices.begin(); iter != matrices.end(); iter++)
                             {
-                                // dereference matrix that corresponds to key (input/output name) and 
+                                // dereference matrix that corresponds to key (input/output name) and
                                 // populate based on whether its a feature or a label
                                 Matrix<ElemType>& data = *matrices[iter->first]; // can be features or labels
                                 if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
@@ -1085,7 +1085,7 @@ namespace Microsoft {
                                 typename std::map<std::wstring, Matrix<ElemType>*>::iterator iter;
                                 for (iter = matrices.begin(); iter != matrices.end(); iter++)
                                 {
-                                    // dereference matrix that corresponds to key (input/output name) and 
+                                    // dereference matrix that corresponds to key (input/output name) and
                                     // populate based on whether its a feature or a label
                                     if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
                                     {
@@ -1144,7 +1144,7 @@ namespace Microsoft {
                                 typename std::map<std::wstring, Matrix<ElemType>*>::iterator iter;
                                 for (iter = matrices.begin(); iter != matrices.end(); iter++)
                                 {
-                                    // dereference matrix that corresponds to key (input/output name) and 
+                                    // dereference matrix that corresponds to key (input/output name) and
                                     // populate based on whether its a feature or a label
                                     if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
                                     {
@@ -1211,7 +1211,7 @@ namespace Microsoft {
                                         endFr = m_mbNumTimeSteps;
                                         for (iter = matrices.begin(); iter != matrices.end(); iter++)
                                         {
-                                            // dereference matrix that corresponds to key (input/output name) and 
+                                            // dereference matrix that corresponds to key (input/output name) and
                                             // populate based on whether its a feature or a label
                                             //Matrix<ElemType>& data = *matrices[iter->first]; // can be features or labels
 
@@ -1262,7 +1262,7 @@ namespace Microsoft {
                         }
                         for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
                         {
-                            // dereference matrix that corresponds to key (input/output name) and 
+                            // dereference matrix that corresponds to key (input/output name) and
                             // populate based on whether its a feature or a label
                             Matrix<ElemType>& data = *matrices[iter->first]; // can be features or labels
                             if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
@@ -1306,7 +1306,7 @@ namespace Microsoft {
                 typename std::map<std::wstring, Matrix<ElemType>*>::iterator iter;
                 for (iter = matrices.begin(); iter != matrices.end(); iter++)
                 {
-                    // dereference matrix that corresponds to key (input/output name) and 
+                    // dereference matrix that corresponds to key (input/output name) and
                     // populate based on whether its a feature or a label
                     if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
                     {
@@ -1416,7 +1416,7 @@ namespace Microsoft {
                     typename std::map<std::wstring, Matrix<ElemType>*>::iterator iter;
                     for (iter = matrices.begin(); iter != matrices.end(); iter++)
                     {
-                        // dereference matrix that corresponds to key (input/output name) and 
+                        // dereference matrix that corresponds to key (input/output name) and
                         // populate based on whether its a feature or a label
 
                         if (m_nameToTypeMap.find(iter->first) != m_nameToTypeMap.end() && m_nameToTypeMap[iter->first] == InputOutputTypes::real)
@@ -1776,7 +1776,7 @@ namespace Microsoft {
             }
 
             template<class ElemType>
-            minibatch NormalPacker<ElemType>::epoch_impl::read_minibatch()
+            Minibatch NormalPacker<ElemType>::epoch_impl::readMinibatch()
             {
                 Matrix<ElemType> features(363, 64, -1);
                 Matrix<ElemType> labels(363, 64, -1);
