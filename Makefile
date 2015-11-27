@@ -332,6 +332,25 @@ $(UCIFASTREADER): $(UCIFASTREADER_OBJ) | $(CNTKMATH_LIB)
 	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ -l$(CNTKMATH)
 
 ########################################
+# LibSVMBinaryReader plugin
+########################################
+
+LIBSVMBINARYREADER_SRC =\
+	DataReader/LibSVMBinaryReader/Exports.cpp \
+	DataReader/LibSVMBinaryReader/LibSVMBinaryReader.cpp \
+
+LIBSVMBINARYREADER_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(LIBSVMBINARYREADER_SRC))
+
+LIBSVMBINARYREADER:=$(LIBDIR)/LibSVMBinaryReader.so
+ALL += $(LIBSVMBINARYREADER)
+SRC+=$(LIBSVMBINARYREADER_SRC)
+
+$(LIBSVMBINARYREADER): $(LIBSVMBINARYREADER_OBJ) | $(CNTKMATH_LIB)
+	@echo $(SEPARATOR)
+	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ -l$(CNTKMATH)
+
+
+########################################
 # Kaldi plugins
 ########################################
 

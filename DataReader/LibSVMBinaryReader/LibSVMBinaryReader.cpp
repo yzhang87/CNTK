@@ -15,6 +15,14 @@
 #include <map>
 #include <ctime>
 #include "basetypes.h"
+#ifndef _WIN32
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#endif
 
 namespace Microsoft {
     namespace MSR {
@@ -61,12 +69,12 @@ namespace Microsoft {
                     sizeof(int64_t) * 2 + sizeof(int32_t) * 2);
 #else
                 sysGran = sysconf(_SC_PAGESIZE);
-                m_hndFile = open(msra::strfun::utf8(fileName).c_str(), m_writeFile ? O_RDWR : O_RDONLY, O_CREAT);
-                if (m_hndFile < 0)
+                m_hndl = open(msra::strfun::utf8(fileName).c_str(), O_RDONLY, O_CREAT);
+                if (m_hndl < 0)
                 {
-                    RuntimeError("Unable to Open/Create file %s, error %d", msra::strfun:utf8(fileName).c_str(), errno);
+                    RuntimeError("Unable to Open/Create file %s, error %d", msra::strfun::utf8(fileName).c_str(), errno);
                 }
-                header_buffer = mmap(0, sizeof(int64_t) * 2000000, PROT_READ, MAP_SHARED, m_hndFile, 0);
+                header_buffer = mmap(0, sizeof(int64_t) * 2000000, PROT_READ, MAP_SHARED, m_hndl, 0);
 #endif
 
                 //cout << "After mapviewoffile" << endl;
@@ -137,7 +145,7 @@ namespace Microsoft {
                 int64_t offsets_padding = base_offset % sysGran;
                 base_offset -= offsets_padding;
 
-                int64_t header_size = numBatches*sizeof(int64_t) + offsets_padding;
+                header_size = numBatches*sizeof(int64_t) + offsets_padding;
 
 #ifdef _WIN32
                 offsets_orig = MapViewOfFile(m_filemap,   // handle to map object
@@ -146,7 +154,7 @@ namespace Microsoft {
                     LODWORD(base_offset),
                     header_size);
 #else
-                offsets_orig = mmap(0, header_size, PROT_READ, MAP_SHARED, m_hndFile, base_offset);
+                offsets_orig = mmap(0, header_size, PROT_READ, MAP_SHARED, m_hndl, base_offset);
 #endif
 
                 offsets_buffer = (int64_t*)((char*)offsets_orig + offsets_padding);
@@ -167,7 +175,7 @@ namespace Microsoft {
 #ifdef _WIN32
 #else
 				struct stat stat_buf;
-				fstat( m_hndFile, &stat_buf );
+				fstat( m_hndl, &stat_buf );
 				m_fileSize = stat_buf.st_size;
 #endif
 
@@ -208,7 +216,7 @@ namespace Microsoft {
 #ifdef _WIN32
                     m_windowSizeBytes = 0;
 #else
-                    m_windowSizeBytes = m_FileSize - offsets_buffer[m_lower];
+                    m_windowSizeBytes = m_fileSize - offsets_buffer[m_lower];
 #endif
                 }
                 else {
@@ -222,7 +230,7 @@ namespace Microsoft {
                     m_windowSizeBytes);
 #else
 
-                data_orig = mmap(0, m_windowSizeBytes, PROT_READ, MAP_SHARED, m_hndFile, m_dataOffset);
+                data_orig = mmap(0, m_windowSizeBytes, PROT_READ, MAP_SHARED, m_hndl, m_dataOffset);
 #endif
                 data_buffer = (char*)data_orig + m_dataPadding;
             }
@@ -295,17 +303,38 @@ namespace Microsoft {
 #endif
                     }
                 }
+                auto findMat = matrices.find(L"DSSMLabel");
+                if( findMat != matrices.end())
+                {
+                    auto mat = findMat->second;
+                    ElemType* labels = (ElemType*)malloc(sizeof(ElemType)*51*curMBSize);
+                    memset(labels, 0, sizeof(ElemType)*51*curMBSize);
+                    for(int c = 0; c < curMBSize; c++ ) {
+                        labels[c] = 1;
+                    }
+                    mat->SetValue(mat->GetNumRows(), curMBSize, mat->GetDeviceId(), labels, matrixFlagNormal);
+
+                }
                 return (size_t)curMBSize;
             }
 
             template<class ElemType>
             void SparseBinaryInput<ElemType>::Dispose(){
                 if (offsets_orig != NULL){
+#ifdef _WIN32
                     UnmapViewOfFile(offsets_orig);
+#else
+                    munmap(offsets_orig,header_size);
+#endif
+
                 }
                 if (data_orig != NULL)
                 {
+#ifdef _WIN32
                     UnmapViewOfFile(data_orig);
+#else
+                    munmap(data_orig,m_windowSizeBytes);
+#endif
                 }
 
             }
@@ -551,7 +580,7 @@ namespace Microsoft {
             // labelMapping - mapping table from label values to IDs (must be 0-n)
             // note: for tasks with labels, the mapping table must be the same between a training run and a testing run 
             template<class ElemType>
-            void LibSVMBinaryReader<ElemType>::SetLabelMapping(const std::wstring& /*sectionName*/, const std::map<typename IDataReader<ElemType>::LabelIdType, typename LabelType>& labelMapping)
+            void LibSVMBinaryReader<ElemType>::SetLabelMapping(const std::wstring& /*sectionName*/, const std::map<typename IDataReader<ElemType>::LabelIdType, LabelType>& labelMapping)
             {
                 m_mapIdToLabel = labelMapping;
                 m_mapLabelToId.clear();

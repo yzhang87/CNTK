@@ -5,15 +5,16 @@
 //
 // LibSVMBinaryReader.h - Include file for the MTK and MLF format of features and samples 
 #pragma once
+#include "stdafx.h"
 #include "DataReader.h"
 #include "DataWriter.h"
-#include <string>
 #include "commandArgUtil.h"
+#include <string>
 #include <map>
 #include <vector>
 #include "basetypes.h"
-#include "minibatchsourcehelpers.h"
 #include <random>
+#include "minibatchsourcehelpers.h"
 
 namespace Microsoft {
     namespace MSR {
@@ -35,7 +36,9 @@ namespace Microsoft {
                 HANDLE m_filemap;
 #else
                 int m_hndl;
+                int64_t m_fileSize;
 #endif
+                int64_t header_size;
 				
                 DWORD sysGran;
 
@@ -65,7 +68,6 @@ namespace Microsoft {
                 int64_t m_dataOffset;
                 int64_t m_dataPadding;
                 int64_t m_lower;
-                int64_t m_fileSize;
                 
                 int64_t m_windowSizeBytes;
 
@@ -88,9 +90,12 @@ namespace Microsoft {
             template<class ElemType>
             class LibSVMBinaryReader : public IDataReader<ElemType>
             {
-                //public:
-                //    typedef std::string LabelType;
-                //    typedef unsigned LabelIdType;
+                public:
+                   // typedef unsigned LabelIdType;
+                    //typedef std::string LabelType;
+                    using LabelType = typename IDataReader<ElemType>::LabelType;
+                    using LabelIdType = typename IDataReader<ElemType>::LabelIdType;
+                    using IDataReader<ElemType>::mBlgSize;
             public:
                 virtual void Init(const ConfigParameters& config);
                 virtual void Destroy();
@@ -110,7 +115,9 @@ namespace Microsoft {
 
                 virtual void RenamedMatrices(const ConfigParameters& readerConfig, std::map<std::wstring, std::wstring>& rename);
                 virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
-                virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, typename LabelType>& labelMapping);
+                //virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
+                //virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, typename LabelType>& labelMapping);
+                virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping);
                 virtual bool GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart = 0);
         
                 size_t GetNumParallelSequences() { return m_pMBLayout->GetNumParallelSequences(); }
@@ -125,7 +132,7 @@ namespace Microsoft {
             private:
                 bool Randomize();
                 void Shuffle();
-                void LibSVMBinaryReader<ElemType>::ReleaseMemory();
+                void ReleaseMemory();
 
 				MBLayoutPtr m_pMBLayout;
                 ConfigParameters m_readerConfig;
