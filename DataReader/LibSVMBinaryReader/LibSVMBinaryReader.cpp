@@ -307,9 +307,11 @@ namespace Microsoft {
                 if( findMat != matrices.end())
                 {
                     auto mat = findMat->second;
-                    ElemType* labels = (ElemType*)malloc(sizeof(ElemType)*51*curMBSize);
-                    memset(labels, 0, sizeof(ElemType)*51*curMBSize);
-                    for(int c = 0; c < curMBSize; c++ ) {
+                    mat->SwitchToMatrixType(MatrixType::DENSE, MatrixFormat::matrixFormatDense, true);
+                    int32_t numRows = mat->GetNumRows();
+                    ElemType* labels = (ElemType*)malloc(sizeof(ElemType)*numRows*curMBSize);
+                    memset(labels, 0, sizeof(ElemType)*numRows*curMBSize);
+                    for(int c = 0; c < curMBSize; c+=numRows ) {
                         labels[c] = 1;
                     }
                     mat->SetValue(mat->GetNumRows(), curMBSize, mat->GetDeviceId(), labels, matrixFlagNormal);
