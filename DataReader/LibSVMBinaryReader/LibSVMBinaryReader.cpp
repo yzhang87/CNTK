@@ -14,7 +14,6 @@
 #include <random>
 #include <map>
 #include <ctime>
-#include "basetypes.h"
 #ifndef _WIN32
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -307,14 +306,21 @@ namespace Microsoft {
                 if( findMat != matrices.end())
                 {
                     auto mat = findMat->second;
-                    mat->SwitchToMatrixType(MatrixType::DENSE, MatrixFormat::matrixFormatDense, true);
-                    int32_t numRows = mat->GetNumRows();
-                    ElemType* labels = (ElemType*)malloc(sizeof(ElemType)*numRows*curMBSize);
-                    memset(labels, 0, sizeof(ElemType)*numRows*curMBSize);
-                    for(int c = 0; c < curMBSize; c+=numRows ) {
-                        labels[c] = 1;
+                    size_t numRows = mat->GetNumRows();
+                    if (DSSMCols < curMBSize) {
+                        if (DSSMLabels != nullptr) {
+                            free(DSSMLabels);
+                        }
+                        DSSMCols = curMBSize;
+                        DSSMLabels = (ElemType*)malloc(sizeof(ElemType)*numRows*curMBSize);
+                        memset(DSSMLabels, 0, sizeof(ElemType)*numRows*curMBSize);
+                        for (size_t c = 0; c < curMBSize; c += numRows) {
+                            DSSMLabels[c] = 1;
+                        }
                     }
-                    mat->SetValue(mat->GetNumRows(), curMBSize, mat->GetDeviceId(), labels, matrixFlagNormal);
+                    if (mat->GetNumCols() != curMBSize) {
+                        mat->SetValue(mat->GetNumRows(), curMBSize, mat->GetDeviceId(), DSSMLabels, matrixFlagNormal);
+                    }
 
                 }
                 return (size_t)curMBSize;
@@ -337,6 +343,9 @@ namespace Microsoft {
 #else
                     munmap(data_orig,m_windowSizeBytes);
 #endif
+                }
+                if (DSSMLabels != nullptr) {
+                    delete[] DSSMLabels;
                 }
 
             }
@@ -367,23 +376,29 @@ namespace Microsoft {
             //]
 
             template<class ElemType>
-            void LibSVMBinaryReader<ElemType>::RenamedMatrices(const ConfigParameters& readerConfig, std::map<std::wstring, std::wstring>& rename)
+			template<class ConfigRecordType>
+
+            void LibSVMBinaryReader<ElemType>::RenamedMatrices(const ConfigRecordType& config, std::map<std::wstring, std::wstring>& rename)
             {
-                for (auto iter = readerConfig.begin(); iter != readerConfig.end(); ++iter)
-                {
-                    auto pair = *iter;
-                    ConfigParameters temp(iter->second);
-                    // see if we have a config parameters that contains a "dim" element, it's a sub key, use it
-                    if (temp.ExistsCurrent("rename"))
+				for (const auto & id : config.GetMemberIds())
+				{
+					if (!config.CanBeConfigRecord(id))
+						continue;
+					const ConfigRecordType & temp = config(id);
+					// see if we have a config parameters that contains a "dim" element, it's a sub key, use it
+                    if (temp.ExistsCurrent(L"rename"))
                     {
-                        rename.emplace(msra::strfun::utf16(iter->first), msra::strfun::utf16(temp("rename")));
+
+                        std::wstring ren = temp(L"rename");
+                        rename.emplace(msra::strfun::utf16(id), msra::strfun::utf16(ren));
                     }
                 }
             }
 
 
             template<class ElemType>
-            void LibSVMBinaryReader<ElemType>::Init(const ConfigParameters& readerConfig)
+			template<class ConfigRecordType>
+			void LibSVMBinaryReader<ElemType>::InitFromConfig(const ConfigRecordType & readerConfig)
             {
                 // Determine the names of the features and lables sections in the config file.
                 // features - [in,out] a vector of feature name strings
@@ -395,11 +410,11 @@ namespace Microsoft {
                 m_epoch = 0;
 
                 m_partialMinibatch = false;
-                m_traceLevel = (size_t)readerConfig("traceLevel", "0");
+                m_traceLevel = (size_t)readerConfig(L"traceLevel", 0);
 
-                if (readerConfig.Exists("randomize"))
+                if (readerConfig.Exists(L"randomize"))
                 {
-                    string randomizeString = readerConfig("randomize");
+                    string randomizeString = readerConfig(L"randomize");
                     if (randomizeString == "None")
                     {
                         m_randomize = 0L;
@@ -415,7 +430,8 @@ namespace Microsoft {
                     }
                     else
                     {
-                        m_randomize = (unsigned long)readerConfig("randomize");
+                        m_randomize = readerConfig(L"randomize", 0 );
+                        //m_randomize = 0L;
                     }
                 }
                 else
@@ -424,16 +440,16 @@ namespace Microsoft {
                 }
 
 
-                std::string minibatchMode(readerConfig("minibatchMode", "Partial"));
+                std::string minibatchMode(readerConfig(L"minibatchMode", "Partial"));
                 m_partialMinibatch = !_stricmp(minibatchMode.c_str(), "Partial");
 
-                std::wstring file = readerConfig("file");
+                std::wstring file = readerConfig(L"file", L"");
 
-                m_windowSize = readerConfig("windowSize", "10000");
+                m_windowSize = readerConfig(L"windowSize", 10000);
 
                 dataInput.Init(file, m_rename, m_windowSize);
 
-                m_mbSize = (size_t)readerConfig("minibatch", "0");
+                m_mbSize = (size_t)readerConfig(L"minibatch", 0);
                 if (m_mbSize > 0)
                 {
                     if (dataInput.getMBSize() != m_mbSize)
@@ -448,8 +464,9 @@ namespace Microsoft {
                 }
 
                 m_numBatches = dataInput.getNumMB();
+                m_windowSize = min(m_numBatches, m_windowSize);
 
-                m_epochSize = readerConfig("epochMinibatches", "0");
+                m_epochSize = readerConfig(L"epochMinibatches", 0);
                 if (m_epochSize > 0)
                 {
                     if (m_numBatches < m_epochSize)

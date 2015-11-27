@@ -9,12 +9,11 @@
 #include "DataReader.h"
 #include "DataWriter.h"
 #include "commandArgUtil.h"
+#include "RandomOrdering.h"
 #include <string>
 #include <map>
 #include <vector>
-#include "basetypes.h"
 #include <random>
-#include "minibatchsourcehelpers.h"
 
 namespace Microsoft {
     namespace MSR {
@@ -69,6 +68,8 @@ namespace Microsoft {
                 int64_t m_dataPadding;
                 int64_t m_lower;
                 
+                ElemType* DSSMLabels;
+                size_t DSSMCols;
                 int64_t m_windowSizeBytes;
 
             public:
@@ -97,7 +98,9 @@ namespace Microsoft {
                     using LabelIdType = typename IDataReader<ElemType>::LabelIdType;
                     using IDataReader<ElemType>::mBlgSize;
             public:
-                virtual void Init(const ConfigParameters& config);
+				virtual void Init(const ConfigParameters & config) override { InitFromConfig(config); }
+				virtual void Init(const ScriptableObjects::IConfigRecord & config) override { InitFromConfig(config); }
+				template<class ConfigRecordType> void InitFromConfig(const ConfigRecordType &);
                 virtual void Destroy();
 
                 LibSVMBinaryReader() { read_order = nullptr; m_pMBLayout=make_shared<MBLayout>(); };
@@ -113,7 +116,7 @@ namespace Microsoft {
 				}
 
 
-                virtual void RenamedMatrices(const ConfigParameters& readerConfig, std::map<std::wstring, std::wstring>& rename);
+				template<class ConfigRecordType> void RenamedMatrices(const ConfigRecordType& readerConfig, std::map<std::wstring, std::wstring>& rename);
                 virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
                 //virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
                 //virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, typename LabelType>& labelMapping);
@@ -165,7 +168,7 @@ namespace Microsoft {
                 bool m_partialMinibatch;    // a partial minibatch is allowed
                 size_t m_traceLevel;
 
-                msra::dbn::randomordering m_randomordering;   // randomizing class
+				RandomOrdering m_randomordering;   // randomizing class
 
                 std::mt19937_64 random_engine;
 
