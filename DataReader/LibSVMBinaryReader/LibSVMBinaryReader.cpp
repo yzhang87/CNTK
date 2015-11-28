@@ -561,7 +561,8 @@ namespace Microsoft {
                     return false;
                 }
 
-                size_t actualmbsize = dataInput.Next_Batch(matrices, read_order[m_nextMB ]);
+                //fprintf(stderr,"m_nextmb: %ld\treadorder: %ld\n", m_nextMB, read_order[m_nextMB]);
+                size_t actualmbsize = dataInput.Next_Batch(matrices, read_order[m_nextMB]);
 				m_pMBLayout->Init(actualmbsize, 1, false/*means it is not sequential*/);
 
                 m_readMB += m_numSubsets;

@@ -55,9 +55,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (m_hndFile == INVALID_HANDLE_VALUE)
         {
+            /*
             char message[256];
             sprintf_s(message, "Unable to Open/Create file %ls, error %x", fileName.c_str(), GetLastError());
             RuntimeError(message);
+            */
+            RuntimeError("Unable to Open/Create file %ls, error %x", fileName.c_str(), GetLastError());
         }
 
         // code to detect type of file (network/local)
@@ -83,9 +86,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                            NULL);
         if (m_hndMapped == NULL)
         {
+            /*
             char message[256];
             sprintf_s(message, "Unable to map file %ls, error 0x%x", fileName.c_str(), GetLastError());
             RuntimeError(message);
+            */
+            RuntimeError("Unable to map file %ls, error 0x%x", fileName.c_str(), GetLastError());
         }
         m_mappedSize = size;
 #else
@@ -94,9 +100,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_hndFile = open(msra::strfun::utf8(fileName).c_str(), m_writeFile ? O_RDWR:O_RDONLY, O_CREAT);
         if (m_hndFile < 0)
         {
-            char message[256];
-            sprintf(message, "Unable to Open/Create file %s, error %d", msra::strfun::utf8(fileName).c_str(), errno);
-            RuntimeError(message);
+            //char message[256];
+            RuntimeError("Unable to Open/Create file %s, error %d", msra::strfun::utf8(fileName).c_str(), errno);
+            //RuntimeError(message);
         }
 
         
@@ -154,10 +160,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 #ifdef _WIN32
             sprintf_s(message, "Setting max position larger than mapped file size: %lu > %lu", m_filePositionMax, m_mappedSize);
-#else
-            sprintf(message, "Setting max position larger than mapped file size: %lu > %lu", m_filePositionMax, m_mappedSize);
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("Setting max position larger than mapped file size: %lu > %lu", m_filePositionMax, m_mappedSize);
+#endif
         }
     }
 
@@ -192,7 +198,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto iter=m_views.begin();
         for(; iter != m_views.end();++iter)
         {
-            byte *viewBegin = (byte *)iter->view;
+            char *viewBegin = (char *)iter->view;
             if ( viewBegin <= data && viewBegin + iter->size > data)
                 break;
         }
@@ -279,10 +285,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             char message[128];
 #ifdef _WIN32
             sprintf_s(message, "Unable to map file %ls @ %lu, error %x", m_name.c_str(), filePosition, GetLastError());
-#else
-            sprintf(message, "Unable to map file %ls @ %lu, error %x", m_name.c_str(), filePosition, errno);
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("Unable to map file %ls @ %lu, error %x", m_name.c_str(), filePosition, errno);
+#endif
         }
         m_views.push_back(ViewPosition(pBuf, filePosition, size));
 
@@ -370,7 +376,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto viewPos = FindDataView(data);
         if (viewPos != m_views.end())
         {
-            int64_t offset = (byte*)data-(byte*)viewPos->view;
+            int64_t offset = (char*)data-(char*)viewPos->view;
             int64_t dataEnd = offset + size;
 
             // if our end of data is beyond the size of the view, need to reallocate
@@ -379,7 +385,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 // TODO: this view change only accomidates this request
                 size_t filePosition = viewPos->filePosition;
                 ReleaseView(viewPos);
-                byte* view = (byte*)GetView(filePosition, dataEnd);
+                char* view = (char*)GetView(filePosition, dataEnd);
                 data = view + offset;
             }
         }
@@ -419,10 +425,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             char message[128];
 #ifdef _WIN32
             sprintf_s(message, "Invalid File format for binary file %ls", fileName.c_str());
-#else
-            sprintf(message, "Invalid File format for binary file %ls", fileName.c_str());
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("Invalid File format for binary file %ls", fileName.c_str());
+#endif
         }
     }
 
@@ -572,10 +578,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             char message[256];
 #ifdef _WIN32
             sprintf_s(message, "Invalid header in file %ls, in header %s\n", m_file->GetName(), section->GetName());
-#else
-            sprintf(message, "Invalid header in file %ls, in header %ls\n", m_file->GetName().c_str(), section->GetName().c_str());
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("Invalid header in file %ls, in header %ls\n", m_file->GetName().c_str(), section->GetName().c_str());
+#endif
         }
 
 
@@ -616,10 +622,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             char message[256];
 #ifdef _WIN32
             sprintf_s(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
-#else
-            sprintf(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
+#endif
         }
 
         // make sure we have the buffer in the range to handle the request
@@ -643,10 +649,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             char message[256];
 #ifdef _WIN32
             sprintf_s(message, "Element out of range, error accesing element %lu, max element=%lu\n", element, GetElementCount());
-#else
-            sprintf(message, "Element out of range, error accesing element %lu, max element=%lu\n", element, GetElementCount());
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("Element out of range, error accesing element %lu, max element=%lu\n", element, GetElementCount());
+#endif
         }
 
         // section is mapped as a whole, so no separate mapping for element buffer
@@ -785,7 +791,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // Element Window is mapped separately so won't no need to remap
             if (m_mappingType !=  mappingElementWindow)
             {
-                int64_t offset = (byte*)view-(byte*)dataStart;
+                int64_t offset = (char*)view-(char*)dataStart;
                 m_sectionHeader = (SectionHeader*)((char*)m_sectionHeader+offset);
                 m_elementBuffer = (char*)m_sectionHeader + m_sectionHeader->sizeHeader;
                 RemapHeader(m_sectionHeader, m_filePosition);
@@ -1156,10 +1162,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 char message[256];
 #ifdef _WIN32
                 sprintf_s(message, "Mapping table doesn't contain an entry for label Id#%d\n", i);
-#else
-                sprintf(message, "Mapping table doesn't contain an entry for label Id#%d\n", i);
-#endif
                 RuntimeError(message);
+#else
+                RuntimeError("Mapping table doesn't contain an entry for label Id#%d\n", i);
+#endif
             }
 
             // add to reverse mapping table
@@ -1172,10 +1178,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 char message[256];
 #ifdef _WIN32
                 sprintf_s(message, "Not enough room in mapping buffer, %lu bytes insufficient for string %d - %s\n", originalSize, i, str.c_str());
-#else
-                sprintf(message, "Not enough room in mapping buffer, %lu bytes insufficient for string %d - %s\n", originalSize, i, str.c_str());
-#endif
                 RuntimeError(message);
+#else
+                RuntimeError("Not enough room in mapping buffer, %lu bytes insufficient for string %d - %s\n", originalSize, i, str.c_str());
+#endif
             }
             size_t len = str.length()+1; // don't forget the null
             size -= len;
@@ -1198,10 +1204,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             char message[256];
 #ifdef _WIN32
             sprintf_s(message, "GetElement: invalid index, %lu requested when there are only %lu elements\n", index, GetElementCount());
-#else
-            sprintf(message, "GetElement: invalid index, %lu requested when there are only %lu elements\n", index, GetElementCount());
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("GetElement: invalid index, %lu requested when there are only %lu elements\n", index, GetElementCount());
+#endif
         }
 
         // now skip all the strings before the one that we want
@@ -1228,10 +1234,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             char message[256];
 #ifdef _WIN32
             sprintf_s(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
-#else
-            sprintf(message, "Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
-#endif
             RuntimeError(message);
+#else
+            RuntimeError("Element out of range, error accesing element %lu, size=%lu\n", element, bytesRequested);
+#endif
         }
 
         // make sure we have the buffer in the range to handle the request
