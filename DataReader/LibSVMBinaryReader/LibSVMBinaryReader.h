@@ -73,7 +73,7 @@ namespace Microsoft {
                 int64_t m_windowSizeBytes;
 
             public:
-                SparseBinaryInput();
+                SparseBinaryInput() {};
                 ~SparseBinaryInput();
 
                 //void Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels);
@@ -87,6 +87,9 @@ namespace Microsoft {
                 size_t getMBSize() { return minibatchSize; };
                 int64_t getNumMB() { return numBatches; };
             };
+
+            template class SparseBinaryInput<float>;
+            template class SparseBinaryInput<double>;
 
             template<class ElemType>
             class LibSVMBinaryReader : public IDataReader<ElemType>

@@ -31,9 +31,6 @@ namespace Microsoft {
             DWORD LODWORD(size_t size) { return size & 0xFFFFFFFF; }
 
             template<class ElemType>
-            SparseBinaryInput<ElemType>::SparseBinaryInput(){}
-
-            template<class ElemType>
             SparseBinaryInput<ElemType>::~SparseBinaryInput(){
                 Dispose();
             }
