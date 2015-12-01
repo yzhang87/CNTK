@@ -27,7 +27,6 @@ namespace Microsoft {
                 labelOther = 3, // some other type of label
             };
 
-            template<class ElemType>
             class SparseBinaryFile {
             private:
 #ifdef _WIN32
@@ -105,7 +104,7 @@ namespace Microsoft {
                 ElemType* DSSMLabels;
                 size_t DSSMCols;
 
-                shared_ptr<SparseBinaryFile<ElemType>> m_file;
+                shared_ptr<SparseBinaryFile> m_file;
             public:
                 SparseBinaryInput() {};
                 ~SparseBinaryInput();

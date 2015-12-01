@@ -35,13 +35,12 @@ namespace Microsoft {
                 Dispose();
             }
 
-			template<class ElemType>
-            SparseBinaryFile<ElemType>::~SparseBinaryFile() {
+            SparseBinaryFile::~SparseBinaryFile() {
                 Dispose();
             }
 
-			template<class ElemType>
-            void SparseBinaryFile<ElemType>::Init(wstring fileName) {
+            void SparseBinaryFile::Init(wstring fileName) {
+                m_headerSize = sizeof(int64_t) * 20000;
 #ifdef _WIN32
                 m_hndl = CreateFile(fileName.c_str(), GENERIC_READ,
                     FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -61,7 +60,6 @@ namespace Microsoft {
                 GetSystemInfo(&sysinfo);
                 sysGran = sysinfo.dwAllocationGranularity;
 
-                m_headerSize = sizeof(int64_t) * 2000000;
                 m_headerBuffer = MapViewOfFile(m_filemap,   // handle to map object
                     FILE_MAP_READ, // get correct permissions
                     HIDWORD(0),
@@ -79,8 +77,7 @@ namespace Microsoft {
 
             }
 
-			template<class ElemType>
-            void SparseBinaryFile<ElemType>::SetOffsets(int64_t base_offset, int64_t numBatches) {
+            void SparseBinaryFile::SetOffsets(int64_t base_offset, int64_t numBatches) {
 
                 m_numBatches = numBatches;
 
@@ -118,10 +115,7 @@ namespace Microsoft {
             //void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels)
             void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename )
             {
-                if (m_file != nullptr) {
-                    m_file.reset();
-                }
-                m_file = make_shared<SparseBinaryFile<ElemType>>();
+                m_file = make_shared<SparseBinaryFile>();
                 m_file->Init(fileName);
 
                 void* header_buffer = m_file->GetHeader();
@@ -193,8 +187,7 @@ namespace Microsoft {
 
             }
             
-            template<class ElemType>
-            void SparseBinaryFile<ElemType>::ReleaseHeader() {
+            void SparseBinaryFile::ReleaseHeader() {
 
                 if (m_headerBuffer != NULL) {
 #ifdef _WIN32
@@ -208,8 +201,7 @@ namespace Microsoft {
             }
 
             
-            template<class ElemType>
-            void SparseBinaryFile<ElemType>::Unload_Window() {
+            void SparseBinaryFile::Unload_Window() {
 
                 if (m_dataOrig != NULL) {
 #ifdef _WIN32
@@ -228,8 +220,7 @@ namespace Microsoft {
                 m_file->Unload_Window();
             }
 
-            template<class ElemType>
-            void SparseBinaryFile<ElemType>::StartMinibatchLoop(size_t startMB, size_t endMB, size_t windowSize) {
+            void SparseBinaryFile::StartMinibatchLoop(size_t startMB, size_t endMB, size_t windowSize) {
                 m_startMB = startMB;
                 m_endMB = endMB;
                 m_maxWindowSize = windowSize;
@@ -248,8 +239,7 @@ namespace Microsoft {
                 return m_file->Load_Window(lowerBound);
             }
 
-            template<class ElemType>
-            size_t SparseBinaryFile<ElemType>::Load_Window(size_t lowerBound ) {
+            size_t SparseBinaryFile::Load_Window(size_t lowerBound ) {
                 Unload_Window();
                 m_mappedLower = lowerBound;
 				size_t upper = lowerBound + m_maxWindowSize;
@@ -258,7 +248,7 @@ namespace Microsoft {
 #ifdef _WIN32
 					m_dataSize = 0;
 #else
-					m_dataSize = m_fileSize - offsets_buffer[m_mappedLower];
+					m_dataSize = m_fileSize - m_offsetsBuffer[m_mappedLower];
 #endif
 				}
                 else {
@@ -292,8 +282,7 @@ namespace Microsoft {
                 return m_curWindowSize;
             }
             
-            template<class ElemType>
-            void* SparseBinaryFile<ElemType>::GetMinibatch(size_t cur_batch){
+            void* SparseBinaryFile::GetMinibatch(size_t cur_batch){
                 int64_t buffer_offset = m_offsetsBuffer[m_mappedLower + cur_batch] - m_offsetsBuffer[m_mappedLower];
                 void* data_buffer = (char*)m_dataBuffer + buffer_offset;
 
@@ -393,8 +382,7 @@ namespace Microsoft {
                 return (size_t)curMBSize;
             }
 
-            template<class ElemType>
-            void SparseBinaryFile<ElemType>::Dispose(){
+            void SparseBinaryFile::Dispose(){
                 if (m_offsetsOrig != NULL){
 #ifdef _WIN32
                     UnmapViewOfFile(m_offsetsOrig);
@@ -417,8 +405,8 @@ namespace Microsoft {
             void SparseBinaryInput<ElemType>::Dispose(){
                 if (m_file != nullptr) {
                     m_file->Dispose();
+                    m_file.reset();
                 }
-                m_file.reset();
                 if (DSSMLabels != nullptr) {
                     delete[] DSSMLabels;
                 }
@@ -479,8 +467,12 @@ namespace Microsoft {
                 // features - [in,out] a vector of feature name strings
                 // labels - [in,out] a vector of label name strings
                 // For SparseBinary dataset, we only need features. No label is necessary. The following "labels" just serves as a place holder
+                
+                fprintf( stderr, "init from config\n" );
                 GetFileConfigNames(readerConfig, m_features, m_labels);
                 RenamedMatrices(readerConfig, m_rename);
+
+                fprintf( stderr, "init from config\n" );
 
                 m_epoch = 0;
 
@@ -522,6 +514,7 @@ namespace Microsoft {
 
                 m_windowSize = readerConfig(L"windowSize", 10000);
 
+                fprintf( stderr, "init \n" );
                 dataInput.Init(file, m_rename);
 
                 m_mbSize = (size_t)readerConfig(L"minibatch", 0);
@@ -540,6 +533,7 @@ namespace Microsoft {
 
                 m_numBatches = dataInput.getNumMB();
 
+                fprintf( stderr, "testing\n");
                 m_epochSize = readerConfig(L"epochMinibatches", 0);
                 if (m_epochSize > 0)
                 {
@@ -555,6 +549,7 @@ namespace Microsoft {
                     m_epochSize = (size_t)dataInput.getNumMB();
                 }
 
+                fprintf( stderr, "done init\n" );
             }
 
             template<class ElemType>
@@ -608,6 +603,7 @@ namespace Microsoft {
             {
 
                 m_readMB = 0;
+                m_nextMB = 0;
 
                 m_epoch = epoch;
 
@@ -659,6 +655,12 @@ namespace Microsoft {
                     return false;
                 }
 
+                if (m_nextMB >= m_curWindowSize)
+                {
+                    m_curLower += m_curWindowSize;
+                    m_curWindowSize = dataInput.Load_Window(m_curLower);
+                    m_nextMB = 0;
+                }
                 //fprintf(stderr,"m_nextmb: %ld\treadorder: %ld\n", m_nextMB, read_order[m_nextMB]);
                 size_t actualmbsize = dataInput.Next_Batch(matrices, read_order[m_nextMB]);
 				m_pMBLayout->Init(actualmbsize, 1, false/*means it is not sequential*/);
@@ -666,12 +668,6 @@ namespace Microsoft {
                 m_readMB++;
                 m_nextMB++;
 
-                if (m_nextMB >= m_curWindowSize)
-                {
-                    m_curLower += m_windowSize;
-                    m_curWindowSize = dataInput.Load_Window(m_curLower);
-                    m_nextMB = 0;
-                }
                 /*
                 m_readMB++;
 
