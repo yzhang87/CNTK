@@ -494,6 +494,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return slice;
     }
 
+    template<class ElemType> GPUMatrix<ElemType> GPUMatrix<ElemType>::RowSlice(size_t startRow, size_t numRows) const
+    {
+        GPUMatrix<ElemType> slice(0); 
+        return slice ;
+    }
+
     template<class ElemType> GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignColumnSlice(const GPUMatrix<ElemType>& fromMatrix, size_t startColumn, size_t numCols) { return *this; }
 
     template<class ElemType> GPUMatrix<ElemType>& GPUMatrix<ElemType>::SetColumnSlice(const GPUMatrix<ElemType>& fromMatrix, size_t startColumn, size_t numCols) { return *this; }
@@ -1037,6 +1043,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     }
 
     template<class ElemType> void GPUMatrix<ElemType>::TensorShuffleScaleAndAdd(ElemType keepWeight, const GPUMatrix<ElemType>& a, size_t D, size_t S, size_t M, size_t K, size_t T, ElemType scaleFactor, const GPUMatrix<ElemType>& b, GPUMatrix<ElemType>& c) { }
+
+    template<class ElemType>
+    void GPUMatrix<ElemType>::CreateCurandObject(unsigned long seed, const char *caller)
+    {
+    }
+
+    template<class ElemType>
+    void GPUMatrix<ElemType>::ResetCurandObject(unsigned long seed, const char *caller)
+    {
+    }
 
     template<class ElemType> GPUMatrix<ElemType>  GPUMatrix<ElemType>::Ones(const size_t rows, const size_t cols, int deviceId)
     {

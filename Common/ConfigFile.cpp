@@ -15,7 +15,6 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-
     // ParseCommandLine - parse the command line parameters
     // argc - count of arguments
     // argv - array of argument parameters
@@ -113,10 +112,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                         // Ensure that the same config file isn't included twice, by keeping track of the config
                         // files that have already been resolved in the resolvedPaths vector.
                         resolvedConfigFiles.push_back(filePath);
-                        newConfigString += ResolveIncludeStatements(
-                                               ReadConfigFile(filePath), 
-                                               resolvedConfigFiles
-                                           );
+                        newConfigString += ResolveIncludeStatements(ReadConfigFile(filePath), resolvedConfigFiles);
                     }
                     else
                     {
@@ -300,6 +296,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         found = str.find_last_not_of(" \t");
         if (found != npos)
             str.erase(found+1);
+    }
+
+    // TrimQuotes - trim surrounding quotation marks
+    // str - string to trim
+    void TrimQuotes(std::string& str)
+    {
+        if (str.empty())
+            return;
+        if (str.front() == '"' && str.back() == '"')
+            str = str.substr(1, str.size() - 2);
     }
 
 }}}

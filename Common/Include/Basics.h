@@ -317,7 +317,7 @@ namespace msra { namespace strfun { // TODO: rename this
         char * ep;          // will be set to point to first character that failed parsing
         double value = strtod(s, &ep);
         if (*s == 0 || *ep != 0)
-            RuntimeError("todouble: invalid input string");
+            RuntimeError("todouble: invalid input string '%s'", s);
         return value;
     }
 
@@ -333,7 +333,7 @@ namespace msra { namespace strfun { // TODO: rename this
 #if _MSC_VER > 1400 // VS 2010+
         size_t * idx = 0;
         value = std::stod(s, idx);
-        if (idx) RuntimeError("todouble: invalid input string");
+        if (idx) RuntimeError("todouble: invalid input string '%s'", s.c_str());
 #else
         char *ep = 0;   // will be updated by strtod to point to first character that failed parsing
         value = strtod(s.c_str(), &ep);
@@ -341,7 +341,7 @@ namespace msra { namespace strfun { // TODO: rename this
         // strtod documentation says ep points to first unconverted character OR 
         // return value will be +/- HUGE_VAL for overflow/underflow
         if (ep != s.c_str() + s.length() || value == HUGE_VAL || value == -HUGE_VAL)
-            RuntimeError("todouble: invalid input string");
+            RuntimeError("todouble: invalid input string '%s'", s.c_str());
 #endif
 
         return value;
@@ -351,7 +351,7 @@ namespace msra { namespace strfun { // TODO: rename this
     {
         wchar_t * endptr;
         double value = wcstod(s.c_str(), &endptr);
-        if (*endptr) RuntimeError("todouble: invalid input string");
+        if (*endptr) RuntimeError("todouble: invalid input string '%ls'", s.c_str());
         return value;
     }
 
@@ -470,5 +470,23 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 #endif
 
 }}}
+
+#ifdef _WIN32
+// ----------------------------------------------------------------------------
+// frequently missing Win32 functions
+// ----------------------------------------------------------------------------
+
+// strerror() for Win32 error codes
+static inline std::wstring FormatWin32Error(DWORD error)
+{
+    wchar_t buf[1024] = { 0 };
+    ::FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, "", error, 0, buf, sizeof(buf) / sizeof(*buf) - 1, NULL);
+    std::wstring res(buf);
+    // eliminate newlines (and spaces) from the end
+    size_t last = res.find_last_not_of(L" \t\r\n");
+    if (last != std::string::npos) res.erase(last + 1, res.length());
+    return res;
+}
+#endif // _WIN32
 
 #endif // _BASICS_H_

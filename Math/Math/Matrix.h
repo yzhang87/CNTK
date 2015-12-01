@@ -121,12 +121,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void SetDataLocation(CurrentDataLocation location, MatrixType type=UNDETERMINED) const;
 
     public:
-        MatrixType GetMatrixType() const {return m_matrixType;};
+        MatrixType GetMatrixType() const { return m_matrixType; }
         MatrixFormat GetFormat() const { return m_baseMatrix->GetFormat(); }
-        bool OwnBuffer() const {return m_baseMatrix->OwnBuffer();}
+        bool OwnBuffer() const { return m_baseMatrix->OwnBuffer(); }
         int GetDeviceId() const; //-1 if CPU, otherwise GPU CUDA device id
         DEVICEID_TYPE GetPreferredDeviceId() const { return m_preferredDeviceId; }; //-1 if CPU, otherwise GPU CUDA device id
-        void SetPreferredDeviceId(DEVICEID_TYPE preferredDeviceId){ if (m_preferredDeviceId != preferredDeviceId) m_preferredDeviceId = preferredDeviceId; }
+        void SetPreferredDeviceId(DEVICEID_TYPE preferredDeviceId) { m_preferredDeviceId = preferredDeviceId; }
         //Moves matrix from device id_from to device with id_to. 
         //If emptyTransfer=true, then no data is ever moved, just corresponding GPU/CPU matrices are deleted and then created using empty constructor
         void TransferFromDeviceToDevice(int id_from, int id_to, bool ismoved = false,/*if false then keep source and set location to BOTH*/ bool emptyTransfer = false, bool updatePreferredDevice = true) const;
@@ -153,7 +153,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void CopySection(size_t numRows, size_t numCols, ElemType* dst, size_t colStride) const; 
 
         Matrix<ElemType> ColumnSlice(size_t startColumn, size_t numCols) const;
-
+        Matrix<ElemType> RowSlice(size_t startRow, size_t numRows) const;
 
         // difference between AssignColumnSlice and SetColumnSlice 
         // AssignColumnSlice :      this(:, startColumn:startColumn+numCols-1) = fromMatrix(:, startColumn: startColumn+numCols-1) 
@@ -165,7 +165,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Matrix<ElemType>& SetColumnSlice(const Matrix<ElemType>& fromMatrix, size_t startColumn, size_t numCols);
 
         void CopyColumnsStrided(const Matrix<ElemType>& fromMatrix, size_t numCols, size_t srcNumColsStride, size_t destNumColsStride);
-
         Matrix<ElemType> Diagonal() const;
         Matrix<ElemType> AssignDiagonalValuesTo(Matrix<ElemType>& diag) const;
         void ShiftBy(int numShift);

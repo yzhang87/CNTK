@@ -140,8 +140,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
 
         GPUMatrix<ElemType> ColumnSlice(size_t startColumn, size_t numCols) const;
+        GPUMatrix<ElemType> RowSlice(size_t startRow, size_t numRows) const;
         GPUMatrix<ElemType>& AssignColumnSlice(const GPUMatrix<ElemType>& fromMatrix, size_t startColumn, size_t numCols);
         GPUMatrix<ElemType>& SetColumnSlice(const GPUMatrix<ElemType>& fromMatrix, size_t startColumn, size_t numCols);
+
+
 
         void CopyColumnsStrided(const GPUMatrix<ElemType>& fromMatrix, size_t numCols, size_t srcNumColsStride, size_t destNumColsStride);
 
@@ -402,6 +405,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         static void TensorShuffleScaleAndAdd(ElemType keepWeight, const GPUMatrix<ElemType>& a, size_t D, size_t S, size_t M, size_t K, size_t T, ElemType scaleFactor, const GPUMatrix<ElemType>& b, GPUMatrix<ElemType>& c);
 
+        static void CreateCurandObject(unsigned long seed, const char *caller);
+        static void ResetCurandObject(unsigned long seed, const char *caller);
         static GPUMatrix<ElemType> Ones(const size_t rows, const size_t cols, int deviceId);
         static GPUMatrix<ElemType> Zeros(const size_t rows, const size_t cols, int deviceId);
         static GPUMatrix<ElemType> Eye(const size_t rows, int deviceId);

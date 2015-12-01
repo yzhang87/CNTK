@@ -330,11 +330,11 @@ void UCIFastReader<ElemType>::InitFromConfig(const ConfigRecordType & readerConf
     if (readerConfig.Exists(L"randomize"))
     {
         string randomizeString = readerConfig(L"randomize");
-        if (randomizeString == "None")
+        if (!_stricmp(randomizeString.c_str(), "none"))
         {
             m_randomizeRange = randomizeNone;
         }
-        else if (randomizeString == "Auto")
+        else if (!_stricmp(randomizeString.c_str(), "auto"))
         {
             m_randomizeRange = randomizeAuto;
         }
@@ -349,8 +349,8 @@ void UCIFastReader<ElemType>::InitFromConfig(const ConfigRecordType & readerConf
     }
 
     // determine if we partial minibatches are desired
-    std::string minibatchMode(readerConfig(L"minibatchMode","Partial"));
-    m_partialMinibatch = !_stricmp(minibatchMode.c_str(),"Partial");
+    std::string minibatchMode(readerConfig(L"minibatchMode","partial"));
+    m_partialMinibatch = !_stricmp(minibatchMode.c_str(),"partial");
 
     // get start and dimensions for labels and features
     size_t startLabels = configLabels(L"start", (size_t)0);
@@ -650,9 +650,9 @@ size_t RoundUp(size_t value, size_t size)
 template<class ElemType>
 void UCIFastReader<ElemType>::SetNumParallelSequences(const size_t sz) 
 {
-    mBlgSize = sz; 
+    mRequestedNumParallelSequences = sz; 
     if (mOneLinePerFile)
-        m_mbSize = mBlgSize;
+        m_mbSize = mRequestedNumParallelSequences;
 };
 
 //StartMinibatchLoop - Startup a minibatch loop 
@@ -665,7 +665,7 @@ void UCIFastReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, si
 {
     fprintf( stderr, "UCIReader start, mbSize: %lu\tepoch: %lu\trequestedEpochSamples: %lu\tbool: %d\n", mbSize, epoch, requestedEpochSamples, mOneLinePerFile );
     if (mOneLinePerFile)
-        mbSize = mBlgSize; /// each file has only one observation, therefore the number of data to read is the number of files
+        mbSize = mRequestedNumParallelSequences; /// each file has only one observation, therefore the number of data to read is the number of files
 
     // if we aren't currently caching, see if we can use a cache
     if (!m_cachingReader && !m_cachingWriter)
