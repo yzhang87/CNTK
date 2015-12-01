@@ -84,16 +84,16 @@ namespace Microsoft {
                 int64_t offsets_padding = base_offset % sysGran;
                 base_offset -= offsets_padding;
 
-                m_headerSize = numBatches*sizeof(int64_t) + offsets_padding;
+                m_offsetsSize = numBatches*sizeof(int64_t) + offsets_padding;
 
 #ifdef _WIN32
                 m_offsetsOrig = MapViewOfFile(m_filemap,   // handle to map object
                     FILE_MAP_READ, // get correct permissions
                     HIDWORD(base_offset),
                     LODWORD(base_offset),
-                    m_headerSize);
+                    m_offsetsSize);
 #else
-                m_offsetsOrig = mmap(0, m_headerSize, PROT_READ, MAP_SHARED, m_hndl, base_offset);
+                m_offsetsOrig = mmap(0, m_offsetsSize, PROT_READ, MAP_SHARED, m_hndl, base_offset);
 #endif
 
                 m_offsetsBuffer = (int64_t*)((char*)m_offsetsOrig + offsets_padding);
@@ -266,7 +266,6 @@ namespace Microsoft {
                 dataOffset -= dataPadding;
                 m_dataSize += dataPadding;
 
-                fprintf(stderr, "loading window: [%ld - %ld]\n", m_mappedLower, upper);
 #ifdef _WIN32
                 m_dataOrig = MapViewOfFile(m_filemap,   // handle to map object
                     FILE_MAP_READ, // get correct permissions
@@ -387,8 +386,9 @@ namespace Microsoft {
 #ifdef _WIN32
                     UnmapViewOfFile(m_offsetsOrig);
 #else
-                    munmap(m_offsetsOrig,m_headerSize);
+                    munmap(m_offsetsOrig,m_offsetsSize);
 #endif
+                    m_offsetsSize = 0;
 
                 }
                 if (m_dataOrig != NULL)
@@ -468,11 +468,9 @@ namespace Microsoft {
                 // labels - [in,out] a vector of label name strings
                 // For SparseBinary dataset, we only need features. No label is necessary. The following "labels" just serves as a place holder
                 
-                fprintf( stderr, "init from config\n" );
                 GetFileConfigNames(readerConfig, m_features, m_labels);
                 RenamedMatrices(readerConfig, m_rename);
 
-                fprintf( stderr, "init from config\n" );
 
                 m_epoch = 0;
 
@@ -514,7 +512,6 @@ namespace Microsoft {
 
                 m_windowSize = readerConfig(L"windowSize", 10000);
 
-                fprintf( stderr, "init \n" );
                 dataInput.Init(file, m_rename);
 
                 m_mbSize = (size_t)readerConfig(L"minibatch", 0);
@@ -533,7 +530,6 @@ namespace Microsoft {
 
                 m_numBatches = dataInput.getNumMB();
 
-                fprintf( stderr, "testing\n");
                 m_epochSize = readerConfig(L"epochMinibatches", 0);
                 if (m_epochSize > 0)
                 {
@@ -549,7 +545,6 @@ namespace Microsoft {
                     m_epochSize = (size_t)dataInput.getNumMB();
                 }
 
-                fprintf( stderr, "done init\n" );
             }
 
             template<class ElemType>
