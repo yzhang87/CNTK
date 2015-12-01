@@ -61,12 +61,14 @@ namespace Microsoft {
                 int32_t numFeatures;
                 int32_t numLabels;
                 
-                size_t m_curWindow;
-                size_t m_numWindows;
-                int64_t m_windowSize;
+                size_t m_startMB;
+                size_t m_endMB;
+                size_t m_windowSize;
+
+                size_t m_lower;
+
                 int64_t m_dataOffset;
                 int64_t m_dataPadding;
-                int64_t m_lower;
                 
                 ElemType* DSSMLabels;
                 size_t DSSMCols;
@@ -77,19 +79,16 @@ namespace Microsoft {
                 ~SparseBinaryInput();
 
                 //void Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels);
-                void Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename, size_t windowSize );
+                void Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename);
+                void StartMinibatchLoop(size_t startMB, size_t endMB, size_t windowSize);
                 size_t Next_Batch(std::map<std::wstring, Matrix<ElemType>*>& matrices, size_t batchIndex);
-				void Load_Window(size_t cur_window);
-				void LoadNextWindow();
+				size_t Load_Window(size_t lowerBound);
 				void Unload_Window();
                 void Dispose();
 
                 size_t getMBSize() { return minibatchSize; };
                 int64_t getNumMB() { return numBatches; };
             };
-
-            template class SparseBinaryInput<float>;
-            template class SparseBinaryInput<double>;
 
             template<class ElemType>
             class LibSVMBinaryReader : public IDataReader<ElemType>
@@ -113,10 +112,7 @@ namespace Microsoft {
 				virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize) override;
                 virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices);
     
-                virtual bool SupportsDistributedMBRead() const override
-				{
-                    return true;
-				}
+                virtual bool SupportsDistributedMBRead() const override { return true; }
 
 
 				template<class ConfigRecordType> void RenamedMatrices(const ConfigRecordType& readerConfig, std::map<std::wstring, std::wstring>& rename);
@@ -137,7 +133,8 @@ namespace Microsoft {
 
             private:
                 bool Randomize();
-                void Shuffle();
+                void FillReadOrder(size_t lowerBound, size_t windowSize);
+                void Shuffle( size_t lowerBound, size_t windowSize);
                 void ReleaseMemory();
 
 				MBLayoutPtr m_pMBLayout;
@@ -150,6 +147,7 @@ namespace Microsoft {
                 std::vector<std::wstring> m_labels;
 
                 size_t* read_order; // array to shuffle to reorder the dataset
+                size_t read_order_length;
 
                 unsigned long m_randomize; // randomization range
 
@@ -160,13 +158,19 @@ namespace Microsoft {
                 size_t m_nextMB; // starting sample # of the next minibatch
                 size_t m_readMB; // starting sample # of the next minibatch
 
+                size_t m_requestedEpochSize; // size of an epoch
                 size_t m_epochSize; // size of an epoch
                 size_t m_epoch; // which epoch are we on
+
+                size_t m_startMB;
+                size_t m_endMB;
+                size_t m_curLower;
                 
                 size_t m_subsetNum;
                 size_t m_numSubsets;
 
                 size_t m_windowSize;
+                size_t m_curWindowSize;
 
                 bool m_partialMinibatch;    // a partial minibatch is allowed
                 size_t m_traceLevel;

@@ -37,7 +37,7 @@ namespace Microsoft {
 
             template<class ElemType>
             //void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels)
-            void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename, size_t windowSize )
+            void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename )
             {
 #ifdef _WIN32
                 m_hndl = CreateFile(fileName.c_str(), GENERIC_READ,
@@ -157,25 +157,16 @@ namespace Microsoft {
 
                 int64_t header_offset = base_offset + offsets_padding + numBatches * sizeof(int64_t);
 
-                m_dataPadding = header_offset % sysGran;
-                header_offset -= m_dataPadding;
-
                 m_dataOffset = header_offset;
-
-                m_windowSize = min((int64_t)windowSize, numBatches);
 
                 data_orig = NULL;
 
-                m_numWindows = (size_t)ceil((double)numBatches / m_windowSize);
-                m_curWindow = 1;
 #ifdef _WIN32
 #else
 				struct stat stat_buf;
 				fstat( m_hndl, &stat_buf );
 				m_fileSize = stat_buf.st_size;
 #endif
-
-                Load_Window(0);
 
             }
             
@@ -195,45 +186,58 @@ namespace Microsoft {
             }
 
             template<class ElemType>
-            void SparseBinaryInput<ElemType>::LoadNextWindow() {
-                Load_Window( ( m_curWindow + 1 ) % m_numWindows );
+            void SparseBinaryInput<ElemType>::StartMinibatchLoop(size_t startMB, size_t endMB, size_t windowSize) {
+                m_startMB = startMB;
+                m_endMB = endMB;
+                m_windowSize = windowSize;
             }
-            
+
             template<class ElemType>
-            void SparseBinaryInput<ElemType>::Load_Window(size_t cur_window) {
-                if (m_curWindow == cur_window) {
-                    return;
-                }
+            size_t SparseBinaryInput<ElemType>::Load_Window(size_t lowerBound ) {
                 Unload_Window();
-                m_curWindow = cur_window;
-                int64_t upper = (cur_window + 1) * m_windowSize + 1;
-                m_lower = cur_window * m_windowSize;
-                if (upper > numBatches) {
+                m_lower = lowerBound;
+				size_t upper = lowerBound + m_windowSize + 1;
+				size_t m_curWindowSize = upper - m_lower - 1;
+				if (upper > (size_t)numBatches) {
 #ifdef _WIN32
-                    m_windowSizeBytes = 0;
+					m_windowSizeBytes = 0;
 #else
-                    m_windowSizeBytes = m_fileSize - offsets_buffer[m_lower];
+					m_windowSizeBytes = m_fileSize - offsets_buffer[m_lower];
 #endif
-                }
+				}
                 else {
+					if (upper > m_endMB) {
+                        upper = m_endMB;
+                        m_curWindowSize = upper - m_lower;
+                    }
                     m_windowSizeBytes = offsets_buffer[upper] - offsets_buffer[m_lower];
                 }
+                //m_dataOffset = header_offset;
+                int64_t dataOffset = m_dataOffset + offsets_buffer[m_lower];
+                m_dataPadding = dataOffset % sysGran;
+
+                dataOffset -= m_dataPadding;
+
 #ifdef _WIN32
                 data_orig = MapViewOfFile(m_filemap,   // handle to map object
                     FILE_MAP_READ, // get correct permissions
-                    HIDWORD(m_dataOffset),
-                    LODWORD(m_dataOffset),
+                    HIDWORD(dataOffset),
+                    LODWORD(dataOffset),
                     m_windowSizeBytes);
 #else
 
                 data_orig = mmap(0, m_windowSizeBytes, PROT_READ, MAP_SHARED, m_hndl, m_dataOffset);
 #endif
+                fprintf(stderr, "loading lower: %ld\tupper: %ld\t windowSize: %ld", m_lower, upper, m_curWindowSize);
                 data_buffer = (char*)data_orig + m_dataPadding;
+
+                return m_curWindowSize;
             }
 
             template<class ElemType>
             size_t SparseBinaryInput<ElemType>::Next_Batch(std::map<std::wstring, Matrix<ElemType>*>& matrices, size_t cur_batch){
 
+                fprintf(stderr, "lower: %ld, cur_batch: %ld\n", m_lower, cur_batch);
                 int64_t buffer_offset = offsets_buffer[m_lower + cur_batch] - offsets_buffer[m_lower];
                 int32_t nnz;
                 int32_t curMBSize;
@@ -444,7 +448,7 @@ namespace Microsoft {
 
                 m_windowSize = readerConfig(L"windowSize", 10000);
 
-                dataInput.Init(file, m_rename, m_windowSize);
+                dataInput.Init(file, m_rename);
 
                 m_mbSize = (size_t)readerConfig(L"minibatch", 0);
                 if (m_mbSize > 0)
@@ -461,7 +465,6 @@ namespace Microsoft {
                 }
 
                 m_numBatches = dataInput.getNumMB();
-                m_windowSize = min(m_numBatches, m_windowSize);
 
                 m_epochSize = readerConfig(L"epochMinibatches", 0);
                 if (m_epochSize > 0)
@@ -478,15 +481,20 @@ namespace Microsoft {
                     m_epochSize = (size_t)dataInput.getNumMB();
                 }
 
-                if (read_order == nullptr)
-                {
-                    read_order = new size_t[m_windowSize];
-                    for (size_t c = 0; c < m_windowSize; c++)
-                    {
-                        read_order[c] = c;
-                    }
-                }
+            }
 
+            template<class ElemType>
+            void LibSVMBinaryReader<ElemType>::FillReadOrder( size_t /*lowerBound*/, size_t windowSize)
+            {
+                if (read_order != nullptr)
+                {
+                    delete[] read_order;
+                }
+				read_order = new size_t[windowSize];
+				for (size_t c = 0; c < windowSize; c++)
+				{
+					read_order[c] = c;
+				}
             }
 
             // Destroy - cleanup and remove this class
@@ -512,6 +520,7 @@ namespace Microsoft {
             template<class ElemType>
             void LibSVMBinaryReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
             {
+                fprintf(stderr, "calling startminibatch loop\n");
                 StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, requestedEpochSamples);
             }
 
@@ -525,8 +534,7 @@ namespace Microsoft {
 				//void LibSVMBinaryReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t /*requestedEpochSamples*/)
             {
 
-                m_readMB = subsetNum;
-                Shuffle();
+                m_readMB = 0;
 
                 m_epoch = epoch;
 
@@ -535,7 +543,28 @@ namespace Microsoft {
                 m_subsetNum = subsetNum;
                 m_numSubsets = numSubsets;
                 
-                dataInput.Load_Window(0);
+                m_epochSize = m_numBatches / numSubsets;
+
+                m_startMB = m_epochSize * subsetNum;
+                m_endMB = m_epochSize * ( subsetNum + 1 );
+                fprintf(stderr, "subsetNum: %ld\tnumSubsets: %ld\tm_epochSize: %ld\tm_startMB: %ld\tm_endMB: %ld\n", subsetNum, numSubsets, m_epochSize, m_startMB, m_endMB);
+
+                size_t remainder = m_numBatches % numSubsets;
+
+                size_t lb = min(remainder, subsetNum);
+                size_t ub = min(remainder, subsetNum + 1);
+
+                m_epochSize += (subsetNum < remainder ) ? 1 : 0;
+
+                m_windowSize = min(m_windowSize, m_epochSize);
+                m_startMB += lb;
+                m_endMB += ub;
+
+                m_curLower = m_startMB;
+
+                dataInput.StartMinibatchLoop(m_startMB, m_endMB, m_windowSize);
+                m_curWindowSize = dataInput.Load_Window(m_curLower);
+                Shuffle(m_curLower, m_curWindowSize);
                 /*
                 if (mbSize != m_mbSize)
                 {
@@ -553,23 +582,27 @@ namespace Microsoft {
             template<class ElemType>
             bool LibSVMBinaryReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
             {
+                fprintf(stderr, "doing getmb lower: %ld\tupper: %ld\twindow: %ld\n", m_startMB, m_endMB, m_windowSize);
                 if (m_readMB >= m_epochSize)
                 {
                     return false;
                 }
 
+                fprintf(stderr, "doing next_batch\n");
                 //fprintf(stderr,"m_nextmb: %ld\treadorder: %ld\n", m_nextMB, read_order[m_nextMB]);
                 size_t actualmbsize = dataInput.Next_Batch(matrices, read_order[m_nextMB]);
+                fprintf(stderr, "doing init\n");
 				m_pMBLayout->Init(actualmbsize, 1, false/*means it is not sequential*/);
 
-                m_readMB += m_numSubsets;
-                m_nextMB += m_numSubsets;
+                m_readMB++;
+                m_nextMB++;
 
-                if (m_nextMB >= m_windowSize)
+                if (m_nextMB >= m_curWindowSize)
                 {
-                    dataInput.LoadNextWindow();
-                    m_nextMB = m_subsetNum;
-                    Shuffle();
+					fprintf(stderr, "load\n");
+                    m_curLower += m_windowSize;
+                    m_curWindowSize = dataInput.Load_Window(m_curLower);
+                    m_nextMB = 0;
                 }
                 /*
                 m_readMB++;
@@ -581,6 +614,7 @@ namespace Microsoft {
                     Shuffle();
                 }
 				*/
+                fprintf(stderr, "done mb\n");
 
                 return true;
             }
@@ -648,8 +682,9 @@ namespace Microsoft {
 
 
             template<class ElemType>
-            void LibSVMBinaryReader<ElemType>::Shuffle()
+            void LibSVMBinaryReader<ElemType>::Shuffle(size_t lowerBound, size_t windowSize)
             {
+				FillReadOrder(lowerBound, windowSize);
                 if (Randomize())
                 {
                     int useLast = (m_partialMinibatch) ? 1 : 0;
