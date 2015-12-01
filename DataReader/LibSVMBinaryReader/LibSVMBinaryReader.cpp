@@ -228,7 +228,6 @@ namespace Microsoft {
 
                 data_orig = mmap(0, m_windowSizeBytes, PROT_READ, MAP_SHARED, m_hndl, m_dataOffset);
 #endif
-                fprintf(stderr, "loading lower: %ld\tupper: %ld\t windowSize: %ld", m_lower, upper, m_curWindowSize);
                 data_buffer = (char*)data_orig + m_dataPadding;
 
                 return m_curWindowSize;
@@ -237,7 +236,6 @@ namespace Microsoft {
             template<class ElemType>
             size_t SparseBinaryInput<ElemType>::Next_Batch(std::map<std::wstring, Matrix<ElemType>*>& matrices, size_t cur_batch){
 
-                fprintf(stderr, "lower: %ld, cur_batch: %ld\n", m_lower, cur_batch);
                 int64_t buffer_offset = offsets_buffer[m_lower + cur_batch] - offsets_buffer[m_lower];
                 int32_t nnz;
                 int32_t curMBSize;
@@ -520,7 +518,6 @@ namespace Microsoft {
             template<class ElemType>
             void LibSVMBinaryReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
             {
-                fprintf(stderr, "calling startminibatch loop\n");
                 StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, requestedEpochSamples);
             }
 
@@ -547,7 +544,6 @@ namespace Microsoft {
 
                 m_startMB = m_epochSize * subsetNum;
                 m_endMB = m_epochSize * ( subsetNum + 1 );
-                fprintf(stderr, "subsetNum: %ld\tnumSubsets: %ld\tm_epochSize: %ld\tm_startMB: %ld\tm_endMB: %ld\n", subsetNum, numSubsets, m_epochSize, m_startMB, m_endMB);
 
                 size_t remainder = m_numBatches % numSubsets;
 
@@ -582,16 +578,13 @@ namespace Microsoft {
             template<class ElemType>
             bool LibSVMBinaryReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
             {
-                fprintf(stderr, "doing getmb lower: %ld\tupper: %ld\twindow: %ld\n", m_startMB, m_endMB, m_windowSize);
                 if (m_readMB >= m_epochSize)
                 {
                     return false;
                 }
 
-                fprintf(stderr, "doing next_batch\n");
                 //fprintf(stderr,"m_nextmb: %ld\treadorder: %ld\n", m_nextMB, read_order[m_nextMB]);
                 size_t actualmbsize = dataInput.Next_Batch(matrices, read_order[m_nextMB]);
-                fprintf(stderr, "doing init\n");
 				m_pMBLayout->Init(actualmbsize, 1, false/*means it is not sequential*/);
 
                 m_readMB++;
@@ -599,7 +592,6 @@ namespace Microsoft {
 
                 if (m_nextMB >= m_curWindowSize)
                 {
-					fprintf(stderr, "load\n");
                     m_curLower += m_windowSize;
                     m_curWindowSize = dataInput.Load_Window(m_curLower);
                     m_nextMB = 0;
@@ -614,7 +606,6 @@ namespace Microsoft {
                     Shuffle();
                 }
 				*/
-                fprintf(stderr, "done mb\n");
 
                 return true;
             }

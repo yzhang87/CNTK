@@ -98,7 +98,6 @@ namespace Microsoft {
                     //typedef std::string LabelType;
                     using LabelType = typename IDataReader<ElemType>::LabelType;
                     using LabelIdType = typename IDataReader<ElemType>::LabelIdType;
-                    using IDataReader<ElemType>::mBlgSize;
             public:
 				virtual void Init(const ConfigParameters & config) override { InitFromConfig(config); }
 				virtual void Init(const ScriptableObjects::IConfigRecord & config) override { InitFromConfig(config); }
