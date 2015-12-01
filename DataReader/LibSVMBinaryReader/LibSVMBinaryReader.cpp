@@ -35,10 +35,13 @@ namespace Microsoft {
                 Dispose();
             }
 
-            template<class ElemType>
-            //void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels)
-            void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename )
-            {
+			template<class ElemType>
+            SparseBinaryFile<ElemType>::~SparseBinaryFile() {
+                Dispose();
+            }
+
+			template<class ElemType>
+            void SparseBinaryFile<ElemType>::Init(wstring fileName) {
 #ifdef _WIN32
                 m_hndl = CreateFile(fileName.c_str(), GENERIC_READ,
                     FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -49,7 +52,7 @@ namespace Microsoft {
                     char message[1024];
                     sprintf_s(message, 1024, "Unable to Open/Create file %ls, error %x", fileName.c_str(), GetLastError());
                     throw runtime_error(message);
-					*/
+                    */
                 }
 
                 m_filemap = CreateFileMapping(m_hndl, NULL, PAGE_READONLY, 0, 0, NULL);
@@ -58,11 +61,12 @@ namespace Microsoft {
                 GetSystemInfo(&sysinfo);
                 sysGran = sysinfo.dwAllocationGranularity;
 
-                header_buffer = MapViewOfFile(m_filemap,   // handle to map object
+                m_headerSize = sizeof(int64_t) * 2000000;
+                m_headerBuffer = MapViewOfFile(m_filemap,   // handle to map object
                     FILE_MAP_READ, // get correct permissions
                     HIDWORD(0),
                     LODWORD(0),
-                    sizeof(int64_t) * 2 + sizeof(int32_t) * 2);
+                    m_headerSize);
 #else
                 sysGran = sysconf(_SC_PAGESIZE);
                 m_hndl = open(msra::strfun::utf8(fileName).c_str(), O_RDONLY, O_CREAT);
@@ -70,11 +74,57 @@ namespace Microsoft {
                 {
                     RuntimeError("Unable to Open/Create file %s, error %d", msra::strfun::utf8(fileName).c_str(), errno);
                 }
-                header_buffer = mmap(0, sizeof(int64_t) * 2000000, PROT_READ, MAP_SHARED, m_hndl, 0);
+                m_headerBuffer = mmap(0, m_headerSize, PROT_READ, MAP_SHARED, m_hndl, 0);
 #endif
 
-                //cout << "After mapviewoffile" << endl;
+            }
 
+			template<class ElemType>
+            void SparseBinaryFile<ElemType>::SetOffsets(int64_t base_offset, int64_t numBatches) {
+
+                m_numBatches = numBatches;
+
+                int64_t offsets_padding = base_offset % sysGran;
+                base_offset -= offsets_padding;
+
+                m_headerSize = numBatches*sizeof(int64_t) + offsets_padding;
+
+#ifdef _WIN32
+                m_offsetsOrig = MapViewOfFile(m_filemap,   // handle to map object
+                    FILE_MAP_READ, // get correct permissions
+                    HIDWORD(base_offset),
+                    LODWORD(base_offset),
+                    m_headerSize);
+#else
+                m_offsetsOrig = mmap(0, m_headerSize, PROT_READ, MAP_SHARED, m_hndl, base_offset);
+#endif
+
+                m_offsetsBuffer = (int64_t*)((char*)m_offsetsOrig + offsets_padding);
+
+                m_dataStart = base_offset + offsets_padding + numBatches * sizeof(int64_t);
+
+                m_dataOrig = NULL;
+
+#ifdef _WIN32
+#else
+				struct stat stat_buf;
+				fstat( m_hndl, &stat_buf );
+				m_fileSize = stat_buf.st_size;
+#endif
+
+            }
+
+            template<class ElemType>
+            //void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels)
+            void SparseBinaryInput<ElemType>::Init(std::wstring fileName, std::map<std::wstring, std::wstring> rename )
+            {
+                if (m_file != nullptr) {
+                    m_file.reset();
+                }
+                m_file = make_shared<SparseBinaryFile<ElemType>>();
+                m_file->Init(fileName);
+
+                void* header_buffer = m_file->GetHeader();
                 int64_t base_offset = 0;
 
                 numRows = *(int64_t*)((char*)header_buffer + base_offset);
@@ -138,51 +188,51 @@ namespace Microsoft {
 
                 }
 
-                int64_t offsets_padding = base_offset % sysGran;
-                base_offset -= offsets_padding;
-
-                header_size = numBatches*sizeof(int64_t) + offsets_padding;
-
-#ifdef _WIN32
-                offsets_orig = MapViewOfFile(m_filemap,   // handle to map object
-                    FILE_MAP_READ, // get correct permissions
-                    HIDWORD(base_offset),
-                    LODWORD(base_offset),
-                    header_size);
-#else
-                offsets_orig = mmap(0, header_size, PROT_READ, MAP_SHARED, m_hndl, base_offset);
-#endif
-
-                offsets_buffer = (int64_t*)((char*)offsets_orig + offsets_padding);
-
-                int64_t header_offset = base_offset + offsets_padding + numBatches * sizeof(int64_t);
-
-                m_dataOffset = header_offset;
-
-                data_orig = NULL;
-
-#ifdef _WIN32
-#else
-				struct stat stat_buf;
-				fstat( m_hndl, &stat_buf );
-				m_fileSize = stat_buf.st_size;
-#endif
+                m_file->SetOffsets(base_offset, numBatches);
+                m_file->ReleaseHeader();
 
             }
             
             template<class ElemType>
-            void SparseBinaryInput<ElemType>::Unload_Window() {
+            void SparseBinaryFile<ElemType>::ReleaseHeader() {
 
-                if (data_orig != NULL) {
+                if (m_headerBuffer != NULL) {
 #ifdef _WIN32
-                    UnmapViewOfFile(data_orig);
+                    UnmapViewOfFile(m_headerBuffer);
 #else
-                    munmap(data_orig,m_windowSizeBytes);
-                    m_windowSizeBytes = 0;
+                    munmap(m_headerBuffer,m_headerSize);
+                    m_headerSize = 0;
 #endif
                 }
-				data_orig = NULL;
-                data_buffer = NULL;
+                m_headerBuffer = NULL;
+            }
+
+            
+            template<class ElemType>
+            void SparseBinaryFile<ElemType>::Unload_Window() {
+
+                if (m_dataOrig != NULL) {
+#ifdef _WIN32
+                    UnmapViewOfFile(m_dataOrig);
+#else
+                    munmap(m_dataOrig,m_dataSize);
+                    m_dataSize = 0;
+#endif
+                }
+				m_dataOrig = NULL;
+                m_dataBuffer = NULL;
+            }
+
+            template<class ElemType>
+            void SparseBinaryInput<ElemType>::Unload_Window() {
+                m_file->Unload_Window();
+            }
+
+            template<class ElemType>
+            void SparseBinaryFile<ElemType>::StartMinibatchLoop(size_t startMB, size_t endMB, size_t windowSize) {
+                m_startMB = startMB;
+                m_endMB = endMB;
+                m_maxWindowSize = windowSize;
             }
 
             template<class ElemType>
@@ -190,53 +240,71 @@ namespace Microsoft {
                 m_startMB = startMB;
                 m_endMB = endMB;
                 m_windowSize = windowSize;
+                m_file->StartMinibatchLoop(startMB, endMB, windowSize);
             }
 
             template<class ElemType>
-            size_t SparseBinaryInput<ElemType>::Load_Window(size_t lowerBound ) {
+            size_t SparseBinaryInput<ElemType>::Load_Window(size_t lowerBound) {
+                return m_file->Load_Window(lowerBound);
+            }
+
+            template<class ElemType>
+            size_t SparseBinaryFile<ElemType>::Load_Window(size_t lowerBound ) {
                 Unload_Window();
-                m_lower = lowerBound;
-				size_t upper = lowerBound + m_windowSize + 1;
-				size_t m_curWindowSize = upper - m_lower - 1;
-				if (upper > (size_t)numBatches) {
+                m_mappedLower = lowerBound;
+				size_t upper = lowerBound + m_maxWindowSize;
+				if (upper > (size_t)m_numBatches) {
+                    upper = m_numBatches;
 #ifdef _WIN32
-					m_windowSizeBytes = 0;
+					m_dataSize = 0;
 #else
-					m_windowSizeBytes = m_fileSize - offsets_buffer[m_lower];
+					m_dataSize = m_fileSize - offsets_buffer[m_mappedLower];
 #endif
 				}
                 else {
 					if (upper > m_endMB) {
                         upper = m_endMB;
-                        m_curWindowSize = upper - m_lower;
+                        m_curWindowSize = upper - m_mappedLower;
                     }
-                    m_windowSizeBytes = offsets_buffer[upper] - offsets_buffer[m_lower];
+                    m_dataSize = m_offsetsBuffer[upper] - m_offsetsBuffer[m_mappedLower];
                 }
+				size_t m_curWindowSize = upper - m_mappedLower;
                 //m_dataOffset = header_offset;
-                int64_t dataOffset = m_dataOffset + offsets_buffer[m_lower];
-                m_dataPadding = dataOffset % sysGran;
+                int64_t dataOffset = m_dataStart + m_offsetsBuffer[m_mappedLower];
+                int64_t dataPadding = dataOffset % sysGran;
 
-                dataOffset -= m_dataPadding;
+                dataOffset -= dataPadding;
+                m_dataSize += dataPadding;
 
+                fprintf(stderr, "loading window: [%ld - %ld]\n", m_mappedLower, upper);
 #ifdef _WIN32
-                data_orig = MapViewOfFile(m_filemap,   // handle to map object
+                m_dataOrig = MapViewOfFile(m_filemap,   // handle to map object
                     FILE_MAP_READ, // get correct permissions
                     HIDWORD(dataOffset),
                     LODWORD(dataOffset),
-                    m_windowSizeBytes);
+                    m_dataSize );
 #else
 
-                data_orig = mmap(0, m_windowSizeBytes, PROT_READ, MAP_SHARED, m_hndl, m_dataOffset);
+                m_dataOrig = mmap(0, m_dataSize, PROT_READ, MAP_SHARED, m_hndl, dataOffset);
 #endif
-                data_buffer = (char*)data_orig + m_dataPadding;
+                m_dataBuffer = (char*)m_dataOrig + dataPadding;
 
                 return m_curWindowSize;
+            }
+            
+            template<class ElemType>
+            void* SparseBinaryFile<ElemType>::GetMinibatch(size_t cur_batch){
+                int64_t buffer_offset = m_offsetsBuffer[m_mappedLower + cur_batch] - m_offsetsBuffer[m_mappedLower];
+                void* data_buffer = (char*)m_dataBuffer + buffer_offset;
+
+                return data_buffer;
             }
 
             template<class ElemType>
             size_t SparseBinaryInput<ElemType>::Next_Batch(std::map<std::wstring, Matrix<ElemType>*>& matrices, size_t cur_batch){
 
-                int64_t buffer_offset = offsets_buffer[m_lower + cur_batch] - offsets_buffer[m_lower];
+                void* data_buffer = m_file->GetMinibatch(cur_batch);
+                int64_t buffer_offset = 0;
                 int32_t nnz;
                 int32_t curMBSize;
 
@@ -326,23 +394,31 @@ namespace Microsoft {
             }
 
             template<class ElemType>
-            void SparseBinaryInput<ElemType>::Dispose(){
-                if (offsets_orig != NULL){
+            void SparseBinaryFile<ElemType>::Dispose(){
+                if (m_offsetsOrig != NULL){
 #ifdef _WIN32
-                    UnmapViewOfFile(offsets_orig);
+                    UnmapViewOfFile(m_offsetsOrig);
 #else
-                    munmap(offsets_orig,header_size);
+                    munmap(m_offsetsOrig,m_headerSize);
 #endif
 
                 }
-                if (data_orig != NULL)
+                if (m_dataOrig != NULL)
                 {
 #ifdef _WIN32
-                    UnmapViewOfFile(data_orig);
+                    UnmapViewOfFile(m_dataOrig);
 #else
-                    munmap(data_orig,m_windowSizeBytes);
+                    munmap(m_dataOrig,m_dataSize);
 #endif
                 }
+            }
+
+            template<class ElemType>
+            void SparseBinaryInput<ElemType>::Dispose(){
+                if (m_file != nullptr) {
+                    m_file->Dispose();
+                }
+                m_file.reset();
                 if (DSSMLabels != nullptr) {
                     delete[] DSSMLabels;
                 }

@@ -28,7 +28,7 @@ namespace Microsoft {
             };
 
             template<class ElemType>
-            class SparseBinaryInput {
+            class SparseBinaryFile {
             private:
 #ifdef _WIN32
                 HANDLE m_hndl;
@@ -37,18 +37,55 @@ namespace Microsoft {
                 int m_hndl;
                 int64_t m_fileSize;
 #endif
-                int64_t header_size;
+                int64_t m_headerSize;
+                int64_t m_offsetsSize;
+                int64_t m_dataSize;
 				
+#ifdef _WIN32
                 DWORD sysGran;
+#else
+                int32_t sysGran;
+#endif
 
+                int64_t m_dataStart;
                 //void* header_orig; // Don't need this since the header is at the start of the file
-                void* offsets_orig;
-                void* data_orig;
+                void* m_offsetsOrig;
+                void* m_dataOrig;
 
-                void* header_buffer;
-                int64_t* offsets_buffer;
-                void* data_buffer;
+                void* m_headerBuffer;
+                int64_t* m_offsetsBuffer;
+                void* m_dataBuffer;
 
+                size_t m_startMB;
+                size_t m_endMB;
+                size_t m_numBatches;
+
+                size_t m_mappedLower;
+                size_t m_maxWindowSize;
+                size_t m_curWindowSize;
+
+            public:
+                SparseBinaryFile() {};
+                ~SparseBinaryFile();
+
+                //void Init(std::wstring fileName, std::vector<std::wstring> features, std::vector<std::wstring> labels);
+                void Init(std::wstring fileName);
+                void StartMinibatchLoop(size_t startMB, size_t endMB, size_t windowSize);
+				size_t Load_Window(size_t lowerBound);
+				void Unload_Window();
+                void Dispose();
+
+                void* GetHeader() { return m_headerBuffer; };
+                void ReleaseHeader();
+                void SetOffsets(int64_t base_offset, int64_t numBatches);
+
+                void* GetMinibatch(size_t mbNum);
+
+            };
+
+            template<class ElemType>
+            class SparseBinaryInput {
+            private:
                 std::vector<std::wstring> m_features;
                 std::vector<std::wstring> m_labels;
 
@@ -65,15 +102,10 @@ namespace Microsoft {
                 size_t m_endMB;
                 size_t m_windowSize;
 
-                size_t m_lower;
-
-                int64_t m_dataOffset;
-                int64_t m_dataPadding;
-                
                 ElemType* DSSMLabels;
                 size_t DSSMCols;
-                int64_t m_windowSizeBytes;
 
+                shared_ptr<SparseBinaryFile<ElemType>> m_file;
             public:
                 SparseBinaryInput() {};
                 ~SparseBinaryInput();
