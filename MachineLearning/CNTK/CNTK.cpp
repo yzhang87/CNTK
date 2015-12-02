@@ -1967,9 +1967,9 @@ void CheckFMA(void)
     {
         const size_t row = 100;
         const size_t col = 900;
-        CPUMatrix<float> cpuMatrix1 = CPUMatrix<float>::RandomUniform(row, col, -1, 1, 1);
-        CPUMatrix<float> cpuMatrix2 = CPUMatrix<float>::RandomUniform(row, row, -2, 2, 2);
-        CPUMatrix<float> cpuMatrix3 = CPUMatrix<float>::RandomUniform(row, row, -3, 1, 3);
+        CPUMatrix<float> cpuMatrix1 = CPUMatrix<float>::RandomUniform(row, col, -1, 1);
+        CPUMatrix<float> cpuMatrix2 = CPUMatrix<float>::RandomUniform(row, col, -2, 2);
+        CPUMatrix<float> cpuMatrix3 = CPUMatrix<float>::RandomUniform(row, col, -3, 1);
         CPUMatrix<float>::MultiplyAndAdd(cpuMatrix1, true, cpuMatrix2, false, cpuMatrix3);
 
         size_t counter = 0;
@@ -1979,7 +1979,7 @@ void CheckFMA(void)
                 counter++;
         }
 
-        if (counter < row*col)
+        if (counter < cpuMatrix3.GetNumCols()*cpuMatrix3.GetNumRows())
         {
             return; // no problem found - we can continue
         }
