@@ -231,6 +231,7 @@ namespace msra { namespace dbn {
             positionchunkwindow (std::vector<chunk>::iterator definingchunk) : definingchunk (definingchunk) {}
         };
         std::vector<positionchunkwindow> positionchunkwindows;      // [utterance position] -> [windowbegin, windowend) for controlling paging
+        // TODO for now, just indirect over randomizedsequencerefs ? optimize later if there's need?
 
         template<typename VECTOR> static void randomshuffle (VECTOR & v, size_t randomseed);
 
@@ -257,6 +258,7 @@ namespace msra { namespace dbn {
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
 
         // Find (randomized) chunk index for a given frame position
+        // TODO rename
         size_t chunkForFramePos(const size_t t) const
         {
             auto iter = std::lower_bound(
@@ -270,7 +272,16 @@ namespace msra { namespace dbn {
                 LogicError("chunkForFramePos: dude, learn STL!");
             return chunkindex;
         }
-        // TODO Use randomizedutteranceposmap above
+
+        size_t sequenceIndexForFramePos(const size_t t) const
+        {
+            auto positer = randomizedutteranceposmap.find(t);
+            if (positer == randomizedutteranceposmap.end())
+                LogicError("sequenceIndexForFramePos: invalid 'globalts' parameter; must match an existing utterance boundary");
+            return positer->second;
+        }
+
+        // TODO chunkForFramePos(); getChunkWindow{Begin,End}() should be replaced by getSequenceWindow{Begin,End}()
 
         size_t getOriginalChunkIndex(size_t randomizedChunkIndex) const
         {
@@ -288,6 +299,18 @@ namespace msra { namespace dbn {
         {
             assert(randomizedChunkIndex < randomizedchunks.size());
             return randomizedchunks[randomizedChunkIndex].windowend;
+        }
+
+        size_t getSequenceWindowBegin(size_t sequenceIndex) const
+        {
+            assert(sequenceIndex < positionchunkwindows.size());
+            return positionchunkwindows[sequenceIndex].windowbegin();
+        }
+
+        size_t getSequenceWindowEnd(size_t sequenceIndex) const
+        {
+            assert(sequenceIndex < positionchunkwindows.size());
+            return positionchunkwindows[sequenceIndex].windowend();
         }
 
         size_t getNumSequences() const
