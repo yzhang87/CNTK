@@ -125,7 +125,7 @@
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Utils.h" />
-    <ClInclude Include="utterancesourcemulti.h" />
+    <ClInclude Include="utterancesourcemultiNew.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Common\TimerUtility.cpp">
