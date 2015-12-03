@@ -64,9 +64,10 @@ class minibatchutterancesourcemulti : public minibatchsource
     {
         size_t numreleased = 0;
         size_t numStreams = allchunks.size();
+        const size_t originalChunkIndex = rand->getOriginalChunkIndex(k);
         for (size_t m = 0; m < numStreams; m++)
         {
-            auto & chunkdata = rand->getChunkData(m, k);
+            auto & chunkdata = allchunks[m][originalChunkIndex];
             if (chunkdata.isinram())
             {
 #if 0 // TODO restore diagnostics
@@ -100,9 +101,10 @@ class minibatchutterancesourcemulti : public minibatchsource
             LogicError("requirerandomizedchunk: requested utterance outside in-memory chunk range");
 
         size_t numStreams = allchunks.size();
+        const size_t originalChunkIndex = rand->getOriginalChunkIndex(chunkindex);
         for (size_t m = 0; m < numStreams; m++)
         {
-            auto & chunkdata = rand->getChunkData(m, chunkindex);
+            auto & chunkdata = allchunks[m][originalChunkIndex];
             if (chunkdata.isinram())
                 numinram++;
         }
@@ -110,9 +112,10 @@ class minibatchutterancesourcemulti : public minibatchsource
             return false;
         else if (numinram == 0)
         {
+            const size_t originalChunkIndex = rand->getOriginalChunkIndex(chunkindex);
             for (size_t m = 0; m < numStreams; m++)
             {
-                auto & chunkdata = rand->getChunkData(m, chunkindex);
+                auto & chunkdata = allchunks[m][originalChunkIndex];
 #if 0 // TODO restore diagnostics
                 if (verbosity)
                     fprintf(stderr, "feature set %u: requirerandomizedchunk: paging in randomized chunk %llu (frame range [%llu..%llu]), %llu resident in RAM\n",
@@ -156,7 +159,8 @@ class minibatchutterancesourcemulti : public minibatchsource
                 allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>> ((*classids[i]), 0, 0)));
             return allclassids;     // nothing to return
         }
-        const auto & chunkdata = rand->getChunkData(0, uttref.chunkindex);
+        const size_t originalChunkIndex = rand->getOriginalChunkIndex(uttref.chunkindex);
+        const auto & chunkdata = allchunks[0][originalChunkIndex];
         const size_t classidsbegin = chunkdata.getclassidsbegin (uttref.utteranceindex); // index of first state label in global concatenated classids[] array
         const size_t n = chunkdata.numframes (uttref.utteranceindex);
         foreach_index(i,classids)
@@ -178,8 +182,8 @@ class minibatchutterancesourcemulti : public minibatchsource
                 allphoneboundaries.push_back(std::move(shiftedvector<biggrowablevector<HMMIDTYPE>>((*phoneboundaries[i]), 0, 0)));
             return allphoneboundaries;     // nothing to return
         }
-        const auto & chunk = randomizedchunks[0][uttref.chunkindex];
-        const auto & chunkdata = chunk.getchunkdata();
+        const size_t originalChunkIndex = rand->getOriginalChunkIndex(uttref.chunkindex);
+        const auto & chunkdata = allchunks[0][originalChunkIndex];
         const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
         const size_t n = chunkdata.numframes(uttref.utteranceindex);
         foreach_index(i, phoneboundaries)
@@ -809,9 +813,10 @@ public:
                 // random utterance
                 readfromdisk |= requirerandomizedchunk (frameref.chunkindex, windowbegin, windowend);    // (this is just a check; should not actually page in anything)
 
+                const size_t originalChunkIndex = rand->getOriginalChunkIndex(frameref.chunkindex);
                 for (size_t i = 0; i < numStreams; i++)
                 {
-                    const auto & chunkdata = rand->getChunkData(i, frameref.chunkindex);
+                    const auto & chunkdata = allchunks[i][originalChunkIndex];
                     auto uttframes = chunkdata.getutteranceframes (frameref.utteranceindex);
                     matrixasvectorofvectors uttframevectors (uttframes);    // (wrapper that allows m[.].size() and m[.][.] as required by augmentneighbors())
                     const size_t n = uttframevectors.size();

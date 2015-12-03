@@ -64,10 +64,11 @@ namespace msra {
             void releaserandomizedchunk(size_t k)
             {
                 size_t numreleased = 0;
-                size_t numStreams = m_allchunks.size();
+                const size_t numStreams = m_allchunks.size();
+                const size_t originalChunkIndex = rand->getOriginalChunkIndex(k);
                 for (size_t m = 0; m < numStreams; m++)
                 {
-                    auto & chunkdata = rand->getChunkData(m, k);
+                    auto & chunkdata = m_allchunks[m][originalChunkIndex];
                     if (chunkdata.isinram())
                     {
 #if 0 // TODO restore diagnostics
@@ -100,10 +101,11 @@ namespace msra {
                 if (chunkindex < windowbegin || chunkindex >= windowend)
                     LogicError("requirerandomizedchunk: requested utterance outside in-memory chunk range");
 
-                size_t numStreams = m_allchunks.size();
+                const size_t numStreams = m_allchunks.size();
+                const size_t originalChunkIndex = rand->getOriginalChunkIndex(chunkindex);
                 for (size_t m = 0; m < numStreams; m++)
                 {
-                    auto & chunkdata = rand->getChunkData(m, chunkindex);
+                    auto & chunkdata = m_allchunks[m][originalChunkIndex];
                     if (chunkdata.isinram())
                         numinram++;
                 }
@@ -111,9 +113,10 @@ namespace msra {
                     return false;
                 else if (numinram == 0)
                 {
+                    const size_t originalChunkIndex = rand->getOriginalChunkIndex(chunkindex);
                     for (size_t m = 0; m < numStreams; m++)
                     {
-                        auto & chunkdata = rand->getChunkData(m, chunkindex);
+                        auto & chunkdata = m_allchunks[m][originalChunkIndex];
 #if 0 // TODO restore diagnostics
                         if (verbosity)
                             fprintf(stderr, "feature set %u: requirerandomizedchunk: paging in randomized chunk %llu (frame range [%llu..%llu]), %llu resident in RAM\n",
@@ -157,7 +160,8 @@ namespace msra {
                         allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), 0, 0)));
                     return allclassids;     // nothing to return
                 }
-                const auto & chunkdata = rand->getChunkData(0, uttref.chunkindex);
+                const size_t originalChunkIndex = rand->getOriginalChunkIndex(uttref.chunkindex);
+                const auto & chunkdata = m_allchunks[0][originalChunkIndex];
                 const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
                 const size_t n = chunkdata.numframes(uttref.utteranceindex);
                 foreach_index(i, m_classids)
@@ -191,8 +195,6 @@ namespace msra {
                 }
                 return allphoneboundaries;   // nothing to return
             }
-
-        public:
 
         private:
             class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors
@@ -513,9 +515,11 @@ namespace msra {
                         // random utterance
                         readfromdisk |= requirerandomizedchunk(frameref.chunkindex, windowbegin, windowend);    // (this is just a check; should not actually page in anything)
 
+                        const size_t originalChunkIndex = rand->getOriginalChunkIndex(frameref.chunkindex);
+
                         for (size_t i = 0; i < numStreams; i++)
                         {
-                            const auto & chunkdata = rand->getChunkData(i, frameref.chunkindex);
+                            const auto & chunkdata = m_allchunks[i][originalChunkIndex];
                             auto uttframes = chunkdata.getutteranceframes(frameref.utteranceindex);
                             matrixasvectorofvectors uttframevectors(uttframes);    // (wrapper that allows m[.].size() and m[.][.] as required by augmentneighbors())
                             const size_t n = uttframevectors.size();

@@ -29,17 +29,21 @@ namespace msra { namespace dbn {
         }
     }
 
-    size_t BlockRandomizer::lazyrandomization (const size_t globalts,
-        const std::vector<std::vector<utterancechunkdata>> & allchunks       // set of utterances organized in chunks, referred to by an iterator (not an index)
-        )
+    size_t BlockRandomizer::lazyrandomization(
+        const size_t globalts,
+        const std::vector<std::vector<utterancechunkdata>> & allchunks)
     {
+        // TODO allchunks / utterancechunkdata: wants to know:
+        // # chunks, # streams, utterances per chunk, frames per chunk.
+        // For checks: length of an utterance
         const size_t sweep = globalts / _totalframes;    // which sweep (this determines randomization)
         if (sweep == currentsweep)                       // already got this one--nothing to do
             return sweep;
 
         currentsweep = sweep;
         if (verbosity > 0)
-            fprintf (stderr, "lazyrandomization: re-randomizing for sweep %d in %s mode\n", (int)currentsweep, framemode ? "frame" : "utterance");
+            fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
+                currentsweep, framemode ? "frame" : "utterance");
 
         const size_t sweepts = sweep * _totalframes;     // first global frame index for this sweep
 
@@ -74,13 +78,18 @@ namespace msra { namespace dbn {
         {
             randomizedchunks[i].reserve (randomizedchunkrefs[i].size());
             foreach_index (k, randomizedchunkrefs[i])
-                randomizedchunks[i].push_back (chunk (randomizedchunkrefs[i][k], randomizedchunks[i].empty() ? 0 : randomizedchunks[i].back().utteranceposend(), randomizedchunks[i].empty() ? sweepts : randomizedchunks[i].back().globalte()));
+                randomizedchunks[i].push_back (chunk (
+                    randomizedchunkrefs[i][k],
+                    randomizedchunkrefs[i][k] - allchunks[i].begin(), 
+                    randomizedchunks[i].empty() ? 0 : randomizedchunks[i].back().utteranceposend(),
+                    randomizedchunks[i].empty() ? sweepts : randomizedchunks[i].back().globalte()));
+
             assert (randomizedchunks[i].size() == allchunks[i].size());
             assert (randomizedchunks[i].empty() || (randomizedchunks[i].back().utteranceposend() == numutterances && randomizedchunks[i].back().globalte() == sweepts + _totalframes));
         }
 
         // for each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
-        foreach_index (i, randomizedchunks)
+        foreach_index(i, randomizedchunks)
         {
             // Only required for first feature stream
             if (i != 0)
@@ -110,7 +119,7 @@ namespace msra { namespace dbn {
         // This completes chunk randomization.
         // Now set up the following members for sequence randomization (i.e., utterance or frame):
         //  - positionchunkwindows
-        //  - randomizedutterancerefs - this is the data structure being shuffled
+        //  - randomizedsequencerefs - this is the data structure being shuffled
         //  - randomizedutteranceposmap
 
         // TODO adapt comments below. TODO test in utterance mode
@@ -146,10 +155,10 @@ namespace msra { namespace dbn {
         }
         assert(positionchunkwindows.size() == (framemode ? _totalframes : numutterances));
 
-        // build the randomized utterances array -> randomizedutterancerefs[]
+        // build the randomized utterances array -> randomizedsequencerefs[]
         // start by assigning all utterance positions to utterances in non-random consecutive manner
-        randomizedutterancerefs.clear();        // [pos] randomized utterance ids
-        randomizedutterancerefs.reserve(numsequences);
+        randomizedsequencerefs.clear();        // [pos] randomized utterance ids
+        randomizedsequencerefs.reserve(numsequences);
         foreach_index (k, randomizedchunks[0])
         {
             chunk & chunk = randomizedchunks[0][k];
@@ -158,22 +167,22 @@ namespace msra { namespace dbn {
                 size_t numsequences = framemode ? chunk.getchunkdata().numframes(i) : 1;
                 for (size_t m = 0; m < numsequences; m++)
                 {
-                    randomizedutterancerefs.push_back (sequenceref /* utteranceref */ (k, i, m));
+                    randomizedsequencerefs.push_back (sequenceref /* utteranceref */ (k, i, m));
                 }
             }
         }
-        assert(randomizedutterancerefs.size() == numsequences);
+        assert(randomizedsequencerefs.size() == numsequences);
 
         // check we got those setup right
-        foreach_index (i, randomizedutterancerefs)
+        foreach_index (i, randomizedsequencerefs)
         {
-            auto & uttref = randomizedutterancerefs[i];
+            auto & uttref = randomizedsequencerefs[i];
             assert(positionchunkwindows[i].isvalidforthisposition(uttref)); uttref;
         }
 
-        // we now randomly shuffle randomizedutterancerefs[pos], while considering the constraints of what chunk range needs to be in memory
+        // we now randomly shuffle randomizedsequencerefs[pos], while considering the constraints of what chunk range needs to be in memory
         srand ((unsigned int) sweep + 1);
-        for (size_t i = 0; i < randomizedutterancerefs.size(); i++)
+        for (size_t i = 0; i < randomizedsequencerefs.size(); i++)
         {
             // get valid randomization range, expressed in chunks
             const size_t windowbegin = positionchunkwindows[i].windowbegin();
@@ -209,23 +218,23 @@ namespace msra { namespace dbn {
                 // This is guaranteed for a so-far untouched utterance, but both i and j may have been touched by a previous swap.
 
                 // We want to use the utterance previously referenced at utterance position j at position i. Is that allowed?
-                if (!positionchunkwindows[i].isvalidforthisposition (randomizedutterancerefs[j]))
+                if (!positionchunkwindows[i].isvalidforthisposition (randomizedsequencerefs[j]))
                     continue;   // nope --try another
 
                 // Likewise may we use the utterance previously referenced at utterance position i at position j?
-                if (!positionchunkwindows[j].isvalidforthisposition (randomizedutterancerefs[i]))
+                if (!positionchunkwindows[j].isvalidforthisposition (randomizedsequencerefs[i]))
                     continue;   // nope --try another
 
                 // yep--swap them
-                ::swap (randomizedutterancerefs[i], randomizedutterancerefs[j]); // TODO old swap was perhaps more efficient
+                ::swap (randomizedsequencerefs[i], randomizedsequencerefs[j]); // TODO old swap was perhaps more efficient
                 break;
             }
         }
 
         size_t t = sweepts;
-        foreach_index (i, randomizedutterancerefs)
+        foreach_index (i, randomizedsequencerefs)
         {
-            auto & uttref = randomizedutterancerefs[i];
+            auto & uttref = randomizedsequencerefs[i];
             uttref.globalts = t;
             if (framemode)
             {
@@ -242,10 +251,10 @@ namespace msra { namespace dbn {
         assert (t == sweepts + _totalframes); // TODO does this hold if there we invalid utterance at the end of a chunk?
 
         // verify that we got it right (I got a knot in my head!)
-        foreach_index (i, randomizedutterancerefs)
+        foreach_index (i, randomizedsequencerefs)
         {
             // get utterance referenced at this position
-            const auto & uttref = randomizedutterancerefs[i];
+            const auto & uttref = randomizedsequencerefs[i];
             // check if it is valid for this position
             if (uttref.chunkindex < positionchunkwindows[i].windowbegin() || uttref.chunkindex >= positionchunkwindows[i].windowend())
                 LogicError("lazyrandomization: randomization logic mangled!");
@@ -253,9 +262,9 @@ namespace msra { namespace dbn {
 
         // create lookup table for (globalts values -> pos) -> randomizedutteranceposmap[]
         randomizedutteranceposmap.clear();      // [globalts] -> pos lookup table
-        foreach_index (pos, randomizedutterancerefs)
+        foreach_index (pos, randomizedsequencerefs)
         {
-            auto & uttref = randomizedutterancerefs[pos];
+            auto & uttref = randomizedsequencerefs[pos];
             randomizedutteranceposmap[uttref.globalts] = (size_t) pos;
         }
 
@@ -268,15 +277,15 @@ namespace msra { namespace dbn {
             const size_t poswindowbegin = chunk.windowbegin;
             const size_t poswindowend = chunk.windowend;
 
-            const auto & chunkdata = chunk.getchunkdata();  // for numutterances/numframes
-            const size_t numutt = chunkdata.numutterances();
+            const size_t numutt = chunk.numutterances();
+            const auto & chunkdata = chunk.getchunkdata();  // for numframes
             for (size_t k = 0; k < numutt; k++)
             {
-                const size_t n = framemode ? chunkdata.numframes (k) : 1;
+                const size_t n = framemode ? chunkdata.numframes(k) : 1;
                 for (size_t m = 0; m < n; m++)
                 {
                     //const size_t randomizedchunkindex = randomizedframerefs[t].chunkindex;
-                    const size_t randomizedchunkindex = randomizedutterancerefs[t].chunkindex;
+                    const size_t randomizedchunkindex = randomizedsequencerefs[t].chunkindex;
                     if (randomizedchunkindex < poswindowbegin || randomizedchunkindex >= poswindowend)
                         LogicError("lazyrandomization: nope, you got frame randomization wrong, dude");
                     t++;

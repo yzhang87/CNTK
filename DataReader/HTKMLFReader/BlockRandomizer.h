@@ -101,7 +101,8 @@ namespace msra { namespace dbn {
                 if (featdim == 0)
                 {
                     reader.getinfo (utteranceset[0].parsedpath, featkind, featdim, sampperiod);
-                    fprintf (stderr, "requiredata: determined feature kind as %d-dimensional '%s' with frame shift %.1f ms\n", (int)featdim, featkind.c_str(), sampperiod / 1e4);
+                    fprintf(stderr, "requiredata: determined feature kind as %llu-dimensional '%s' with frame shift %.1f ms\n",
+                        featdim, featkind.c_str(), sampperiod / 1e4);
                 }
                 // read all utterances; if they are in the same archive, htkfeatreader will be efficient in not closing the file
                 frames.resize (featdim, totalframes);
@@ -147,13 +148,14 @@ namespace msra { namespace dbn {
         bool framemode;
         size_t _totalframes;
         size_t numutterances;
-        size_t randomizationrange;// parameter remembered; this is the full window (e.g. 48 hours), not the half window
+        size_t randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
 
         size_t currentsweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
         struct chunk                    // chunk as used in actual processing order (randomized sequence)
         {
             // the underlying chunk (as a non-indexed reference into the chunk set)
             std::vector<utterancechunkdata>::const_iterator uttchunkdata;
+            size_t originalChunkIndex;
             const utterancechunkdata & getchunkdata() const { return *uttchunkdata; }
             size_t numutterances() const { return uttchunkdata->numutterances(); }
             size_t numframes() const { return uttchunkdata->totalframes; }
@@ -170,8 +172,16 @@ namespace msra { namespace dbn {
             // TODO only need to maintain for first feature stream
             size_t windowbegin;         // randomizedchunk index of earliest chunk that utterances in here can be randomized with
             size_t windowend;           // and end index [windowbegin, windowend)
-            chunk(std::vector<utterancechunkdata>::const_iterator uttchunkdata, size_t utteranceposbegin, size_t globalts) : uttchunkdata(uttchunkdata), utteranceposbegin(utteranceposbegin), globalts(globalts) {}
+            chunk(std::vector<utterancechunkdata>::const_iterator uttchunkdata,
+                size_t originalChunkIndex,
+                size_t utteranceposbegin,
+                size_t globalts)
+                : uttchunkdata(uttchunkdata)
+                , originalChunkIndex(originalChunkIndex)
+                , utteranceposbegin(utteranceposbegin)
+                , globalts(globalts) {}
         };
+        // TODO no need to keep this for every feature stream - order is the same for all
         std::vector<std::vector<chunk>> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
 
     public:
@@ -204,7 +214,8 @@ namespace msra { namespace dbn {
         };
 
     private:
-        std::vector<sequenceref> randomizedutterancerefs;          // [pos] randomized utterance ids
+        // TODO rename
+        std::vector<sequenceref> randomizedsequencerefs;          // [pos] randomized utterance ids
         std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table
 
         struct positionchunkwindow       // chunk window required in memory when at a certain position, for controlling paging
@@ -242,25 +253,30 @@ namespace msra { namespace dbn {
         //     - utterances (in utt mode), or
         //     - frames (in frame mode)
         // The 'globalts' parameter is the start time that triggered the rerandomization; it is NOT the base time of the randomized area.
-        size_t lazyrandomization (const size_t globalts,
-            const std::vector<std::vector<utterancechunkdata>> & allchunks       // set of utterances organized in chunks, referred to by an iterator (not an index)
-            );
+        size_t lazyrandomization(
+            const size_t globalts,
+            const std::vector<std::vector<utterancechunkdata>> & allchunks);
 
         size_t chunkForFramePos(const size_t t) const  // find chunk for a given frame position
         {
             //inspect chunk of first feature stream only
-            auto iter = std::lower_bound(randomizedchunks[0].begin(), randomizedchunks[0].end(), t, [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
+            auto iter = std::lower_bound(
+                randomizedchunks[0].begin(),
+                randomizedchunks[0].end(),
+                t,
+                [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
+            assert(iter != randomizedchunks[0].end());
             const size_t chunkindex = iter - randomizedchunks[0].begin();
             if (t < randomizedchunks[0][chunkindex].globalts || t >= randomizedchunks[0][chunkindex].globalte())
                 LogicError("chunkForFramePos: dude, learn STL!");
             return chunkindex;
         }
 
-        const utterancechunkdata & getChunkData(size_t streamIndex, size_t randomizedChunkIndex)
+        size_t getOriginalChunkIndex(size_t randomizedChunkIndex)
         {
-            assert(streamIndex < randomizedchunks.size());
+            const size_t streamIndex = 0;
             assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
-            return randomizedchunks[streamIndex][randomizedChunkIndex].getchunkdata();
+            return randomizedchunks[streamIndex][randomizedChunkIndex].originalChunkIndex;
         }
 
         size_t getChunkWindowBegin(size_t randomizedChunkIndex)
@@ -279,13 +295,13 @@ namespace msra { namespace dbn {
 
         size_t getNumSequences()
         {
-            return randomizedutterancerefs.size();
+            return randomizedsequencerefs.size();
         }
 
         const sequenceref & getSequenceRef(size_t sequenceIndex)
         {
-            assert(sequenceIndex < randomizedutterancerefs.size());
-            return randomizedutterancerefs[sequenceIndex];
+            assert(sequenceIndex < randomizedsequencerefs.size());
+            return randomizedsequencerefs[sequenceIndex];
         }
     };
 
