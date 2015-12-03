@@ -29,28 +29,28 @@ namespace msra {
         class Bundler : public minibatchsource
         {
             void operator=(const Bundler & other); // non-assignable
-            std::vector<size_t> vdim;                    // feature dimension after augmenting neighhors
-            std::vector<size_t> leftcontext;             // number of frames to the left of the target frame in the context window
-            std::vector<size_t> rightcontext;            // number of frames to the right of the target frame in the context window
-            std::vector<unsigned int> sampperiod;        // (for reference and to check against model)
-            std::vector<string> featkind;
-            std::vector<size_t> featdim;
-            const bool framemode;           // true -> actually return frame-level randomized frames (not possible in lattice mode)
-            std::vector<std::vector<size_t>> counts;     // [s] occurrence count for all states (used for priors)
-            int verbosity;
+            std::vector<size_t> m_vdim;                    // feature dimension after augmenting neighhors
+            std::vector<size_t> m_leftcontext;             // number of frames to the left of the target frame in the context window
+            std::vector<size_t> m_rightcontext;            // number of frames to the right of the target frame in the context window
+            std::vector<unsigned int> m_sampperiod;        // (for reference and to check against model)
+            std::vector<string> m_featkind;
+            std::vector<size_t> m_featdim;
+            const bool m_framemode;           // true -> actually return frame-level randomized frames (not possible in lattice mode)
+            std::vector<std::vector<size_t>> m_counts;     // [s] occurrence count for all states (used for priors)
+            int m_verbosity;
             // lattice reader
             //const std::vector<unique_ptr<latticesource>> &lattices;
-            const latticesource & lattices;
+            const latticesource & m_lattices;
 
             //std::vector<latticesource> lattices;
             // word-level transcripts (for MMI mode when adding best path to lattices)
-            const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & allwordtranscripts; // (used for getting word-level transcripts)
+            const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & m_allwordtranscripts; // (used for getting word-level transcripts)
             //std::vector<map<wstring,msra::lattices::lattice::htkmlfwordsequence>> allwordtranscripts;
 
-            std::vector<std::vector<utterancechunkdata>> allchunks;          // set of utterances organized in chunks, referred to by an iterator (not an index)
-            std::vector<unique_ptr<biggrowablevector<CLASSIDTYPE>>> classids;            // [classidsbegin+t] concatenation of all state sequences
-            std::vector<unique_ptr<biggrowablevector<HMMIDTYPE>>> phoneboundaries;
-            bool issupervised() const { return !classids.empty(); }
+            std::vector<std::vector<utterancechunkdata>> m_allchunks;          // set of utterances organized in chunks, referred to by an iterator (not an index)
+            std::vector<unique_ptr<biggrowablevector<CLASSIDTYPE>>> m_classids;            // [classidsbegin+t] concatenation of all state sequences
+            std::vector<unique_ptr<biggrowablevector<HMMIDTYPE>>> m_phoneboundaries;
+            bool issupervised() const { return !m_classids.empty(); }
 
             size_t numutterances;           // total number of utterances
             size_t _totalframes;            // total frames (same as classids.size() if we have labels)
@@ -64,7 +64,7 @@ namespace msra {
             void releaserandomizedchunk(size_t k)
             {
                 size_t numreleased = 0;
-                size_t numStreams = allchunks.size();
+                size_t numStreams = m_allchunks.size();
                 for (size_t m = 0; m < numStreams; m++)
                 {
                     auto & chunkdata = rand->getChunkData(m, k);
@@ -100,7 +100,7 @@ namespace msra {
                 if (chunkindex < windowbegin || chunkindex >= windowend)
                     LogicError("requirerandomizedchunk: requested utterance outside in-memory chunk range");
 
-                size_t numStreams = allchunks.size();
+                size_t numStreams = m_allchunks.size();
                 for (size_t m = 0; m < numStreams; m++)
                 {
                     auto & chunkdata = rand->getChunkData(m, chunkindex);
@@ -121,7 +121,7 @@ namespace msra {
 #endif
                         msra::util::attempt(5, [&]()   // (reading from network)
                         {
-                            chunkdata.requiredata(featkind[m], featdim[m], sampperiod[m], lattices, verbosity);
+                            chunkdata.requiredata(m_featkind[m], m_featdim[m], m_sampperiod[m], m_lattices, m_verbosity);
                         });
                     }
                     chunksinram++;
@@ -153,18 +153,18 @@ namespace msra {
 
                 if (!issupervised())
                 {
-                    foreach_index(i, classids)
-                        allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*classids[i]), 0, 0)));
+                    foreach_index(i, m_classids)
+                        allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), 0, 0)));
                     return allclassids;     // nothing to return
                 }
                 const auto & chunkdata = rand->getChunkData(0, uttref.chunkindex);
                 const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
                 const size_t n = chunkdata.numframes(uttref.utteranceindex);
-                foreach_index(i, classids)
+                foreach_index(i, m_classids)
                 {
-                    if ((*classids[i])[classidsbegin + n] != (CLASSIDTYPE)-1)
+                    if ((*m_classids[i])[classidsbegin + n] != (CLASSIDTYPE)-1)
                         LogicError("getclassids: expected boundary marker not found, internal data structure screwed up");
-                    allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*classids[i]), classidsbegin, n)));
+                    allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), classidsbegin, n)));
                 }
                 return allclassids;   // nothing to return
             }
@@ -199,8 +199,8 @@ namespace msra {
             Bundler(const std::vector<std::vector<wstring>> & infiles, const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels,
                 std::vector<size_t> vdim, std::vector<size_t> udim, std::vector<size_t> leftcontext, std::vector<size_t> rightcontext, size_t randomizationrange,
                 const latticesource & lattices, const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & allwordtranscripts, const bool framemode)
-                : vdim(vdim), leftcontext(leftcontext), rightcontext(rightcontext), sampperiod(0), featdim(0),
-                lattices(lattices), allwordtranscripts(allwordtranscripts), framemode(framemode), chunksinram(0), timegetbatch(0), verbosity(2)
+                : m_vdim(vdim), m_leftcontext(leftcontext), m_rightcontext(rightcontext), m_sampperiod(0), m_featdim(0),
+                m_lattices(lattices), m_allwordtranscripts(allwordtranscripts), m_framemode(framemode), chunksinram(0), timegetbatch(0), m_verbosity(2)
                 // [v-hansu] change framemode (lattices.empty()) into framemode (false) to run utterance mode without lattice
                 // you also need to change another line, search : [v-hansu] comment out to run utterance mode without lattice
             {
@@ -225,18 +225,18 @@ namespace msra {
                 assert(rightcontext[0] == 0);
                 assert(labels.size() == 1); // only have one
 
-                allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
-                featdim = std::vector<size_t>(infiles.size(), 0);
-                sampperiod = std::vector<unsigned int>(infiles.size(), 0);
-                featkind = std::vector<string>(infiles.size(), "");
+                m_allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
+                m_featdim = std::vector<size_t>(infiles.size(), 0);
+                m_sampperiod = std::vector<unsigned int>(infiles.size(), 0);
+                m_featkind = std::vector<string>(infiles.size(), "");
 
                 numclasses = std::vector<size_t>(labels.size(), 0);
-                counts = std::vector<std::vector<size_t>>(labels.size(), std::vector<size_t>());
+                m_counts = std::vector<std::vector<size_t>>(labels.size(), std::vector<size_t>());
 
                 foreach_index(i, labels)
                 {
-                    classids.push_back(unique_ptr<biggrowablevector<CLASSIDTYPE>>(new biggrowablevector<CLASSIDTYPE>()));
-                    phoneboundaries.push_back(unique_ptr<biggrowablevector<HMMIDTYPE>>(new biggrowablevector<HMMIDTYPE>()));
+                    m_classids.push_back(unique_ptr<biggrowablevector<CLASSIDTYPE>>(new biggrowablevector<CLASSIDTYPE>()));
+                    m_phoneboundaries.push_back(unique_ptr<biggrowablevector<HMMIDTYPE>>(new biggrowablevector<HMMIDTYPE>()));
                     //std::pair<std::vector<wstring>,std::vector<wstring>> latticetocs;
                     //std::unordered_map<std::string,size_t> modelsymmap;
                     //lattices.push_back(shared_ptr<latticesource>(new latticesource(latticetocs, modelsymmap)));
@@ -316,7 +316,7 @@ namespace msra {
                         if (i % (infiles[m].size() / 100 + 1) == 0) { fprintf(stderr, "."); fflush(stderr); }
                         // build utterance descriptor
                         if (m == 0 && !labels.empty())
-                            classidsbegin.push_back(classids[0]->size());
+                            classidsbegin.push_back(m_classids[0]->size());
 
                         if (uttisvalid[i])
                         {
@@ -407,29 +407,29 @@ namespace msra {
                                                     RuntimeError("CLASSIDTYPE has too few bits");
                                                 for (size_t t = e.firstframe; t < e.firstframe + e.numframes; t++)
                                                 {
-                                                    classids[j]->push_back(e.classid);
+                                                    m_classids[j]->push_back(e.classid);
                                                     if (e.phonestart != 0 && t == e.firstframe)
-                                                        phoneboundaries[j]->push_back((HMMIDTYPE)e.phonestart);
+                                                        m_phoneboundaries[j]->push_back((HMMIDTYPE)e.phonestart);
                                                     else
-                                                        phoneboundaries[j]->push_back((HMMIDTYPE)0);
+                                                        m_phoneboundaries[j]->push_back((HMMIDTYPE)0);
                                                 }
                                                 numclasses[j] = max(numclasses[j], (size_t)(1u + e.classid));
-                                                counts[j].resize(numclasses[j], 0);
-                                                counts[j][e.classid] += e.numframes;
+                                                m_counts[j].resize(numclasses[j], 0);
+                                                m_counts[j][e.classid] += e.numframes;
                                             }
 
-                                            classids[j]->push_back((CLASSIDTYPE)-1);  // append a boundary marker marker for checking
-                                            phoneboundaries[j]->push_back((HMMIDTYPE)-1); // append a boundary marker marker for checking
+                                            m_classids[j]->push_back((CLASSIDTYPE)-1);  // append a boundary marker marker for checking
+                                            m_phoneboundaries[j]->push_back((HMMIDTYPE)-1); // append a boundary marker marker for checking
 
-                                            if (!labels[j].empty() && classids[j]->size() != _totalframes + utteranceset.size())
+                                            if (!labels[j].empty() && m_classids[j]->size() != _totalframes + utteranceset.size())
                                                 LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());
-                                            assert(labels[j].empty() || classids[j]->size() == _totalframes + utteranceset.size());
+                                            assert(labels[j].empty() || m_classids[j]->size() == _totalframes + utteranceset.size());
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    assert(classids.empty() && labels.empty());
+                                    assert(m_classids.empty() && labels.empty());
                                     utteranceset.push_back(std::move(utterance));
                                     _totalframes += uttframes;
                                 }
@@ -449,7 +449,7 @@ namespace msra {
 
                     if (!labels.empty()){
                         foreach_index(j, labels){
-                            biggrowablevector<CLASSIDTYPE> & cid = *classids[j];
+                            biggrowablevector<CLASSIDTYPE> & cid = *m_classids[j];
                             foreach_index(i, utteranceset){
                                 //if ((*classids[j])[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (CLASSIDTYPE) -1)
                                 //printf("index = %d\n",utteranceset[i].classidsbegin + utteranceset[i].numframes());
@@ -475,7 +475,7 @@ namespace msra {
                     const size_t chunkframes = 15 * 60 * framespersec;  // number of frames to target for each chunk
                     // Loading an initial 24-hour range will involve 96 disk seeks, acceptable.
                     // When paging chunk by chunk, chunk size ~14 MB.
-                    std::vector<utterancechunkdata> & thisallchunks = allchunks[m];
+                    std::vector<utterancechunkdata> & thisallchunks = m_allchunks[m];
 
                     thisallchunks.resize(0);
                     thisallchunks.reserve(_totalframes / chunkframes); // This is ignoring I/O for invalid utterances... // TODO round up?
@@ -498,7 +498,7 @@ namespace msra {
                     // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
 
                     // Initialize the block randomizer
-                    rand = std::make_unique<BlockRandomizer>(verbosity, framemode, _totalframes, numutterances, randomizationrange);
+                    rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, _totalframes, numutterances, randomizationrange);
                 }
             }
 
@@ -516,7 +516,7 @@ namespace msra {
 
         public:
 
-            void setverbosity(int newverbosity){ verbosity = newverbosity; }
+            void setverbosity(int newverbosity){ m_verbosity = newverbosity; }
 
             // get the next minibatch
             // A minibatch is made up of one or more utterances.
@@ -542,7 +542,7 @@ namespace msra {
                 assert(_totalframes > 0);
 
                 // update randomization if a new sweep is entered  --this is a complex operation that updates many of the data members used below
-                const size_t sweep = rand->lazyrandomization(globalts, allchunks);
+                const size_t sweep = rand->lazyrandomization(globalts, m_allchunks);
 
                 size_t mbframes = 0;
                 const std::vector<char> noboundaryflags;    // dummy
@@ -722,7 +722,7 @@ namespace msra {
                 }
 #endif
 
-                if (!framemode)      // regular utterance mode
+                if (!m_framemode)      // regular utterance mode
                 {
                     assert(0); // looking at frame-mode scenario for now
                     // TODO code was moved up
@@ -742,9 +742,9 @@ namespace msra {
                     assert(lastchunk <= firstchunk + 1); // shouldn't really cover more than two chunks...?
                     const size_t windowbegin = rand->getChunkWindowBegin(firstchunk);
                     const size_t windowend = rand->getChunkWindowEnd(lastchunk);
-                    const size_t numChunks = allchunks[0].size();
-                    const size_t numStreams = allchunks.size();
-                    if (verbosity > 0)
+                    const size_t numChunks = m_allchunks[0].size();
+                    const size_t numStreams = m_allchunks.size();
+                    if (m_verbosity > 0)
                         fprintf(stderr, "getbatch: getting randomized frames [%d..%d] (%d frames out of %d requested) in sweep %d; chunks [%d..%d] -> chunk window [%d..%d)\n",
                         (int)globalts, (int)globalte, (int)mbframes, (int)framesrequested, (int)sweep, (int)firstchunk, (int)lastchunk, (int)windowbegin, (int)windowend);
                     // release all data outside, and page in all data inside
@@ -771,14 +771,14 @@ namespace msra {
                     const size_t allocframes = max(j, (mbframes + numsubsets - 1) / numsubsets);  // we leave space for the desired #frames, assuming caller will try to pad them later
 
                     // resize feat and uids
-                    feat.resize(vdim.size());
-                    uids.resize(classids.size());
-                    assert(feat.size() == vdim.size());
+                    feat.resize(m_vdim.size());
+                    uids.resize(m_classids.size());
+                    assert(feat.size() == m_vdim.size());
                     assert(feat.size() == numStreams);
                     foreach_index(i, feat)
                     {
-                        feat[i].resize(vdim[i], allocframes);
-                        feat[i].shrink(vdim[i], j);
+                        feat[i].resize(m_vdim[i], allocframes);
+                        feat[i].shrink(m_vdim[i], j);
                     }
 
                     foreach_index(k, uids)
@@ -823,14 +823,14 @@ namespace msra {
 
                             size_t leftextent, rightextent;
                             // page in the needed range of frames
-                            if (leftcontext[i] == 0 && rightcontext[i] == 0)
+                            if (m_leftcontext[i] == 0 && m_rightcontext[i] == 0)
                             {
-                                leftextent = rightextent = augmentationextent(uttframevectors[t].size(), vdim[i]);
+                                leftextent = rightextent = augmentationextent(uttframevectors[t].size(), m_vdim[i]);
                             }
                             else
                             {
-                                leftextent = leftcontext[i];
-                                rightextent = rightcontext[i];
+                                leftextent = m_leftcontext[i];
+                                rightextent = m_rightcontext[i];
                             }
                             augmentneighbors(uttframevectors, noboundaryflags, t, leftextent, rightextent, feat[i], currmpinodeframecount);
 
@@ -891,10 +891,10 @@ namespace msra {
             /*implement*/ size_t firstvalidglobalts(const size_t globalts) // TODO can be const
             {
                 // update randomization if a new sweep is entered
-                const size_t sweep = rand->lazyrandomization(globalts, allchunks);
+                const size_t sweep = rand->lazyrandomization(globalts, m_allchunks);
 
                 // frame mode: start at sweep boundary directly // TODO so globalts needs to be at sweep boundary?
-                if (framemode)
+                if (m_framemode)
                     return globalts;
                 // utterance mode
                 assert(globalts >= sweep * _totalframes && globalts < (sweep + 1) * _totalframes); sweep;
@@ -906,7 +906,7 @@ namespace msra {
                 return rand->getSequenceRef(pos - 1).globalte();     // boundary case: requested time falls within the last utterance
             }
 
-            const std::vector<size_t> & unitcounts() const { return counts[0]; }
+            const std::vector<size_t> & unitcounts() const { return m_counts[0]; }
         };
 
     }
