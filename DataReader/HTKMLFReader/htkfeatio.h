@@ -575,7 +575,7 @@ public:
     template<class MATRIX> void read (MATRIX & feat, size_t ts, size_t te)
     {
         // read vectors from file and push to our target structure
-        vector<float> v(featdim+energyElements);
+        std::vector<float> v(featdim+energyElements);
         for (size_t t = ts; t < te; t++)
         {
             read (v);

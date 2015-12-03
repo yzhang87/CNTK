@@ -23,6 +23,7 @@
     <ClCompile Include="MonolithicTransformer.cpp" />
     <ClCompile Include="Utils.cpp" />
     <ClCompile Include="Bundler.cpp" />
+    <ClCompile Include="ScpDataDeserializer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
