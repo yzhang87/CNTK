@@ -29,17 +29,22 @@ namespace msra { namespace dbn {
         }
     }
 
-    size_t BlockRandomizer::lazyrandomization (const size_t globalts,
-        const std::vector<std::vector<utterancechunkdata>> & allchunks       // set of utterances organized in chunks, referred to by an iterator (not an index)
-        )
+    size_t BlockRandomizer::lazyrandomization(
+        const size_t globalts,
+        const std::vector<std::vector<utterancechunkdata>> & allchunks)
     {
+        // TODO allchunks / utterancechunkdata: wants to know:
+        // # chunks, # streams, utterances per chunk, frames per chunk.
+        // For checks: length of an utterance
+        // For getChunkData - returns reference
         const size_t sweep = globalts / _totalframes;    // which sweep (this determines randomization)
         if (sweep == currentsweep)                       // already got this one--nothing to do
             return sweep;
 
         currentsweep = sweep;
         if (verbosity > 0)
-            fprintf (stderr, "lazyrandomization: re-randomizing for sweep %d in %s mode\n", (int)currentsweep, framemode ? "frame" : "utterance");
+            fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
+                currentsweep, framemode ? "frame" : "utterance");
 
         const size_t sweepts = sweep * _totalframes;     // first global frame index for this sweep
 
@@ -74,13 +79,17 @@ namespace msra { namespace dbn {
         {
             randomizedchunks[i].reserve (randomizedchunkrefs[i].size());
             foreach_index (k, randomizedchunkrefs[i])
-                randomizedchunks[i].push_back (chunk (randomizedchunkrefs[i][k], randomizedchunks[i].empty() ? 0 : randomizedchunks[i].back().utteranceposend(), randomizedchunks[i].empty() ? sweepts : randomizedchunks[i].back().globalte()));
+                randomizedchunks[i].push_back (chunk (
+                    randomizedchunkrefs[i][k],
+                    randomizedchunks[i].empty() ? 0 : randomizedchunks[i].back().utteranceposend(),
+                    randomizedchunks[i].empty() ? sweepts : randomizedchunks[i].back().globalte()));
+
             assert (randomizedchunks[i].size() == allchunks[i].size());
             assert (randomizedchunks[i].empty() || (randomizedchunks[i].back().utteranceposend() == numutterances && randomizedchunks[i].back().globalte() == sweepts + _totalframes));
         }
 
         // for each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
-        foreach_index (i, randomizedchunks)
+        foreach_index(i, randomizedchunks)
         {
             // Only required for first feature stream
             if (i != 0)
@@ -268,11 +277,11 @@ namespace msra { namespace dbn {
             const size_t poswindowbegin = chunk.windowbegin;
             const size_t poswindowend = chunk.windowend;
 
-            const auto & chunkdata = chunk.getchunkdata();  // for numutterances/numframes
-            const size_t numutt = chunkdata.numutterances();
+            const size_t numutt = chunk.numutterances();
+            const auto & chunkdata = chunk.getchunkdata();  // for numframes
             for (size_t k = 0; k < numutt; k++)
             {
-                const size_t n = framemode ? chunkdata.numframes (k) : 1;
+                const size_t n = framemode ? chunkdata.numframes(k) : 1;
                 for (size_t m = 0; m < n; m++)
                 {
                     //const size_t randomizedchunkindex = randomizedframerefs[t].chunkindex;

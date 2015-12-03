@@ -101,7 +101,8 @@ namespace msra { namespace dbn {
                 if (featdim == 0)
                 {
                     reader.getinfo (utteranceset[0].parsedpath, featkind, featdim, sampperiod);
-                    fprintf (stderr, "requiredata: determined feature kind as %d-dimensional '%s' with frame shift %.1f ms\n", (int)featdim, featkind.c_str(), sampperiod / 1e4);
+                    fprintf(stderr, "requiredata: determined feature kind as %llu-dimensional '%s' with frame shift %.1f ms\n",
+                        featdim, featkind.c_str(), sampperiod / 1e4);
                 }
                 // read all utterances; if they are in the same archive, htkfeatreader will be efficient in not closing the file
                 frames.resize (featdim, totalframes);
@@ -147,7 +148,7 @@ namespace msra { namespace dbn {
         bool framemode;
         size_t _totalframes;
         size_t numutterances;
-        size_t randomizationrange;// parameter remembered; this is the full window (e.g. 48 hours), not the half window
+        size_t randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
 
         size_t currentsweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
         struct chunk                    // chunk as used in actual processing order (randomized sequence)
@@ -170,7 +171,12 @@ namespace msra { namespace dbn {
             // TODO only need to maintain for first feature stream
             size_t windowbegin;         // randomizedchunk index of earliest chunk that utterances in here can be randomized with
             size_t windowend;           // and end index [windowbegin, windowend)
-            chunk(std::vector<utterancechunkdata>::const_iterator uttchunkdata, size_t utteranceposbegin, size_t globalts) : uttchunkdata(uttchunkdata), utteranceposbegin(utteranceposbegin), globalts(globalts) {}
+            chunk(std::vector<utterancechunkdata>::const_iterator uttchunkdata,
+                size_t utteranceposbegin,
+                size_t globalts)
+                : uttchunkdata(uttchunkdata)
+                , utteranceposbegin(utteranceposbegin)
+                , globalts(globalts) {}
         };
         std::vector<std::vector<chunk>> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
 
@@ -242,14 +248,18 @@ namespace msra { namespace dbn {
         //     - utterances (in utt mode), or
         //     - frames (in frame mode)
         // The 'globalts' parameter is the start time that triggered the rerandomization; it is NOT the base time of the randomized area.
-        size_t lazyrandomization (const size_t globalts,
-            const std::vector<std::vector<utterancechunkdata>> & allchunks       // set of utterances organized in chunks, referred to by an iterator (not an index)
-            );
+        size_t lazyrandomization(
+            const size_t globalts,
+            const std::vector<std::vector<utterancechunkdata>> & allchunks);
 
         size_t chunkForFramePos(const size_t t) const  // find chunk for a given frame position
         {
             //inspect chunk of first feature stream only
-            auto iter = std::lower_bound(randomizedchunks[0].begin(), randomizedchunks[0].end(), t, [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
+            auto iter = std::lower_bound(
+                randomizedchunks[0].begin(),
+                randomizedchunks[0].end(),
+                t,
+                [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
             const size_t chunkindex = iter - randomizedchunks[0].begin();
             if (t < randomizedchunks[0][chunkindex].globalts || t >= randomizedchunks[0][chunkindex].globalte())
                 LogicError("chunkForFramePos: dude, learn STL!");
