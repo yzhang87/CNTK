@@ -18,6 +18,7 @@
       <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="HTKMLFReaderShim.cpp" />
+    <ClCompile Include="BlockRandomizer.cpp" />
     <ClCompile Include="FrameModePacker.cpp" />
     <ClCompile Include="MonolithicTransformer.cpp" />
     <ClCompile Include="Utils.cpp" />
@@ -55,6 +56,7 @@
     </ClInclude>
     <ClInclude Include="HTKMLFReaderShim.h" />
     <ClInclude Include="FrameModePacker.h" />
+    <ClInclude Include="BlockRandomizer.h" />
     <ClInclude Include="CudaMemoryProvider.h" />
     <ClInclude Include="HeapMemoryProvider.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />

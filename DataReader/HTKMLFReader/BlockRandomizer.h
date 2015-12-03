@@ -1,0 +1,563 @@
+//
+// <copyright file="BlockRandomizer.h" company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+// BlockRandomizer.h -- interface of the block randomizer
+//
+
+#pragma once
+
+#include "Basics.h"                  // for attempt()
+#include "htkfeatio.h"                  // for htkmlfreader
+#include "latticearchive.h"             // for reading HTK phoneme lattices (MMI training)
+#include "minibatchsourcehelpers.h"
+#include "minibatchiterator.h"
+#include "biggrowablevectors.h"
+#include "ssematrix.h"
+#include "unordered_set"
+
+namespace msra { namespace dbn {
+
+    // data store (incl. paging in/out of features and lattices)
+    struct utterancedesc            // data descriptor for one utterance
+    {
+        msra::asr::htkfeatreader::parsedpath parsedpath;    // archive filename and frame range in that file
+        size_t classidsbegin;       // index into allclassids[] array (first frame)
+
+        utterancedesc (msra::asr::htkfeatreader::parsedpath&& ppath, size_t classidsbegin) : parsedpath (std::move(ppath)), classidsbegin (classidsbegin) {}
+
+        const wstring & logicalpath() const { return parsedpath; /*type cast will return logical path*/ }
+        size_t numframes() const { return parsedpath.numframes(); }
+        wstring key() const                           // key used for looking up lattice (not stored to save space)
+        {
+#ifdef _MSC_VER
+            static const wstring emptywstring;
+            static const wregex deleteextensionre (L"\\.[^\\.\\\\/:]*$");
+            return regex_replace (logicalpath(), deleteextensionre, emptywstring);  // delete extension (or not if none)
+#else
+            return removeExtension(logicalpath());
+#endif
+        }
+    };
+
+    // Make sure type 'utterancedesc' has a move constructor
+    static_assert(std::is_move_constructible<utterancedesc>::value, "Type 'utterancedesc' should be move constructible!");
+
+    struct utterancechunkdata       // data for a chunk of utterances
+    {
+        std::vector<utterancedesc> utteranceset;    // utterances in this set
+        size_t numutterances() const { return utteranceset.size(); }
+
+        std::vector<size_t> firstframes;    // [utteranceindex] first frame for given utterance
+        mutable msra::dbn::matrix frames;   // stores all frames consecutively (mutable since this is a cache)
+        size_t totalframes;         // total #frames for all utterances in this chunk
+        mutable std::vector<shared_ptr<const latticesource::latticepair>> lattices;   // (may be empty if none)
+
+        // construction
+        utterancechunkdata() : totalframes (0) {}
+        void push_back (utterancedesc &&/*destructive*/ utt)
+        {
+            if (isinram())
+                LogicError("utterancechunkdata: frames already paged into RAM--too late to add data");
+            firstframes.push_back (totalframes);
+            totalframes += utt.numframes();
+            utteranceset.push_back (std::move(utt));
+        }
+
+        // accessors to an utterance's data
+        size_t numframes (size_t i) const { return utteranceset[i].numframes(); }
+        size_t getclassidsbegin (size_t i) const { return utteranceset[i].classidsbegin; }
+        msra::dbn::matrixstripe getutteranceframes (size_t i) const // return the frame set for a given utterance
+        {
+            if (!isinram())
+                LogicError("getutteranceframes: called when data have not been paged in");
+            const size_t ts = firstframes[i];
+            const size_t n = numframes(i);
+            return msra::dbn::matrixstripe (frames, ts, n);
+        }
+        shared_ptr<const latticesource::latticepair> getutterancelattice (size_t i) const // return the frame set for a given utterance
+        {
+            if (!isinram())
+                LogicError("getutterancelattice: called when data have not been paged in");
+            return lattices[i];
+        }
+
+        // paging
+        // test if data is in memory at the moment
+        bool isinram() const { return !frames.empty(); }
+        // page in data for this chunk
+        // We pass in the feature info variables by ref which will be filled lazily upon first read
+        void requiredata (string & featkind, size_t & featdim, unsigned int & sampperiod, const latticesource & latticesource, int verbosity=0) const
+        {
+            if (numutterances() == 0)
+                LogicError("requiredata: cannot page in virgin block");
+            if (isinram())
+                LogicError("requiredata: called when data is already in memory");
+            try             // this function supports retrying since we read from the unrealible network, i.e. do not return in a broken state
+            {
+                msra::asr::htkfeatreader reader;    // feature reader (we reinstantiate it for each block, i.e. we reopen the file actually)
+                // if this is the first feature read ever, we explicitly open the first file to get the information such as feature dimension
+                if (featdim == 0)
+                {
+                    reader.getinfo (utteranceset[0].parsedpath, featkind, featdim, sampperiod);
+                    fprintf (stderr, "requiredata: determined feature kind as %d-dimensional '%s' with frame shift %.1f ms\n", (int)featdim, featkind.c_str(), sampperiod / 1e4);
+                }
+                // read all utterances; if they are in the same archive, htkfeatreader will be efficient in not closing the file
+                frames.resize (featdim, totalframes);
+                if (!latticesource.empty())
+                    lattices.resize (utteranceset.size());
+                foreach_index (i, utteranceset)
+                {
+                    //fprintf (stderr, ".");
+                    // read features for this file
+                    auto uttframes = getutteranceframes (i);    // matrix stripe for this utterance (currently unfilled)
+                    reader.read (utteranceset[i].parsedpath, (const string &) featkind, sampperiod, uttframes);  // note: file info here used for checkuing only
+                    // page in lattice data
+                    if (!latticesource.empty())
+                        latticesource.getlattices (utteranceset[i].key(), lattices[i], uttframes.cols());
+                }
+                //fprintf (stderr, "\n");
+                if (verbosity)
+                    fprintf (stderr, "requiredata: %d utterances read\n", (int)utteranceset.size());
+            }
+            catch (...)
+            {
+                releasedata();
+                throw;
+            }
+        }
+        // page out data for this chunk
+        void releasedata() const
+        {
+            if (numutterances() == 0)
+                LogicError("releasedata: cannot page out virgin block");
+            if (!isinram())
+                LogicError("releasedata: called when data is not memory");
+            // release frames
+            frames.resize (0, 0);
+            // release lattice data
+            lattices.clear();
+        }
+    };
+
+    class BlockRandomizer
+    {
+        int verbosity;
+        bool framemode;
+        size_t _totalframes;
+        size_t numutterances;
+        size_t randomizationrange;// parameter remembered; this is the full window (e.g. 48 hours), not the half window
+
+        size_t currentsweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
+        struct chunk                    // chunk as used in actual processing order (randomized sequence)
+        {
+            // the underlying chunk (as a non-indexed reference into the chunk set)
+            std::vector<utterancechunkdata>::const_iterator uttchunkdata;
+            const utterancechunkdata & getchunkdata() const { return *uttchunkdata; }
+            size_t numutterances() const { return uttchunkdata->numutterances(); }
+            size_t numframes() const { return uttchunkdata->totalframes; }
+
+            // position in utterance-position space
+            size_t utteranceposbegin;
+            size_t utteranceposend() const { return utteranceposbegin + numutterances(); }
+
+            // position on global time line
+            size_t globalts;            // start frame on global timeline (after randomization)
+            size_t globalte() const { return globalts + numframes(); }
+
+            // randomization range limits
+            // TODO only need to maintain for first feature stream
+            size_t windowbegin;         // randomizedchunk index of earliest chunk that utterances in here can be randomized with
+            size_t windowend;           // and end index [windowbegin, windowend)
+            chunk(std::vector<utterancechunkdata>::const_iterator uttchunkdata, size_t utteranceposbegin, size_t globalts) : uttchunkdata(uttchunkdata), utteranceposbegin(utteranceposbegin), globalts(globalts) {}
+        };
+        std::vector<std::vector<chunk>> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
+
+    public:
+        struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
+        {
+            size_t chunkindex;          // lives in this chunk (index into randomizedchunks[])
+            size_t utteranceindex;      // utterance index in that chunk
+            size_t numframes;           // (cached since we cannot directly access the underlying data from here)
+            size_t globalts;            // start frame in global space after randomization (for mapping frame index to utterance position)
+            size_t frameindex;          // 0 for utterances
+
+            // TODO globalts - sweep cheaper?
+            size_t globalte() const { return globalts + numframes; }            // end frame
+
+            sequenceref()
+                : chunkindex (0)
+                , utteranceindex (0)
+                , frameindex (0)
+                , globalts (SIZE_MAX)
+                , numframes (0) {}
+            sequenceref (size_t chunkindex, size_t utteranceindex, size_t frameindex = 0)
+                : chunkindex (chunkindex)
+                , utteranceindex (utteranceindex)
+                , frameindex (frameindex)
+                , globalts (SIZE_MAX)
+                , numframes (0) {}
+
+            // TODO globalts and numframes only set after swapping, wouldn't need to swap them
+            // TODO old frameref was more tighly packed (less fields, smaller frameindex and utteranceindex). We need to bring these space optimizations back.
+        };
+
+    private:
+        std::vector<sequenceref> randomizedutterancerefs;          // [pos] randomized utterance ids
+        std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table
+
+        struct positionchunkwindow       // chunk window required in memory when at a certain position, for controlling paging
+        {
+            std::vector<chunk>::iterator definingchunk;       // the chunk in randomizedchunks[] that defined the utterance position of this utterance
+            size_t windowbegin() const { return definingchunk->windowbegin; }
+            size_t windowend() const { return definingchunk->windowend; }
+            bool isvalidforthisposition (const sequenceref & sequence) const
+            {
+                return sequence.chunkindex >= windowbegin() && sequence.chunkindex < windowend(); // check if 'sequence' lives in is in allowed range for this position
+                // TODO by construction sequences cannot span chunks (check again)
+            }
+
+            positionchunkwindow (std::vector<chunk>::iterator definingchunk) : definingchunk (definingchunk) {}
+        };
+        std::vector<positionchunkwindow> positionchunkwindows;      // [utterance position] -> [windowbegin, windowend) for controlling paging
+
+        // shuffle a vector into random order by randomly swapping elements
+        template<typename VECTOR> static void randomshuffle (VECTOR & v, size_t randomseed)
+        {
+            if (v.size() > RAND_MAX * (size_t) RAND_MAX)
+                RuntimeError("randomshuffle: too large set: need to change to different random generator!");
+            srand ((unsigned int) randomseed);
+            foreach_index (i, v)
+            {
+                // pick a random location
+                const size_t irand = msra::dbn::rand (0, v.size());
+
+                // swap element i with it
+                if (irand == (size_t) i)
+                    continue;
+                ::swap (v[i], v[irand]);
+            }
+        }
+
+    public:
+        // big long helper to update all cached randomization information
+        // This is a rather complex process since we randomize on two levels:
+        //  - chunks of consecutive data in the feature archive
+        //  - within a range of chunks that is paged into RAM
+        //     - utterances (in utt mode), or
+        //     - frames (in frame mode)
+        // The 'globalts' parameter is the start time that triggered the rerandomization; it is NOT the base time of the randomized area.
+        size_t lazyrandomization (const size_t globalts,
+            const std::vector<std::vector<utterancechunkdata>> & allchunks       // set of utterances organized in chunks, referred to by an iterator (not an index)
+            )
+        {
+            const size_t sweep = globalts / _totalframes;    // which sweep (this determines randomization)
+            if (sweep == currentsweep)                       // already got this one--nothing to do
+                return sweep;
+
+            currentsweep = sweep;
+            if (verbosity > 0)
+                fprintf (stderr, "lazyrandomization: re-randomizing for sweep %d in %s mode\n", (int)currentsweep, framemode ? "frame" : "utterance");
+
+            const size_t sweepts = sweep * _totalframes;     // first global frame index for this sweep
+
+            // first randomize chunks
+            std::vector<std::vector<std::vector<utterancechunkdata>::const_iterator>> randomizedchunkrefs;
+            foreach_index (i, allchunks)
+                randomizedchunkrefs.push_back(std::vector<std::vector<utterancechunkdata>::const_iterator>());
+
+            foreach_index (i, allchunks)
+                randomizedchunkrefs[i].reserve (allchunks[i].size());
+
+            foreach_index (i, allchunks)    // TODO: this cries for iterating using the iterator!
+            {
+                foreach_index(j, allchunks[i])
+                    randomizedchunkrefs[i].push_back (allchunks[i].begin() + j);
+                assert (randomizedchunkrefs[i].size() == allchunks[i].size());
+
+                // note that since randomshuffle() uses sweep as seed, this will keep the randomization common across all feature streams
+                randomshuffle (randomizedchunkrefs[i], sweep); // bring into random order (with random seed depending on sweep)
+            }
+
+            // place them onto the global timeline -> randomizedchunks[]
+            // We are processing with randomization within a rolling window over this chunk sequence.
+            // Paging will happen on a chunk-by-chunk basis.
+            // The global time stamp is needed to determine the paging window.
+            randomizedchunks.clear();               // data chunks after being brought into random order (we randomize within a rolling window over them)
+
+            foreach_index(i, allchunks)
+                randomizedchunks.push_back(std::vector<chunk>());
+
+            foreach_index(i, allchunks)
+            {
+                randomizedchunks[i].reserve (randomizedchunkrefs[i].size());
+                foreach_index (k, randomizedchunkrefs[i])
+                    randomizedchunks[i].push_back (chunk (randomizedchunkrefs[i][k], randomizedchunks[i].empty() ? 0 : randomizedchunks[i].back().utteranceposend(), randomizedchunks[i].empty() ? sweepts : randomizedchunks[i].back().globalte()));
+                assert (randomizedchunks[i].size() == allchunks[i].size());
+                assert (randomizedchunks[i].empty() || (randomizedchunks[i].back().utteranceposend() == numutterances && randomizedchunks[i].back().globalte() == sweepts + _totalframes));
+            }
+
+            // for each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
+            foreach_index (i, randomizedchunks)
+            {
+                // Only required for first feature stream
+                if (i != 0)
+                    continue;
+
+                foreach_index (k, randomizedchunks[i])
+                {
+                    chunk & chunk = randomizedchunks[i][k];
+                    // start with the range of left neighbor
+                    if (k == 0)
+                    {
+                        chunk.windowbegin = 0;
+                        chunk.windowend = 1;
+                    }
+                    else
+                    {
+                        chunk.windowbegin = randomizedchunks[i][k-1].windowbegin;  // might be too early
+                        chunk.windowend = randomizedchunks[i][k-1].windowend;      // might have more space
+                    }
+                    while (chunk.globalts - randomizedchunks[i][chunk.windowbegin].globalts > randomizationrange/2)
+                        chunk.windowbegin++;            // too early
+                    while (chunk.windowend < randomizedchunks[i].size() && randomizedchunks[i][chunk.windowend].globalte() - chunk.globalts < randomizationrange/2)
+                        chunk.windowend++;              // got more space
+                }
+            }
+
+            // This completes chunk randomization.
+            // Now set up the following members for sequence randomization (i.e., utterance or frame):
+            //  - positionchunkwindows
+            //  - randomizedutterancerefs - this is the data structure being shuffled
+            //  - randomizedutteranceposmap
+
+            // TODO adapt comments below. TODO test in utterance mode
+            // We will now introduce the concept of utterance *position*.
+            // During processing, utterances will be indexed by position (which is in turn derived from a frame index in getbatch()),
+            // and it is assumed (required) that positions are requested consecutively.
+            // Each utterance position has an underlying associated utterance, which is represented as (chunkid, within-chunk index) and randomly assigned.
+            // Each utterance position also has an associated range of chunks that are kept in memory,
+            // and the associated underlying utterance is guaranteed to be found within that associated range of chunks.
+            // That allows to page out/in data when processing utterance positions in a consecutive manner.
+
+            // compute chunk windows for every utterance position -> positionchunkwindows[]
+            // Utterance positions can only reference underlying utterance data within the chunk window.
+            // Utterance positions are defined by the randomized chunk sequence (i.e. their underlying 'defining' chunk differs from sweep to sweep).
+            size_t numsequences = framemode ? _totalframes : numutterances;
+
+            positionchunkwindows.clear();           // [utterance position] -> [windowbegin, windowend) for controlling paging
+            positionchunkwindows.reserve(numsequences);
+
+            // positionchunkwindows should be consistent for all inputs (distinct feature streams), so just build based on feature[0]
+            // contains pointer to chunk elements but only to compute index
+            foreach_index (k, randomizedchunks[0]) // TODO: this really cries for iterating using iterators!
+            {
+                chunk & chunk = randomizedchunks[0][k];
+                for (size_t i = 0; i < chunk.numutterances(); i++)  // loop over utterances in this chunk
+                {
+                    size_t numsequences = framemode ? chunk.getchunkdata().numframes(i) : 1;
+                    for (size_t m = 0; m < numsequences; m++)
+                    {
+                        positionchunkwindows.push_back(randomizedchunks[0].begin() + k);
+                    }
+                }
+            }
+            assert(positionchunkwindows.size() == (framemode ? _totalframes : numutterances));
+
+            // build the randomized utterances array -> randomizedutterancerefs[]
+            // start by assigning all utterance positions to utterances in non-random consecutive manner
+            randomizedutterancerefs.clear();        // [pos] randomized utterance ids
+            randomizedutterancerefs.reserve(numsequences);
+            foreach_index (k, randomizedchunks[0])
+            {
+                chunk & chunk = randomizedchunks[0][k];
+                for (size_t i = 0; i < chunk.numutterances(); i++)  // loop over utterances in this chunk
+                {
+                    size_t numsequences = framemode ? chunk.getchunkdata().numframes(i) : 1;
+                    for (size_t m = 0; m < numsequences; m++)
+                    {
+                        randomizedutterancerefs.push_back (sequenceref /* utteranceref */ (k, i, m));
+                    }
+                }
+            }
+            assert(randomizedutterancerefs.size() == numsequences);
+
+            // check we got those setup right
+            foreach_index (i, randomizedutterancerefs)
+            {
+                auto & uttref = randomizedutterancerefs[i];
+                assert(positionchunkwindows[i].isvalidforthisposition(uttref)); uttref;
+            }
+
+            // we now randomly shuffle randomizedutterancerefs[pos], while considering the constraints of what chunk range needs to be in memory
+            srand ((unsigned int) sweep + 1);
+            for (size_t i = 0; i < randomizedutterancerefs.size(); i++)
+            {
+                // get valid randomization range, expressed in chunks
+                const size_t windowbegin = positionchunkwindows[i].windowbegin();
+                const size_t windowend =   positionchunkwindows[i].windowend();
+
+                // get valid randomization range, expressed in utterance positions
+                // Remember, utterance positions are defined by chunks.
+                size_t posbegin;
+                size_t posend;
+
+                // TODO abstract across these (should be sequence indices...)
+                if (framemode)
+                {
+                    // in frames
+                    posbegin = randomizedchunks[0][windowbegin].globalts   - sweepts;
+                    posend =   randomizedchunks[0][windowend-1].globalte() - sweepts;
+                }
+                else
+                {
+                    posbegin = randomizedchunks[0][windowbegin].utteranceposbegin;
+                    posend =   randomizedchunks[0][windowend-1].utteranceposend();
+                }
+
+                // randomization range for this utterance position is [posbegin, posend)
+                for(;;)
+                {
+                    // pick a random location
+                    const size_t j = msra::dbn::rand (posbegin, posend);    // a random number within the window
+                    if (i == j)
+                        break;  // the random gods say "this one points to its original position"... nothing wrong about that, but better not try to swap
+
+                    // We want to swap utterances at i and j, but need to make sure they remain in their allowed range.
+                    // This is guaranteed for a so-far untouched utterance, but both i and j may have been touched by a previous swap.
+
+                    // We want to use the utterance previously referenced at utterance position j at position i. Is that allowed?
+                    if (!positionchunkwindows[i].isvalidforthisposition (randomizedutterancerefs[j]))
+                        continue;   // nope --try another
+
+                    // Likewise may we use the utterance previously referenced at utterance position i at position j?
+                    if (!positionchunkwindows[j].isvalidforthisposition (randomizedutterancerefs[i]))
+                        continue;   // nope --try another
+
+                    // yep--swap them
+                    ::swap (randomizedutterancerefs[i], randomizedutterancerefs[j]); // TODO old swap was perhaps more efficient
+                    break;
+                }
+            }
+
+            size_t t = sweepts;
+            foreach_index (i, randomizedutterancerefs)
+            {
+                auto & uttref = randomizedutterancerefs[i];
+                uttref.globalts = t;
+                if (framemode)
+                {
+                    uttref.numframes = 1;
+                }
+                else
+                {
+                    uttref.numframes = randomizedchunks[0][uttref.chunkindex].getchunkdata().numframes (uttref.utteranceindex);
+                }
+
+
+                t = uttref.globalte();
+            }
+            assert (t == sweepts + _totalframes); // TODO does this hold if there we invalid utterance at the end of a chunk?
+
+            // verify that we got it right (I got a knot in my head!)
+            foreach_index (i, randomizedutterancerefs)
+            {
+                // get utterance referenced at this position
+                const auto & uttref = randomizedutterancerefs[i];
+                // check if it is valid for this position
+                if (uttref.chunkindex < positionchunkwindows[i].windowbegin() || uttref.chunkindex >= positionchunkwindows[i].windowend())
+                    LogicError("lazyrandomization: randomization logic mangled!");
+            }
+
+            // create lookup table for (globalts values -> pos) -> randomizedutteranceposmap[]
+            randomizedutteranceposmap.clear();      // [globalts] -> pos lookup table
+            foreach_index (pos, randomizedutterancerefs)
+            {
+                auto & uttref = randomizedutterancerefs[pos];
+                randomizedutteranceposmap[uttref.globalts] = (size_t) pos;
+            }
+
+            // TODO refactor into method
+            // check it --my head spins
+            t = 0;
+            foreach_index (i, randomizedchunks[0])
+            {
+                const auto & chunk = randomizedchunks[0][i];       // for window and chunkdata
+                const size_t poswindowbegin = chunk.windowbegin;
+                const size_t poswindowend = chunk.windowend;
+
+                const auto & chunkdata = chunk.getchunkdata();  // for numutterances/numframes
+                const size_t numutt = chunkdata.numutterances();
+                for (size_t k = 0; k < numutt; k++)
+                {
+                    const size_t n = framemode ? chunkdata.numframes (k) : 1;
+                    for (size_t m = 0; m < n; m++)
+                    {
+                        //const size_t randomizedchunkindex = randomizedframerefs[t].chunkindex;
+                        const size_t randomizedchunkindex = randomizedutterancerefs[t].chunkindex;
+                        if (randomizedchunkindex < poswindowbegin || randomizedchunkindex >= poswindowend)
+                            LogicError("lazyrandomization: nope, you got frame randomization wrong, dude");
+                        t++;
+                    }
+                }
+            }
+            assert (t == numsequences);
+
+            return sweep;
+        }
+
+        BlockRandomizer(int verbosity, bool framemode, size_t totalframes, size_t numutterances, size_t randomizationrange)
+            : verbosity(verbosity)
+            , framemode(framemode)
+            , _totalframes(totalframes)
+            , numutterances(numutterances)
+            , randomizationrange(randomizationrange)
+            , currentsweep(SIZE_MAX)
+        {
+        }
+
+        size_t chunkForFramePos(const size_t t) const  // find chunk for a given frame position
+        {
+            //inspect chunk of first feature stream only
+            auto iter = std::lower_bound(randomizedchunks[0].begin(), randomizedchunks[0].end(), t, [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
+            const size_t chunkindex = iter - randomizedchunks[0].begin();
+            if (t < randomizedchunks[0][chunkindex].globalts || t >= randomizedchunks[0][chunkindex].globalte())
+                LogicError("chunkForFramePos: dude, learn STL!");
+            return chunkindex;
+        }
+
+        const utterancechunkdata & getChunkData(size_t streamIndex, size_t randomizedChunkIndex)
+        {
+            assert(streamIndex < randomizedchunks.size());
+            assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
+            return randomizedchunks[streamIndex][randomizedChunkIndex].getchunkdata();
+        }
+
+        size_t getChunkWindowBegin(size_t randomizedChunkIndex)
+        {
+            const size_t streamIndex = 0;
+            assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
+            return randomizedchunks[streamIndex][randomizedChunkIndex].windowbegin;
+        }
+
+        size_t getChunkWindowEnd(size_t randomizedChunkIndex)
+        {
+            const size_t streamIndex = 0;
+            assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
+            return randomizedchunks[streamIndex][randomizedChunkIndex].windowend;
+        }
+
+        size_t getNumSequences()
+        {
+            return randomizedutterancerefs.size();
+        }
+
+        const sequenceref & getSequenceRef(size_t sequenceIndex)
+        {
+            assert(sequenceIndex < randomizedutterancerefs.size());
+            return randomizedutterancerefs[sequenceIndex];
+        }
+    };
+
+} }
