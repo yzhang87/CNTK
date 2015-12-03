@@ -154,7 +154,7 @@ namespace msra { namespace dbn {
         struct chunk                    // chunk as used in actual processing order (randomized sequence)
         {
             // the underlying chunk (as a non-indexed reference into the chunk set)
-            std::vector<utterancechunkdata>::const_iterator uttchunkdata;
+            std::vector<utterancechunkdata>::const_iterator uttchunkdata; // TODO remove, keep next
             size_t originalChunkIndex;
             const utterancechunkdata & getchunkdata() const { return *uttchunkdata; }
             size_t numutterances() const { return uttchunkdata->numutterances(); }
@@ -181,8 +181,7 @@ namespace msra { namespace dbn {
                 , utteranceposbegin(utteranceposbegin)
                 , globalts(globalts) {}
         };
-        // TODO no need to keep this for every feature stream - order is the same for all
-        std::vector<std::vector<chunk>> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
+        std::vector<chunk> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
 
     public:
         struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
@@ -261,36 +260,33 @@ namespace msra { namespace dbn {
         {
             //inspect chunk of first feature stream only
             auto iter = std::lower_bound(
-                randomizedchunks[0].begin(),
-                randomizedchunks[0].end(),
+                randomizedchunks.begin(),
+                randomizedchunks.end(),
                 t,
                 [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
-            assert(iter != randomizedchunks[0].end());
-            const size_t chunkindex = iter - randomizedchunks[0].begin();
-            if (t < randomizedchunks[0][chunkindex].globalts || t >= randomizedchunks[0][chunkindex].globalte())
+            assert(iter != randomizedchunks.end());
+            const size_t chunkindex = iter - randomizedchunks.begin();
+            if (t < randomizedchunks[chunkindex].globalts || t >= randomizedchunks[chunkindex].globalte())
                 LogicError("chunkForFramePos: dude, learn STL!");
             return chunkindex;
         }
 
         size_t getOriginalChunkIndex(size_t randomizedChunkIndex)
         {
-            const size_t streamIndex = 0;
-            assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
-            return randomizedchunks[streamIndex][randomizedChunkIndex].originalChunkIndex;
+            assert(randomizedChunkIndex < randomizedchunks.size());
+            return randomizedchunks[randomizedChunkIndex].originalChunkIndex;
         }
 
         size_t getChunkWindowBegin(size_t randomizedChunkIndex)
         {
-            const size_t streamIndex = 0;
-            assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
-            return randomizedchunks[streamIndex][randomizedChunkIndex].windowbegin;
+            assert(randomizedChunkIndex < randomizedchunks.size());
+            return randomizedchunks[randomizedChunkIndex].windowbegin;
         }
 
         size_t getChunkWindowEnd(size_t randomizedChunkIndex)
         {
-            const size_t streamIndex = 0;
-            assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
-            return randomizedchunks[streamIndex][randomizedChunkIndex].windowend;
+            assert(randomizedChunkIndex < randomizedchunks.size());
+            return randomizedchunks[randomizedChunkIndex].windowend;
         }
 
         size_t getNumSequences()

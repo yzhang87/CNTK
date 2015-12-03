@@ -46,24 +46,21 @@ namespace msra { namespace dbn {
                 currentsweep, framemode ? "frame" : "utterance");
 
         const size_t sweepts = sweep * _totalframes;     // first global frame index for this sweep
+        const size_t numChunks = allchunks[0].size();
 
         // first randomize chunks
-        std::vector<std::vector<std::vector<utterancechunkdata>::const_iterator>> randomizedchunkrefs;
-        foreach_index (i, allchunks)
-            randomizedchunkrefs.push_back(std::vector<std::vector<utterancechunkdata>::const_iterator>());
+        std::vector<std::vector<utterancechunkdata>::const_iterator> randomizedchunkrefs;
 
-        foreach_index (i, allchunks)
-            randomizedchunkrefs[i].reserve (allchunks[i].size());
+        // TODO assert sizes and other parameters match
 
-        foreach_index (i, allchunks)    // TODO: this cries for iterating using the iterator!
-        {
-            foreach_index(j, allchunks[i])
-                randomizedchunkrefs[i].push_back (allchunks[i].begin() + j);
-            assert (randomizedchunkrefs[i].size() == allchunks[i].size());
+        randomizedchunkrefs.reserve(numChunks);
 
-            // note that since randomshuffle() uses sweep as seed, this will keep the randomization common across all feature streams
-            randomshuffle (randomizedchunkrefs[i], sweep); // bring into random order (with random seed depending on sweep)
-        }
+        foreach_index(j, allchunks[0])
+            randomizedchunkrefs.push_back(allchunks[0].begin() + j);
+        assert (randomizedchunkrefs.size() == numChunks);
+
+        // note that since randomshuffle() uses sweep as seed, this will keep the randomization common across all feature streams
+        randomshuffle (randomizedchunkrefs, sweep); // bring into random order (with random seed depending on sweep)
 
         // place them onto the global timeline -> randomizedchunks[]
         // We are processing with randomization within a rolling window over this chunk sequence.
@@ -71,49 +68,37 @@ namespace msra { namespace dbn {
         // The global time stamp is needed to determine the paging window.
         randomizedchunks.clear();               // data chunks after being brought into random order (we randomize within a rolling window over them)
 
-        foreach_index(i, allchunks)
-            randomizedchunks.push_back(std::vector<chunk>());
+        randomizedchunks.reserve(numChunks);
+        foreach_index (k, randomizedchunkrefs)
+            randomizedchunks.push_back (chunk (
+                randomizedchunkrefs[k],
+                randomizedchunkrefs[k] - allchunks[0].begin(), 
+                randomizedchunks.empty() ? 0 : randomizedchunks.back().utteranceposend(),
+                randomizedchunks.empty() ? sweepts : randomizedchunks.back().globalte()));
 
-        foreach_index(i, allchunks)
-        {
-            randomizedchunks[i].reserve (randomizedchunkrefs[i].size());
-            foreach_index (k, randomizedchunkrefs[i])
-                randomizedchunks[i].push_back (chunk (
-                    randomizedchunkrefs[i][k],
-                    randomizedchunkrefs[i][k] - allchunks[i].begin(), 
-                    randomizedchunks[i].empty() ? 0 : randomizedchunks[i].back().utteranceposend(),
-                    randomizedchunks[i].empty() ? sweepts : randomizedchunks[i].back().globalte()));
-
-            assert (randomizedchunks[i].size() == allchunks[i].size());
-            assert (randomizedchunks[i].empty() || (randomizedchunks[i].back().utteranceposend() == numutterances && randomizedchunks[i].back().globalte() == sweepts + _totalframes));
-        }
+        assert (randomizedchunks.size() == numChunks);
+        assert (randomizedchunks.empty() || (randomizedchunks.back().utteranceposend() == numutterances && randomizedchunks.back().globalte() == sweepts + _totalframes));
 
         // for each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
-        foreach_index(i, randomizedchunks)
+        foreach_index (k, randomizedchunks)
         {
-            // Only required for first feature stream
-            if (i != 0)
-                continue;
-
-            foreach_index (k, randomizedchunks[i])
+            chunk & chunk = randomizedchunks[k];
+            // start with the range of left neighbor
+            if (k == 0)
             {
-                chunk & chunk = randomizedchunks[i][k];
-                // start with the range of left neighbor
-                if (k == 0)
-                {
-                    chunk.windowbegin = 0;
-                    chunk.windowend = 1;
-                }
-                else
-                {
-                    chunk.windowbegin = randomizedchunks[i][k-1].windowbegin;  // might be too early
-                    chunk.windowend = randomizedchunks[i][k-1].windowend;      // might have more space
-                }
-                while (chunk.globalts - randomizedchunks[i][chunk.windowbegin].globalts > randomizationrange/2)
-                    chunk.windowbegin++;            // too early
-                while (chunk.windowend < randomizedchunks[i].size() && randomizedchunks[i][chunk.windowend].globalte() - chunk.globalts < randomizationrange/2)
-                    chunk.windowend++;              // got more space
+                chunk.windowbegin = 0;
+                chunk.windowend = 1;
             }
+            else
+            {
+                chunk.windowbegin = randomizedchunks[k-1].windowbegin;  // might be too early
+                chunk.windowend = randomizedchunks[k-1].windowend;      // might have more space
+            }
+            while (chunk.globalts - randomizedchunks[chunk.windowbegin].globalts > randomizationrange/2)
+                chunk.windowbegin++;            // too early
+            while (chunk.windowend < numChunks &&
+                randomizedchunks[chunk.windowend].globalte() - chunk.globalts < randomizationrange/2)
+                chunk.windowend++;              // got more space
         }
 
         // This completes chunk randomization.
@@ -141,15 +126,15 @@ namespace msra { namespace dbn {
 
         // positionchunkwindows should be consistent for all inputs (distinct feature streams), so just build based on feature[0]
         // contains pointer to chunk elements but only to compute index
-        foreach_index (k, randomizedchunks[0]) // TODO: this really cries for iterating using iterators!
+        foreach_index (k, randomizedchunks) // TODO: this really cries for iterating using iterators!
         {
-            chunk & chunk = randomizedchunks[0][k];
+            chunk & chunk = randomizedchunks[k];
             for (size_t i = 0; i < chunk.numutterances(); i++)  // loop over utterances in this chunk
             {
                 size_t numsequences = framemode ? chunk.getchunkdata().numframes(i) : 1;
                 for (size_t m = 0; m < numsequences; m++)
                 {
-                    positionchunkwindows.push_back(randomizedchunks[0].begin() + k);
+                    positionchunkwindows.push_back(randomizedchunks.begin() + k);
                 }
             }
         }
@@ -159,9 +144,9 @@ namespace msra { namespace dbn {
         // start by assigning all utterance positions to utterances in non-random consecutive manner
         randomizedsequencerefs.clear();        // [pos] randomized utterance ids
         randomizedsequencerefs.reserve(numsequences);
-        foreach_index (k, randomizedchunks[0])
+        foreach_index (k, randomizedchunks)
         {
-            chunk & chunk = randomizedchunks[0][k];
+            chunk & chunk = randomizedchunks[k];
             for (size_t i = 0; i < chunk.numutterances(); i++)  // loop over utterances in this chunk
             {
                 size_t numsequences = framemode ? chunk.getchunkdata().numframes(i) : 1;
@@ -197,13 +182,13 @@ namespace msra { namespace dbn {
             if (framemode)
             {
                 // in frames
-                posbegin = randomizedchunks[0][windowbegin].globalts   - sweepts;
-                posend =   randomizedchunks[0][windowend-1].globalte() - sweepts;
+                posbegin = randomizedchunks[windowbegin].globalts   - sweepts;
+                posend =   randomizedchunks[windowend-1].globalte() - sweepts;
             }
             else
             {
-                posbegin = randomizedchunks[0][windowbegin].utteranceposbegin;
-                posend =   randomizedchunks[0][windowend-1].utteranceposend();
+                posbegin = randomizedchunks[windowbegin].utteranceposbegin;
+                posend =   randomizedchunks[windowend-1].utteranceposend();
             }
 
             // randomization range for this utterance position is [posbegin, posend)
@@ -242,7 +227,7 @@ namespace msra { namespace dbn {
             }
             else
             {
-                uttref.numframes = randomizedchunks[0][uttref.chunkindex].getchunkdata().numframes (uttref.utteranceindex);
+                uttref.numframes = randomizedchunks[uttref.chunkindex].getchunkdata().numframes (uttref.utteranceindex);
             }
 
 
@@ -271,9 +256,9 @@ namespace msra { namespace dbn {
         // TODO refactor into method
         // check it --my head spins
         t = 0;
-        foreach_index (i, randomizedchunks[0])
+        foreach_index (i, randomizedchunks)
         {
-            const auto & chunk = randomizedchunks[0][i];       // for window and chunkdata
+            const auto & chunk = randomizedchunks[i];       // for window and chunkdata
             const size_t poswindowbegin = chunk.windowbegin;
             const size_t poswindowend = chunk.windowend;
 
