@@ -178,6 +178,7 @@ namespace msra { namespace dbn {
                 , utteranceposbegin(utteranceposbegin)
                 , globalts(globalts) {}
         };
+        // TODO no need to keep this for every feature stream - order is the same for all
         std::vector<std::vector<chunk>> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
 
     public:
@@ -210,7 +211,8 @@ namespace msra { namespace dbn {
         };
 
     private:
-        std::vector<sequenceref> randomizedutterancerefs;          // [pos] randomized utterance ids
+        // TODO rename
+        std::vector<sequenceref> randomizedsequencerefs;          // [pos] randomized utterance ids
         std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table
 
         struct positionchunkwindow       // chunk window required in memory when at a certain position, for controlling paging
@@ -266,6 +268,7 @@ namespace msra { namespace dbn {
             return chunkindex;
         }
 
+        // TODO instead give back original chunk index, drop the streamIndex
         const utterancechunkdata & getChunkData(size_t streamIndex, size_t randomizedChunkIndex)
         {
             assert(streamIndex < randomizedchunks.size());
@@ -289,13 +292,13 @@ namespace msra { namespace dbn {
 
         size_t getNumSequences()
         {
-            return randomizedutterancerefs.size();
+            return randomizedsequencerefs.size();
         }
 
         const sequenceref & getSequenceRef(size_t sequenceIndex)
         {
-            assert(sequenceIndex < randomizedutterancerefs.size());
-            return randomizedutterancerefs[sequenceIndex];
+            assert(sequenceIndex < randomizedsequencerefs.size());
+            return randomizedsequencerefs[sequenceIndex];
         }
     };
 
