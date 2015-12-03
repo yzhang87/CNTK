@@ -22,6 +22,7 @@
     <ClCompile Include="FrameModePacker.cpp" />
     <ClCompile Include="MonolithicTransformer.cpp" />
     <ClCompile Include="Utils.cpp" />
+    <ClCompile Include="Bundler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
@@ -62,6 +63,8 @@
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="MonolithicTransformer.h" />
     <ClInclude Include="Utils.h" />
+    <ClInclude Include="Bundler.h" />
+    <ClInclude Include="Timeline.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />

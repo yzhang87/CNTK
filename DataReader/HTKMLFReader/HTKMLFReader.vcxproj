@@ -107,6 +107,7 @@
     <ClInclude Include="..\..\Common\Include\ssematrix.h" />
     <ClInclude Include="basetypes.h" />
     <ClInclude Include="biggrowablevectors.h" />
+    <ClInclude Include="Bundler.h" />
     <ClInclude Include="chunkevalsource.h" />
     <ClInclude Include="..\..\Common\Include\fileutil.h" />
     <ClInclude Include="..\..\Common\Include\DebugUtil.h" />
@@ -125,6 +126,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Timeline.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="utterancesourcemultiNew.h" />
   </ItemGroup>
@@ -132,6 +134,7 @@
     <ClCompile Include="..\..\Common\TimerUtility.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Bundler.cpp" />
     <ClCompile Include="DataReader.cpp" />
     <ClCompile Include="DataWriter.cpp" />
     <ClCompile Include="dllmain.cpp">
