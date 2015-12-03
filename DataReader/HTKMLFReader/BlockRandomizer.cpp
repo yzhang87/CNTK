@@ -34,21 +34,22 @@ namespace msra { namespace dbn {
         const std::vector<std::vector<utterancechunkdata>> & allchunks)
     {
         // TODO allchunks / utterancechunkdata: wants to know:
-        // # chunks, # streams, utterances per chunk, frames per chunk, lenght of utterances
-        const size_t sweep = globalts / _totalframes;    // which sweep (this determines randomization)
-        if (sweep == currentsweep)                       // already got this one--nothing to do
+        // # chunks, utterances per chunk, frames per chunk, length of utterances
+        const size_t sweep = globalts / m_totalframes;    // which sweep (this determines randomization)
+        if (sweep == m_currentsweep)                       // already got this one--nothing to do
             return sweep;
 
-        currentsweep = sweep;
-        if (verbosity > 0)
+        m_currentsweep = sweep;
+        if (m_verbosity > 0)
             fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
-                currentsweep, framemode ? "frame" : "utterance");
+                m_currentsweep, m_framemode ? "frame" : "utterance");
 
-        const size_t sweepts = sweep * _totalframes;     // first global frame index for this sweep
-        const size_t numChunks = allchunks[0].size();
+        const size_t sweepts = sweep * m_totalframes;     // first global frame index for this sweep
+        const auto & primaryChunks = allchunks[0];
+        const size_t numChunks = primaryChunks.size();
         // TODO assert sizes and other parameters match
 
-        // first randomize chunks indices
+        // first randomize chunk indices
         std::vector<size_t> randomizedChunkIndices;
         randomizedchunks.reserve(numChunks);
         for (size_t i = 0; i < numChunks; i++)
@@ -67,7 +68,7 @@ namespace msra { namespace dbn {
         for (size_t k = 0, t = sweepts, pos = 0; k < numChunks; k++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[k];
-            const auto & chunkdata = allchunks[0][originalChunkIndex];
+            const auto & chunkdata = primaryChunks[originalChunkIndex];
             const size_t numutterances = chunkdata.numutterances();
             const size_t numframes = chunkdata.totalframes;
             randomizedchunks.push_back(chunk(
@@ -81,7 +82,9 @@ namespace msra { namespace dbn {
         }
 
         assert (randomizedchunks.size() == numChunks);
-        assert (randomizedchunks.empty() || (randomizedchunks.back().utteranceposend() == numutterances && randomizedchunks.back().globalte() == sweepts + _totalframes));
+        assert (randomizedchunks.empty() ||
+            (randomizedchunks.back().utteranceposend() == m_numutterances &&
+                randomizedchunks.back().globalte() == sweepts + m_totalframes));
 
         // for each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
         foreach_index (k, randomizedchunks)
@@ -98,10 +101,10 @@ namespace msra { namespace dbn {
                 chunk.windowbegin = randomizedchunks[k-1].windowbegin;  // might be too early
                 chunk.windowend = randomizedchunks[k-1].windowend;      // might have more space
             }
-            while (chunk.globalts - randomizedchunks[chunk.windowbegin].globalts > randomizationrange/2)
+            while (chunk.globalts - randomizedchunks[chunk.windowbegin].globalts > m_randomizationrange/2)
                 chunk.windowbegin++;            // too early
             while (chunk.windowend < numChunks &&
-                randomizedchunks[chunk.windowend].globalte() - chunk.globalts < randomizationrange/2)
+                randomizedchunks[chunk.windowend].globalte() - chunk.globalts < m_randomizationrange/2)
                 chunk.windowend++;              // got more space
         }
 
@@ -123,7 +126,7 @@ namespace msra { namespace dbn {
         // compute chunk windows for every utterance position -> positionchunkwindows[]
         // Utterance positions can only reference underlying utterance data within the chunk window.
         // Utterance positions are defined by the randomized chunk sequence (i.e. their underlying 'defining' chunk differs from sweep to sweep).
-        size_t numsequences = framemode ? _totalframes : numutterances;
+        size_t numsequences = m_framemode ? m_totalframes : m_numutterances;
 
         positionchunkwindows.clear();           // [utterance position] -> [windowbegin, windowend) for controlling paging
         positionchunkwindows.reserve(numsequences);
@@ -133,13 +136,13 @@ namespace msra { namespace dbn {
         foreach_index (k, randomizedchunks) // TODO: this really cries for iterating using iterators!
         {
             chunk & chunk = randomizedchunks[k];
-            size_t numsequences = framemode ? chunk.numframes : chunk.numutterances;
+            size_t numsequences = m_framemode ? chunk.numframes : chunk.numutterances;
             for (size_t i = 0; i < numsequences; i++)
             {
                 positionchunkwindows.push_back(randomizedchunks.begin() + k);
             }
         }
-        assert(positionchunkwindows.size() == (framemode ? _totalframes : numutterances));
+        assert(positionchunkwindows.size() == numsequences);
 
         // build the randomized utterances array -> randomizedsequencerefs[]
         // start by assigning all utterance positions to utterances in non-random consecutive manner
@@ -150,8 +153,8 @@ namespace msra { namespace dbn {
             chunk & chunk = randomizedchunks[k];
             for (size_t i = 0; i < chunk.numutterances; i++)  // loop over utterances in this chunk
             {
-                const auto & chunkdata = allchunks[0][chunk.originalChunkIndex];
-                size_t numsequences = framemode ? chunkdata.numframes(i) : 1;
+                const auto & chunkdata = primaryChunks[chunk.originalChunkIndex];
+                size_t numsequences = m_framemode ? chunkdata.numframes(i) : 1;
                 for (size_t m = 0; m < numsequences; m++)
                 {
                     randomizedsequencerefs.push_back(sequenceref(k, i, m));
@@ -163,8 +166,8 @@ namespace msra { namespace dbn {
         // check we got those setup right
         foreach_index (i, randomizedsequencerefs)
         {
-            auto & uttref = randomizedsequencerefs[i];
-            assert(positionchunkwindows[i].isvalidforthisposition(uttref)); uttref;
+            auto & sequenceRef = randomizedsequencerefs[i];
+            assert(positionchunkwindows[i].isvalidforthisposition(sequenceRef)); sequenceRef;
         }
 
         // we now randomly shuffle randomizedsequencerefs[pos], while considering the constraints of what chunk range needs to be in memory
@@ -181,7 +184,7 @@ namespace msra { namespace dbn {
             size_t posend;
 
             // TODO abstract across these (should be sequence indices...)
-            if (framemode)
+            if (m_framemode)
             {
                 // in frames
                 posbegin = randomizedchunks[windowbegin].globalts   - sweepts;
@@ -221,30 +224,30 @@ namespace msra { namespace dbn {
         size_t t = sweepts;
         foreach_index (i, randomizedsequencerefs)
         {
-            auto & uttref = randomizedsequencerefs[i];
-            uttref.globalts = t;
-            if (framemode)
+            auto & sequenceRef = randomizedsequencerefs[i];
+            sequenceRef.globalts = t;
+            if (m_framemode)
             {
-                uttref.numframes = 1;
+                sequenceRef.numframes = 1;
             }
             else
             {
-                const size_t originalChunkIndex = randomizedchunks[uttref.chunkindex].originalChunkIndex;
-                const auto & chunkdata = allchunks[0][originalChunkIndex];
-                uttref.numframes = chunkdata.numframes(uttref.utteranceindex);
+                const size_t originalChunkIndex = randomizedchunks[sequenceRef.chunkindex].originalChunkIndex;
+                const auto & chunkdata = primaryChunks[originalChunkIndex];
+                sequenceRef.numframes = chunkdata.numframes(sequenceRef.utteranceindex);
             }
 
-            t = uttref.globalte();
+            t = sequenceRef.globalte();
         }
-        assert (t == sweepts + _totalframes); // TODO does this hold if there we invalid utterance at the end of a chunk?
+        assert (t == sweepts + m_totalframes); // TODO does this hold if there we invalid utterance at the end of a chunk?
 
         // verify that we got it right (I got a knot in my head!)
         foreach_index (i, randomizedsequencerefs)
         {
             // get utterance referenced at this position
-            const auto & uttref = randomizedsequencerefs[i];
+            const auto & sequenceRef = randomizedsequencerefs[i];
             // check if it is valid for this position
-            if (uttref.chunkindex < positionchunkwindows[i].windowbegin() || uttref.chunkindex >= positionchunkwindows[i].windowend())
+            if (sequenceRef.chunkindex < positionchunkwindows[i].windowbegin() || sequenceRef.chunkindex >= positionchunkwindows[i].windowend())
                 LogicError("lazyrandomization: randomization logic mangled!");
         }
 
@@ -252,8 +255,8 @@ namespace msra { namespace dbn {
         randomizedutteranceposmap.clear();      // [globalts] -> pos lookup table
         foreach_index (pos, randomizedsequencerefs)
         {
-            auto & uttref = randomizedsequencerefs[pos];
-            randomizedutteranceposmap[uttref.globalts] = (size_t) pos;
+            auto & sequenceRef = randomizedsequencerefs[pos];
+            randomizedutteranceposmap[sequenceRef.globalts] = (size_t) pos;
         }
 
         // TODO refactor into method
@@ -266,10 +269,10 @@ namespace msra { namespace dbn {
             const size_t poswindowend = chunk.windowend;
 
             const size_t numutt = chunk.numutterances;
-            const auto & chunkdata = allchunks[0][chunk.originalChunkIndex];
+            const auto & chunkdata = primaryChunks[chunk.originalChunkIndex];
             for (size_t k = 0; k < numutt; k++)
             {
-                const size_t n = framemode ? chunkdata.numframes(k) : 1;
+                const size_t n = m_framemode ? chunkdata.numframes(k) : 1;
                 for (size_t m = 0; m < n; m++)
                 {
                     //const size_t randomizedchunkindex = randomizedframerefs[t].chunkindex;

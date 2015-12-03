@@ -144,13 +144,12 @@ namespace msra { namespace dbn {
 
     class BlockRandomizer
     {
-        int verbosity;
-        bool framemode;
-        size_t _totalframes;
-        size_t numutterances;
-        size_t randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
-
-        size_t currentsweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
+        int m_verbosity;
+        bool m_framemode;
+        size_t m_totalframes;
+        size_t m_numutterances;
+        size_t m_randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
+        size_t m_currentsweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
         // TODO note: numutterances / numframes could also be computed through neighbors
         struct chunk                    // chunk as used in actual processing order (randomized sequence)
         {
@@ -161,6 +160,8 @@ namespace msra { namespace dbn {
             // position in utterance-position space
             size_t utteranceposbegin;
             size_t utteranceposend() const { return utteranceposbegin + numutterances; }
+
+            // TODO ts instead of globalts, merge with pos ?
 
             // position on global time line
             size_t globalts;            // start frame on global timeline (after randomization)
@@ -235,12 +236,12 @@ namespace msra { namespace dbn {
 
     public:
         BlockRandomizer(int verbosity, bool framemode, size_t totalframes, size_t numutterances, size_t randomizationrange)
-            : verbosity(verbosity)
-            , framemode(framemode)
-            , _totalframes(totalframes)
-            , numutterances(numutterances)
-            , randomizationrange(randomizationrange)
-            , currentsweep(SIZE_MAX)
+            : m_verbosity(verbosity)
+            , m_framemode(framemode)
+            , m_totalframes(totalframes)
+            , m_numutterances(numutterances)
+            , m_randomizationrange(randomizationrange)
+            , m_currentsweep(SIZE_MAX)
         {
         }
 
@@ -255,9 +256,9 @@ namespace msra { namespace dbn {
             const size_t globalts,
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
 
-        size_t chunkForFramePos(const size_t t) const  // find chunk for a given frame position
+        // Find (randomized) chunk index for a given frame position
+        size_t chunkForFramePos(const size_t t) const
         {
-            //inspect chunk of first feature stream only
             auto iter = std::lower_bound(
                 randomizedchunks.begin(),
                 randomizedchunks.end(),
@@ -269,31 +270,32 @@ namespace msra { namespace dbn {
                 LogicError("chunkForFramePos: dude, learn STL!");
             return chunkindex;
         }
+        // TODO Use randomizedutteranceposmap above
 
-        size_t getOriginalChunkIndex(size_t randomizedChunkIndex)
+        size_t getOriginalChunkIndex(size_t randomizedChunkIndex) const
         {
             assert(randomizedChunkIndex < randomizedchunks.size());
             return randomizedchunks[randomizedChunkIndex].originalChunkIndex;
         }
 
-        size_t getChunkWindowBegin(size_t randomizedChunkIndex)
+        size_t getChunkWindowBegin(size_t randomizedChunkIndex) const
         {
             assert(randomizedChunkIndex < randomizedchunks.size());
             return randomizedchunks[randomizedChunkIndex].windowbegin;
         }
 
-        size_t getChunkWindowEnd(size_t randomizedChunkIndex)
+        size_t getChunkWindowEnd(size_t randomizedChunkIndex) const
         {
             assert(randomizedChunkIndex < randomizedchunks.size());
             return randomizedchunks[randomizedChunkIndex].windowend;
         }
 
-        size_t getNumSequences()
+        size_t getNumSequences() const
         {
             return randomizedsequencerefs.size();
         }
 
-        const sequenceref & getSequenceRef(size_t sequenceIndex)
+        const sequenceref & getSequenceRef(size_t sequenceIndex) const
         {
             assert(sequenceIndex < randomizedsequencerefs.size());
             return randomizedsequencerefs[sequenceIndex];
