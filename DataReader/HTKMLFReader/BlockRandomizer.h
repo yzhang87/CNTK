@@ -151,33 +151,32 @@ namespace msra { namespace dbn {
         size_t randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
 
         size_t currentsweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
+        // TODO note: numutterances / numframes could also be computed through neighbors
         struct chunk                    // chunk as used in actual processing order (randomized sequence)
         {
-            // the underlying chunk (as a non-indexed reference into the chunk set)
-            std::vector<utterancechunkdata>::const_iterator uttchunkdata; // TODO remove, keep next
             size_t originalChunkIndex;
-            const utterancechunkdata & getchunkdata() const { return *uttchunkdata; }
-            size_t numutterances() const { return uttchunkdata->numutterances(); }
-            size_t numframes() const { return uttchunkdata->totalframes; }
+            size_t numutterances;
+            size_t numframes;
 
             // position in utterance-position space
             size_t utteranceposbegin;
-            size_t utteranceposend() const { return utteranceposbegin + numutterances(); }
+            size_t utteranceposend() const { return utteranceposbegin + numutterances; }
 
             // position on global time line
             size_t globalts;            // start frame on global timeline (after randomization)
-            size_t globalte() const { return globalts + numframes(); }
+            size_t globalte() const { return globalts + numframes; }
 
             // randomization range limits
-            // TODO only need to maintain for first feature stream
             size_t windowbegin;         // randomizedchunk index of earliest chunk that utterances in here can be randomized with
             size_t windowend;           // and end index [windowbegin, windowend)
-            chunk(std::vector<utterancechunkdata>::const_iterator uttchunkdata,
-                size_t originalChunkIndex,
+            chunk(size_t originalChunkIndex,
+                size_t numutterances,
+                size_t numframes,
                 size_t utteranceposbegin,
                 size_t globalts)
-                : uttchunkdata(uttchunkdata)
-                , originalChunkIndex(originalChunkIndex)
+                : originalChunkIndex(originalChunkIndex)
+                , numutterances(numutterances)
+                , numframes(numframes)
                 , utteranceposbegin(utteranceposbegin)
                 , globalts(globalts) {}
         };

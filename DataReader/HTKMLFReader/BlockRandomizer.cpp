@@ -34,8 +34,7 @@ namespace msra { namespace dbn {
         const std::vector<std::vector<utterancechunkdata>> & allchunks)
     {
         // TODO allchunks / utterancechunkdata: wants to know:
-        // # chunks, # streams, utterances per chunk, frames per chunk.
-        // For checks: length of an utterance
+        // # chunks, # streams, utterances per chunk, frames per chunk, lenght of utterances
         const size_t sweep = globalts / _totalframes;    // which sweep (this determines randomization)
         if (sweep == currentsweep)                       // already got this one--nothing to do
             return sweep;
@@ -47,34 +46,39 @@ namespace msra { namespace dbn {
 
         const size_t sweepts = sweep * _totalframes;     // first global frame index for this sweep
         const size_t numChunks = allchunks[0].size();
-
-        // first randomize chunks
-        std::vector<std::vector<utterancechunkdata>::const_iterator> randomizedchunkrefs;
-
         // TODO assert sizes and other parameters match
 
-        randomizedchunkrefs.reserve(numChunks);
-
-        foreach_index(j, allchunks[0])
-            randomizedchunkrefs.push_back(allchunks[0].begin() + j);
-        assert (randomizedchunkrefs.size() == numChunks);
-
-        // note that since randomshuffle() uses sweep as seed, this will keep the randomization common across all feature streams
-        randomshuffle (randomizedchunkrefs, sweep); // bring into random order (with random seed depending on sweep)
+        // first randomize chunks indices
+        std::vector<size_t> randomizedChunkIndices;
+        randomizedchunks.reserve(numChunks);
+        for (size_t i = 0; i < numChunks; i++)
+        {
+            randomizedChunkIndices.push_back(i);
+        }
+        // Note: clients will use the same randomization across streams.
+        randomshuffle(randomizedChunkIndices, sweep);
 
         // place them onto the global timeline -> randomizedchunks[]
         // We are processing with randomization within a rolling window over this chunk sequence.
         // Paging will happen on a chunk-by-chunk basis.
         // The global time stamp is needed to determine the paging window.
-        randomizedchunks.clear();               // data chunks after being brought into random order (we randomize within a rolling window over them)
-
+        randomizedchunks.clear();
         randomizedchunks.reserve(numChunks);
-        foreach_index (k, randomizedchunkrefs)
-            randomizedchunks.push_back (chunk (
-                randomizedchunkrefs[k],
-                randomizedchunkrefs[k] - allchunks[0].begin(), 
-                randomizedchunks.empty() ? 0 : randomizedchunks.back().utteranceposend(),
-                randomizedchunks.empty() ? sweepts : randomizedchunks.back().globalte()));
+        for (size_t k = 0, t = sweepts, pos = 0; k < numChunks; k++)
+        {
+            const size_t originalChunkIndex = randomizedChunkIndices[k];
+            const auto & chunkdata = allchunks[0][originalChunkIndex];
+            const size_t numutterances = chunkdata.numutterances();
+            const size_t numframes = chunkdata.totalframes;
+            randomizedchunks.push_back(chunk(
+                originalChunkIndex,
+                numutterances,
+                numframes,
+                pos,
+                t));
+            t += numframes;
+            pos += numutterances;
+        }
 
         assert (randomizedchunks.size() == numChunks);
         assert (randomizedchunks.empty() || (randomizedchunks.back().utteranceposend() == numutterances && randomizedchunks.back().globalte() == sweepts + _totalframes));
@@ -129,13 +133,10 @@ namespace msra { namespace dbn {
         foreach_index (k, randomizedchunks) // TODO: this really cries for iterating using iterators!
         {
             chunk & chunk = randomizedchunks[k];
-            for (size_t i = 0; i < chunk.numutterances(); i++)  // loop over utterances in this chunk
+            size_t numsequences = framemode ? chunk.numframes : chunk.numutterances;
+            for (size_t i = 0; i < numsequences; i++)
             {
-                size_t numsequences = framemode ? chunk.getchunkdata().numframes(i) : 1;
-                for (size_t m = 0; m < numsequences; m++)
-                {
-                    positionchunkwindows.push_back(randomizedchunks.begin() + k);
-                }
+                positionchunkwindows.push_back(randomizedchunks.begin() + k);
             }
         }
         assert(positionchunkwindows.size() == (framemode ? _totalframes : numutterances));
@@ -147,12 +148,13 @@ namespace msra { namespace dbn {
         foreach_index (k, randomizedchunks)
         {
             chunk & chunk = randomizedchunks[k];
-            for (size_t i = 0; i < chunk.numutterances(); i++)  // loop over utterances in this chunk
+            for (size_t i = 0; i < chunk.numutterances; i++)  // loop over utterances in this chunk
             {
-                size_t numsequences = framemode ? chunk.getchunkdata().numframes(i) : 1;
+                const auto & chunkdata = allchunks[0][chunk.originalChunkIndex];
+                size_t numsequences = framemode ? chunkdata.numframes(i) : 1;
                 for (size_t m = 0; m < numsequences; m++)
                 {
-                    randomizedsequencerefs.push_back (sequenceref /* utteranceref */ (k, i, m));
+                    randomizedsequencerefs.push_back(sequenceref(k, i, m));
                 }
             }
         }
@@ -227,9 +229,10 @@ namespace msra { namespace dbn {
             }
             else
             {
-                uttref.numframes = randomizedchunks[uttref.chunkindex].getchunkdata().numframes (uttref.utteranceindex);
+                const size_t originalChunkIndex = randomizedchunks[uttref.chunkindex].originalChunkIndex;
+                const auto & chunkdata = allchunks[0][originalChunkIndex];
+                uttref.numframes = chunkdata.numframes(uttref.utteranceindex);
             }
-
 
             t = uttref.globalte();
         }
@@ -262,8 +265,8 @@ namespace msra { namespace dbn {
             const size_t poswindowbegin = chunk.windowbegin;
             const size_t poswindowend = chunk.windowend;
 
-            const size_t numutt = chunk.numutterances();
-            const auto & chunkdata = chunk.getchunkdata();  // for numframes
+            const size_t numutt = chunk.numutterances;
+            const auto & chunkdata = allchunks[0][chunk.originalChunkIndex];
             for (size_t k = 0; k < numutt; k++)
             {
                 const size_t n = framemode ? chunkdata.numframes(k) : 1;
