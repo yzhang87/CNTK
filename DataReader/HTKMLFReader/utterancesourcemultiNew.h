@@ -736,20 +736,15 @@ public:
             const size_t sweepte = sweepts + _totalframes;       // and its end
             const size_t globalte = min (globalts + framesrequested, sweepte);  // we return as much as requested, but not exceeding sweep end
             mbframes = globalte - globalts;        // that's our mb size
-
-            // determine window range
-            // We enumerate all frames--can this be done more efficiently?
-            const size_t firstchunk = rand->chunkForFramePos (globalts);
-            const size_t lastchunk = rand->chunkForFramePos (globalte-1);
-
-            assert(lastchunk <= firstchunk + 1); // shouldn't really cover more than two chunks...?
-            const size_t windowbegin = rand->getChunkWindowBegin(firstchunk);
-            const size_t windowend = rand->getChunkWindowEnd(lastchunk);
             const size_t numChunks = allchunks[0].size();
             const size_t numStreams = allchunks.size();
+
+            // Determine window range
+            const size_t windowbegin = rand->getSequenceWindowBegin(globalts);
+            const size_t windowend = rand->getSequenceWindowEnd(globalte - 1);
             if (verbosity > 0)
                 fprintf (stderr, "getbatch: getting randomized frames [%d..%d] (%d frames out of %d requested) in sweep %d; chunks [%d..%d] -> chunk window [%d..%d)\n",
-                     (int)globalts, (int)globalte, (int)mbframes, (int)framesrequested, (int)sweep, (int)firstchunk, (int)lastchunk, (int)windowbegin, (int)windowend);
+                     (int)globalts, (int)globalte, (int)mbframes, (int)framesrequested, (int)sweep, 42, 42, /* TODO (int)firstchunk, (int)lastchunk, */ (int)windowbegin, (int)windowend);
             // release all data outside, and page in all data inside
             for (size_t k = 0; k < windowbegin; k++)
                 releaserandomizedchunk (k);

@@ -257,22 +257,6 @@ namespace msra { namespace dbn {
             const size_t globalts,
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
 
-        // Find (randomized) chunk index for a given frame position
-        // TODO rename
-        size_t chunkForFramePos(const size_t t) const
-        {
-            auto iter = std::lower_bound(
-                randomizedchunks.begin(),
-                randomizedchunks.end(),
-                t,
-                [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
-            assert(iter != randomizedchunks.end());
-            const size_t chunkindex = iter - randomizedchunks.begin();
-            if (t < randomizedchunks[chunkindex].globalts || t >= randomizedchunks[chunkindex].globalte())
-                LogicError("chunkForFramePos: dude, learn STL!");
-            return chunkindex;
-        }
-
         size_t sequenceIndexForFramePos(const size_t t) const
         {
             auto positer = randomizedutteranceposmap.find(t);
@@ -280,8 +264,6 @@ namespace msra { namespace dbn {
                 LogicError("sequenceIndexForFramePos: invalid 'globalts' parameter; must match an existing utterance boundary");
             return positer->second;
         }
-
-        // TODO chunkForFramePos(); getChunkWindow{Begin,End}() should be replaced by getSequenceWindow{Begin,End}()
 
         size_t getOriginalChunkIndex(size_t randomizedChunkIndex) const
         {
