@@ -155,6 +155,7 @@ namespace msra { namespace dbn {
         {
             // the underlying chunk (as a non-indexed reference into the chunk set)
             std::vector<utterancechunkdata>::const_iterator uttchunkdata;
+            size_t originalChunkIndex;
             const utterancechunkdata & getchunkdata() const { return *uttchunkdata; }
             size_t numutterances() const { return uttchunkdata->numutterances(); }
             size_t numframes() const { return uttchunkdata->totalframes; }
@@ -172,9 +173,11 @@ namespace msra { namespace dbn {
             size_t windowbegin;         // randomizedchunk index of earliest chunk that utterances in here can be randomized with
             size_t windowend;           // and end index [windowbegin, windowend)
             chunk(std::vector<utterancechunkdata>::const_iterator uttchunkdata,
+                size_t originalChunkIndex,
                 size_t utteranceposbegin,
                 size_t globalts)
                 : uttchunkdata(uttchunkdata)
+                , originalChunkIndex(originalChunkIndex)
                 , utteranceposbegin(utteranceposbegin)
                 , globalts(globalts) {}
         };
@@ -262,18 +265,18 @@ namespace msra { namespace dbn {
                 randomizedchunks[0].end(),
                 t,
                 [&](const chunk & chunk, size_t t) { return chunk.globalte() <= t; });
+            assert(iter != randomizedchunks[0].end());
             const size_t chunkindex = iter - randomizedchunks[0].begin();
             if (t < randomizedchunks[0][chunkindex].globalts || t >= randomizedchunks[0][chunkindex].globalte())
                 LogicError("chunkForFramePos: dude, learn STL!");
             return chunkindex;
         }
 
-        // TODO instead give back original chunk index, drop the streamIndex
-        const utterancechunkdata & getChunkData(size_t streamIndex, size_t randomizedChunkIndex)
+        size_t getOriginalChunkIndex(size_t randomizedChunkIndex)
         {
-            assert(streamIndex < randomizedchunks.size());
+            const size_t streamIndex = 0;
             assert(randomizedChunkIndex < randomizedchunks[streamIndex].size());
-            return randomizedchunks[streamIndex][randomizedChunkIndex].getchunkdata();
+            return randomizedchunks[streamIndex][randomizedChunkIndex].originalChunkIndex;
         }
 
         size_t getChunkWindowBegin(size_t randomizedChunkIndex)

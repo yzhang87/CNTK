@@ -36,7 +36,6 @@ namespace msra { namespace dbn {
         // TODO allchunks / utterancechunkdata: wants to know:
         // # chunks, # streams, utterances per chunk, frames per chunk.
         // For checks: length of an utterance
-        // For getChunkData - returns reference
         const size_t sweep = globalts / _totalframes;    // which sweep (this determines randomization)
         if (sweep == currentsweep)                       // already got this one--nothing to do
             return sweep;
@@ -81,6 +80,7 @@ namespace msra { namespace dbn {
             foreach_index (k, randomizedchunkrefs[i])
                 randomizedchunks[i].push_back (chunk (
                     randomizedchunkrefs[i][k],
+                    randomizedchunkrefs[i][k] - allchunks[i].begin(), 
                     randomizedchunks[i].empty() ? 0 : randomizedchunks[i].back().utteranceposend(),
                     randomizedchunks[i].empty() ? sweepts : randomizedchunks[i].back().globalte()));
 
