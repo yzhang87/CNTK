@@ -416,7 +416,7 @@ namespace msra { namespace dbn {
         // a separate second call to get the rest. In trainlayer(), the one
         // sweep-boundary-spanning mini-batch will simply be shortened.
         // This function is NOT thread-safe (due to caching of random sequence).
-        bool getbatch (const size_t globalts, const size_t framesrequested, msra::dbn::matrix & feat, std::vector<size_t> & uids,
+        void getbatch (const size_t globalts, const size_t framesrequested, msra::dbn::matrix & feat, std::vector<size_t> & uids,
             std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts, 
             std::vector<shared_ptr<const latticesource::latticepair>> & latticepairs)
         {
@@ -439,7 +439,7 @@ namespace msra { namespace dbn {
 
             // page in the needed range of frames
             const size_t extent = augmentationextent (frames.dim(), vdim);
-            bool readfromdisk = frames.require (randomordering.bounds (max (ts, extent) - extent, te + 1 + extent));
+            frames.require (randomordering.bounds (max (ts, extent) - extent, te + 1 + extent));
 
             // generate features and uids
             feat.resize (vdim, te - ts);    // note: special mode vdim == 0 means no features to be loaded
@@ -459,10 +459,9 @@ namespace msra { namespace dbn {
                     uids[t-ts] = classids[trand];
             }
             timegetbatch = timergetbatch;
-            return readfromdisk;
         }
 
-        bool getbatch (const size_t globalts, const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
+        void getbatch (const size_t globalts, const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
             std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts, 
 			std::vector<shared_ptr<const latticesource::latticepair>> & latticepairs, std::vector<std::vector<size_t>> & sentendmark,
 			std::vector<std::vector<size_t>> & phoneboundaries)
@@ -474,7 +473,7 @@ namespace msra { namespace dbn {
             //latticepairs.resize(1);
 			sentendmark.resize(1);
 			phoneboundaries.resize(1);
-            return getbatch(globalts, framesrequested, feat[0], uids[0], transcripts, latticepairs);
+            getbatch(globalts, framesrequested, feat[0], uids[0], transcripts, latticepairs);
         }
 
         double gettimegetbatch () { return timegetbatch;}
@@ -742,7 +741,7 @@ namespace msra { namespace dbn {
         // a separate second call to get the rest. In trainlayer(), the one
         // sweep-boundary-spanning mini-batch will simply be shortened.
         // This function is NOT thread-safe (due to caching of random sequence).
-        bool getbatch (const size_t globalts, const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
+        void getbatch (const size_t globalts, const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
             std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts, 
 			std::vector<shared_ptr<const latticesource::latticepair>> & latticepairs, std::vector<std::vector<size_t>> & sentendmark,
 			std::vector<std::vector<size_t>> & phoneboundaries)
@@ -813,12 +812,9 @@ namespace msra { namespace dbn {
             }
 
             (nreadfromdisk==feat.size()) ? readfromdisk = true : readfromdisk = false;
-
-            return readfromdisk;
-
         }
 
-        bool getbatch (const size_t /*globalts*/, const size_t /*framesrequested*/, msra::dbn::matrix & /*feat*/, std::vector<size_t> & /*uids*/,
+        void getbatch (const size_t /*globalts*/, const size_t /*framesrequested*/, msra::dbn::matrix & /*feat*/, std::vector<size_t> & /*uids*/,
             std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & /*transcripts*/, 
             std::vector<shared_ptr<const latticesource::latticepair>> & /*latticepairs*/)
         {

@@ -31,6 +31,7 @@ typedef unsigned int UNINT32;
 
 #include "TimerUtility.h"
 #include "Utils.h"
+#include "Bundler.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -403,7 +404,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_lattices.reset(new msra::dbn::latticesource(latticetocs, m_hset.getsymmap()));
 
             // now get the frame source. This has better randomization and doesn't create temp files
-            m_frameSource.reset(new msra::dbn::minibatchutterancesourcemulti(infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true));
+            m_frameSource.reset(new msra::dbn::Bundler(infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true));
             m_frameSource->setverbosity(m_verbosity);
         }
         else

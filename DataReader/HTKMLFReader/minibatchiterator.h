@@ -34,12 +34,12 @@ public:
     //  - lattices are returned as a shared_ptr
     // Thus, getbatch() can be called in a thread-safe fashion, allowing for a 'minibatchsource' implementation that wraps another with a read-ahead thread.
     // Return value is 'true' if it did read anything from disk, and 'false' if data came only from RAM cache. This is used for controlling the read-ahead thread.
-    virtual bool getbatch (const size_t globalts,
+    virtual void getbatch (const size_t globalts,
                            const size_t framesrequested, msra::dbn::matrix & feat, std::vector<size_t> & uids,
                            std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
                            std::vector<shared_ptr<const latticesource::latticepair>> & lattices) = 0;
     // alternate (updated) definition for multiple inputs/outputs - read as a vector of feature matrixes or a vector of label strings
-    virtual bool getbatch (const size_t globalts,
+    virtual void getbatch (const size_t globalts,
                            const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
                            std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
                            std::vector<shared_ptr<const latticesource::latticepair>> & lattices, std::vector<std::vector<size_t>> & sentendmark,
@@ -47,7 +47,7 @@ public:
     // getbatch() overload to support subsetting of mini-batches for parallel training
     // Default implementation does not support subsetting and throws an exception on
     // calling this overload with a numsubsets value other than 1.
-    virtual bool getbatch(const size_t globalts,
+    virtual void getbatch(const size_t globalts,
                           const size_t framesrequested, const size_t subsetnum, const size_t numsubsets, size_t & framesadvanced,
                           std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
                           std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
@@ -55,10 +55,8 @@ public:
 						  std::vector<std::vector<size_t>> & phoneboundaries)
     {
         assert((subsetnum == 0) && (numsubsets == 1) && !supportsbatchsubsetting()); subsetnum; numsubsets;
-        bool retVal = getbatch(globalts, framesrequested, feat, uids, transcripts, lattices,sentendmark, phoneboundaries);
+        getbatch(globalts, framesrequested, feat, uids, transcripts, lattices,sentendmark, phoneboundaries);
         framesadvanced = feat[0].cols();
-
-        return retVal;
     }
 
     virtual bool supportsbatchsubsetting() const

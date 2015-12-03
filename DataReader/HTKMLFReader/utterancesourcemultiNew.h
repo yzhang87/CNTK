@@ -528,7 +528,7 @@ public:
     //  - load only a subset of blocks from the disk
     //  - skip frames/utterances in not-loaded blocks in the returned data
     //  - 'framesadvanced' will still return the logical #frames; that is, by how much the global time index is advanced
-    bool getbatch(const size_t globalts, const size_t framesrequested,
+    void getbatch(const size_t globalts, const size_t framesrequested,
                   const size_t subsetnum, const size_t numsubsets, size_t & framesadvanced,
                   std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
                   std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
@@ -848,8 +848,6 @@ public:
 
         // this is the number of frames we actually moved ahead in time
         framesadvanced = mbframes;
-
-        return readfromdisk;
     }
 
     bool supportsbatchsubsetting() const override
@@ -857,20 +855,20 @@ public:
         return true;
     }
 
-    bool getbatch(const size_t globalts,
+    void getbatch(const size_t globalts,
                   const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
                   std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
                   std::vector<shared_ptr<const latticesource::latticepair>> & lattices, std::vector<std::vector<size_t>> & sentendmark,
                   std::vector<std::vector<size_t>> & phoneboundaries)
     {
         size_t dummy;
-        return getbatch(globalts, framesrequested, 0, 1, dummy, feat, uids, transcripts, lattices,sentendmark,phoneboundaries);
+        getbatch(globalts, framesrequested, 0, 1, dummy, feat, uids, transcripts, lattices,sentendmark,phoneboundaries);
     }
 
     double gettimegetbatch() { return timegetbatch;}
 
     // alternate (updated) definition for multiple inputs/outputs - read as a vector of feature matrixes or a vector of label strings
-    bool getbatch (const size_t /*globalts*/,
+    void getbatch (const size_t /*globalts*/,
                    const size_t /*framesrequested*/, msra::dbn::matrix & /*feat*/, std::vector<size_t> & /*uids*/,
                    std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & /*transcripts*/,
                    std::vector<shared_ptr<const latticesource::latticepair>> & /*latticepairs*/)
