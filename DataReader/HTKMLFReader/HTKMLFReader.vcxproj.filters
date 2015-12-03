@@ -65,6 +65,7 @@
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Bundler.h" />
     <ClInclude Include="Timeline.h" />
+    <ClInclude Include="ScpDataDeserializer.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />

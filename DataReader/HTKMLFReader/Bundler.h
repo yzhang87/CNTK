@@ -52,10 +52,10 @@ namespace msra {
             std::vector<unique_ptr<biggrowablevector<HMMIDTYPE>>> m_phoneboundaries;
             bool issupervised() const { return !m_classids.empty(); }
 
-            size_t numutterances;           // total number of utterances
-            size_t _totalframes;            // total frames (same as classids.size() if we have labels)
-            double timegetbatch;            // [v-hansu] for time measurement
-            size_t chunksinram;             // (for diagnostics messages)
+            size_t m_numutterances;           // total number of utterances
+            size_t m_totalframes;            // total frames (same as classids.size() if we have labels)
+            double m_timegetbatch;            // [v-hansu] for time measurement
+            size_t m_chunksinram;             // (for diagnostics messages)
 
 
             std::unique_ptr<BlockRandomizer> rand;
@@ -85,7 +85,7 @@ namespace msra {
                 }
                 else if (numreleased == numStreams)
                 {
-                    chunksinram--;
+                    m_chunksinram--;
                 }
                 return;
             }
@@ -124,7 +124,7 @@ namespace msra {
                             chunkdata.requiredata(m_featkind[m], m_featdim[m], m_sampperiod[m], m_lattices, m_verbosity);
                         });
                     }
-                    chunksinram++;
+                    m_chunksinram++;
                     return true;
                 }
                 else
@@ -200,7 +200,7 @@ namespace msra {
                 std::vector<size_t> vdim, std::vector<size_t> udim, std::vector<size_t> leftcontext, std::vector<size_t> rightcontext, size_t randomizationrange,
                 const latticesource & lattices, const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & allwordtranscripts, const bool framemode)
                 : m_vdim(vdim), m_leftcontext(leftcontext), m_rightcontext(rightcontext), m_sampperiod(0), m_featdim(0),
-                m_lattices(lattices), m_allwordtranscripts(allwordtranscripts), m_framemode(framemode), chunksinram(0), timegetbatch(0), m_verbosity(2)
+                m_lattices(lattices), m_allwordtranscripts(allwordtranscripts), m_framemode(framemode), m_chunksinram(0), m_timegetbatch(0), m_verbosity(2)
                 // [v-hansu] change framemode (lattices.empty()) into framemode (false) to run utterance mode without lattice
                 // you also need to change another line, search : [v-hansu] comment out to run utterance mode without lattice
             {
@@ -208,7 +208,7 @@ namespace msra {
                 size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
                 size_t nolat = 0;                       // number of entries missing in lattice archive (diagnostics)
                 std::vector<size_t> numclasses;                  // number of output classes as found in the label file (diagnostics)
-                _totalframes = 0;
+                m_totalframes = 0;
                 wstring key;
                 size_t numutts = 0;
 
@@ -384,7 +384,7 @@ namespace msra {
                                     if (uttisvalid[i])
                                     {
                                         utteranceset.push_back(std::move(utterance));
-                                        _totalframes += uttframes;
+                                        m_totalframes += uttframes;
                                         // then parse each mlf if the durations are consistent
                                         foreach_index(j, labels)
                                         {
@@ -421,9 +421,9 @@ namespace msra {
                                             m_classids[j]->push_back((CLASSIDTYPE)-1);  // append a boundary marker marker for checking
                                             m_phoneboundaries[j]->push_back((HMMIDTYPE)-1); // append a boundary marker marker for checking
 
-                                            if (!labels[j].empty() && m_classids[j]->size() != _totalframes + utteranceset.size())
+                                            if (!labels[j].empty() && m_classids[j]->size() != m_totalframes + utteranceset.size())
                                                 LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());
-                                            assert(labels[j].empty() || m_classids[j]->size() == _totalframes + utteranceset.size());
+                                            assert(labels[j].empty() || m_classids[j]->size() == m_totalframes + utteranceset.size());
                                         }
                                     }
                                 }
@@ -431,7 +431,7 @@ namespace msra {
                                 {
                                     assert(m_classids.empty() && labels.empty());
                                     utteranceset.push_back(std::move(utterance));
-                                    _totalframes += uttframes;
+                                    m_totalframes += uttframes;
                                 }
                             }
                             else
@@ -445,7 +445,7 @@ namespace msra {
                     else
                         assert(utteranceset.size() == utterancesetsize);
 
-                    fprintf(stderr, "feature set %d: %d frames in %d out of %d utterances\n", m, (int)_totalframes, (int)utteranceset.size(), (int)infiles[m].size());
+                    fprintf(stderr, "feature set %d: %d frames in %d out of %d utterances\n", m, (int)m_totalframes, (int)utteranceset.size(), (int)infiles[m].size());
 
                     if (!labels.empty()){
                         foreach_index(j, labels){
@@ -478,7 +478,7 @@ namespace msra {
                     std::vector<utterancechunkdata> & thisallchunks = m_allchunks[m];
 
                     thisallchunks.resize(0);
-                    thisallchunks.reserve(_totalframes / chunkframes); // This is ignoring I/O for invalid utterances... // TODO round up?
+                    thisallchunks.reserve(m_totalframes / chunkframes); // This is ignoring I/O for invalid utterances... // TODO round up?
 
                     foreach_index(i, utteranceset)
                     {
@@ -492,13 +492,13 @@ namespace msra {
                         currentchunk.push_back(std::move(utteranceset[i]));    // move it out from our temp array into the chunk
                         // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
                     }
-                    numutterances = utteranceset.size();
+                    m_numutterances = utteranceset.size();
                     fprintf(stderr, "minibatchutterancesource: %d utterances grouped into %d chunks, av. chunk size: %.1f utterances, %.1f frames\n",
-                        (int)numutterances, (int)thisallchunks.size(), numutterances / (double)thisallchunks.size(), _totalframes / (double)thisallchunks.size());
+                        (int)m_numutterances, (int)thisallchunks.size(), m_numutterances / (double)thisallchunks.size(), m_totalframes / (double)thisallchunks.size());
                     // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
 
                     // Initialize the block randomizer
-                    rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, _totalframes, numutterances, randomizationrange);
+                    rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, m_totalframes, m_numutterances, randomizationrange);
                 }
             }
 
@@ -539,7 +539,7 @@ namespace msra {
                 bool readfromdisk = false;  // return value: shall be 'true' if we paged in anything
 
                 auto_timer timergetbatch;
-                assert(_totalframes > 0);
+                assert(m_totalframes > 0);
 
                 // update randomization if a new sweep is entered  --this is a complex operation that updates many of the data members used below
                 const size_t sweep = rand->lazyrandomization(globalts, m_allchunks);
@@ -729,8 +729,8 @@ namespace msra {
                 }
                 else
                 {
-                    const size_t sweepts = sweep * _totalframes;         // first global frame index for this sweep
-                    const size_t sweepte = sweepts + _totalframes;       // and its end
+                    const size_t sweepts = sweep * m_totalframes;         // first global frame index for this sweep
+                    const size_t sweepte = sweepts + m_totalframes;       // and its end
                     const size_t globalte = min(globalts + framesrequested, sweepte);  // we return as much as requested, but not exceeding sweep end
                     mbframes = globalte - globalts;        // that's our mb size
 
@@ -762,7 +762,7 @@ namespace msra {
                     std::vector<size_t> subsetsizes(numsubsets, 0);
                     for (size_t i = 0; i < mbframes; i++)   // i is input frame index; j < i in case of MPI/data-parallel sub-set mode
                     {
-                        const size_t framepos = (globalts + i) % _totalframes;  // (for comments, see main loop below)
+                        const size_t framepos = (globalts + i) % m_totalframes;  // (for comments, see main loop below)
                         //const sequenceref & frameref = randomizedframerefs[framepos];
                         const BlockRandomizer::sequenceref & frameref = rand->getSequenceRef(framepos);
                         subsetsizes[frameref.chunkindex % numsubsets]++;
@@ -799,7 +799,7 @@ namespace msra {
                             break;
 
                         // map to time index inside arrays
-                        const size_t framepos = (globalts + j) % _totalframes;  // using mod because we may actually run beyond the sweep for the last call
+                        const size_t framepos = (globalts + j) % m_totalframes;  // using mod because we may actually run beyond the sweep for the last call
                         //const sequenceref & frameref = randomizedframerefs[framepos];
                         const BlockRandomizer::sequenceref & frameref = rand->getSequenceRef(framepos);
 
@@ -845,7 +845,7 @@ namespace msra {
                         currmpinodeframecount++;
                     }
                 }
-                timegetbatch = timergetbatch;
+                m_timegetbatch = timergetbatch;
 
                 // this is the number of frames we actually moved ahead in time
                 framesadvanced = mbframes;
@@ -866,7 +866,7 @@ namespace msra {
                 getbatch(globalts, framesrequested, 0, 1, dummy, feat, uids, transcripts, lattices, sentendmark, phoneboundaries);
             }
 
-            double gettimegetbatch() { return timegetbatch; }
+            double gettimegetbatch() { return m_timegetbatch; }
 
             // alternate (updated) definition for multiple inputs/outputs - read as a vector of feature matrixes or a vector of label strings
             void getbatch(const size_t /*globalts*/,
@@ -883,7 +883,7 @@ namespace msra {
                 //return getbatch(globalts, framesrequested, feat[0], uids[0], transcripts, latticepairs);
             }
 
-            size_t totalframes() const { return _totalframes; }
+            size_t totalframes() const { return m_totalframes; }
 
             // return first valid globalts to ask getbatch() for
             // In utterance mode, the epoch start may fall in the middle of an utterance.
@@ -897,7 +897,7 @@ namespace msra {
                 if (m_framemode)
                     return globalts;
                 // utterance mode
-                assert(globalts >= sweep * _totalframes && globalts < (sweep + 1) * _totalframes); sweep;
+                assert(globalts >= sweep * m_totalframes && globalts < (sweep + 1) * m_totalframes); sweep;
                 // TODO use std::find
                 size_t pos;
                 for (pos = 0; pos < rand->getNumSequences(); pos++)
