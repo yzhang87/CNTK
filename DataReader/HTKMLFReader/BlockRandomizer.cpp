@@ -32,31 +32,6 @@ namespace msra { namespace dbn {
         }
     }
 
-    size_t BlockRandomizer::newLazyRandomize(
-        const size_t globalts,
-        const std::vector<std::vector<utterancechunkdata>> & allchunks)
-    {
-        const size_t sweep = globalts / m_totalframes;    // which sweep (this determines randomization)
-        if (sweep == m_currentsweep)                       // already got this one--nothing to do
-            return sweep;
-
-        m_currentsweep = sweep;
-        if (m_verbosity > 0)
-            fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
-                m_currentsweep, m_framemode ? "frame" : "utterance");
-
-        const size_t sweepts = sweep * m_totalframes;     // first global frame index for this sweep
-
-        auto timeline = BlockRandomizer::getTimelineFromAllchunks(allchunks);
-
-        assert(timelineIsValid(*timeline));
-        assert(allchunks[0].size() == timeline->back().chunkId);
-
-        newRandomize(sweep, sweepts, *timeline);
-
-        return sweep;
-    }
-
     void BlockRandomizer::newRandomize(
         const size_t sweep,
         const size_t sweepts,
@@ -295,15 +270,15 @@ namespace msra { namespace dbn {
         // TODO allchunks / utterancechunkdata: wants to know:
         // # chunks, utterances per chunk, frames per chunk, length of utterances
         const size_t sweep = globalts / m_totalframes;    // which sweep (this determines randomization)
-        if (sweep == m_currentsweep)                       // already got this one--nothing to do
+        if (sweep == m_currentSweep)                       // already got this one--nothing to do
             return sweep;
 
-        m_currentsweep = sweep;
+        m_currentSweep = sweep;
         if (m_verbosity > 0)
             fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
-                m_currentsweep, m_framemode ? "frame" : "utterance");
+                m_currentSweep, m_framemode ? "frame" : "utterance");
 
-        newLazyRandomize(globalts, allchunks); // TODO
+        // newLazyRandomize(globalts, allchunks); // TODO
 
         const size_t sweepts = sweep * m_totalframes;     // first global frame index for this sweep
         const auto & primaryChunks = allchunks[0];
@@ -549,7 +524,7 @@ namespace msra { namespace dbn {
         return sweep;
     }
 
-    bool BlockRandomizer::timelineIsValid(Timeline& timeline)
+    bool BlockRandomizer::timelineIsValid(const Timeline& timeline)
     {
         SequenceDescription previous = {
             static_cast<size_t>(-1),
@@ -592,5 +567,27 @@ namespace msra { namespace dbn {
         }
         return timeline;
     }
+
+    void BlockRandomizer::newLazyRandomize()
+    {
+        if (m_currentSequenceId >= m_randomTimeline.size())
+        {
+            if (m_verbosity > 0)
+                fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
+                    m_currentSweep, m_framemode ? "frame" : "utterance");
+            newRandomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
+            m_currentSequenceId = 0;
+            m_currentSweep++;
+        };
+    }
+
+    std::map<InputId, Sequence> BlockRandomizer::getNextSequence()
+    {
+        newLazyRandomize();
+        assert(m_currentSequenceId < m_randomTimeline.size());
+        const auto & seqDesc = m_randomTimeline[m_currentSequenceId++];
+        // TODO purge maybe
+        return m_sequencer->getSequenceById(seqDesc.id);
+    };
 
 } }

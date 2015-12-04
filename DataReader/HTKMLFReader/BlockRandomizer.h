@@ -20,6 +20,7 @@
 
 namespace msra { namespace dbn {
 
+    // TODO the following should move
     // data store (incl. paging in/out of features and lattices)
     struct utterancedesc            // data descriptor for one utterance
     {
@@ -150,7 +151,11 @@ namespace msra { namespace dbn {
         size_t m_totalframes;
         size_t m_numutterances;
         size_t m_randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
-        size_t m_currentsweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
+        size_t m_currentSweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
+        Microsoft::MSR::CNTK::SequencerPtr m_sequencer;
+        size_t m_currentSequenceId; // position within the current sweep
+        Microsoft::MSR::CNTK::Timeline m_randomTimeline;
+
         // TODO note: numutterances / numframes could also be computed through neighbors
         struct chunk                    // chunk as used in actual processing order (randomized sequence)
         {
@@ -249,9 +254,16 @@ namespace msra { namespace dbn {
             , m_totalframes(totalframes)
             , m_numutterances(numutterances)
             , m_randomizationrange(randomizationrange)
-            , m_currentsweep(SIZE_MAX)
+            , m_currentSweep(SIZE_MAX)
+            , m_currentSequenceId(SIZE_MAX)
+            , m_sequencer(sequencer)
         {
-            sequencer;
+            // TODO new mode
+            if (sequencer != nullptr)
+            {
+                assert(timelineIsValid(sequencer->getTimeline()));
+                // TODO more
+            }
         }
 
         // big long helper to update all cached randomization information
@@ -265,10 +277,7 @@ namespace msra { namespace dbn {
             const size_t globalts,
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
 
-        // TODO temporary
-        size_t newLazyRandomize(
-            const size_t globalts,
-            const std::vector<std::vector<utterancechunkdata>> & allchunks);
+        void newLazyRandomize();
 
         // TODO temporary
         void newRandomize(
@@ -325,7 +334,7 @@ namespace msra { namespace dbn {
             return randomizedsequencerefs[sequenceIndex];
         }
 
-        bool timelineIsValid(Microsoft::MSR::CNTK::Timeline& timeline);
+        bool timelineIsValid(const Microsoft::MSR::CNTK::Timeline& timeline);
 
         std::unique_ptr<Microsoft::MSR::CNTK::Timeline> getTimelineFromAllchunks(
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
@@ -347,11 +356,7 @@ namespace msra { namespace dbn {
         {
         }
 
-        virtual std::map<Microsoft::MSR::CNTK::InputId, Microsoft::MSR::CNTK::Sequence> getNextSequence() override
-        {
-            std::map<Microsoft::MSR::CNTK::InputId, Microsoft::MSR::CNTK::Sequence> dummy;
-            return dummy;
-        };
+        virtual std::map<Microsoft::MSR::CNTK::InputId, Microsoft::MSR::CNTK::Sequence> getNextSequence() override;
     };
 
 } }
