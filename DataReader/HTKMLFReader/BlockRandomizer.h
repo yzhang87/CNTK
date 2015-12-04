@@ -221,7 +221,7 @@ namespace msra { namespace dbn {
     private:
         // TODO rename
         std::vector<sequenceref> randomizedsequencerefs;          // [pos] randomized utterance ids
-        std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table
+        std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table // TODO not valid for new randomizer
 
         struct positionchunkwindow       // chunk window required in memory when at a certain position, for controlling paging
         {
@@ -262,6 +262,7 @@ namespace msra { namespace dbn {
             if (sequencer != nullptr)
             {
                 assert(IsValid(sequencer->getTimeline()));
+                m_randomTimeline.reserve(sequencer->getTimeline().size()); // TODO
                 // TODO more
             }
         }
@@ -287,6 +288,7 @@ namespace msra { namespace dbn {
 
         size_t sequenceIndexForFramePos(const size_t t) const
         {
+            assert(m_sequencer == nullptr); // not valid in new mode
             auto positer = randomizedutteranceposmap.find(t);
             if (positer == randomizedutteranceposmap.end())
                 LogicError("sequenceIndexForFramePos: invalid 'globalts' parameter; must match an existing utterance boundary");
@@ -295,41 +297,48 @@ namespace msra { namespace dbn {
 
         size_t getOriginalChunkIndex(size_t randomizedChunkIndex) const
         {
+            assert(m_sequencer == nullptr); // don't call in new mode
             assert(randomizedChunkIndex < randomizedchunks.size());
             return randomizedchunks[randomizedChunkIndex].originalChunkIndex;
         }
 
         size_t getChunkWindowBegin(size_t randomizedChunkIndex) const
         {
+            assert(m_sequencer == nullptr); // don't call in new mode
             assert(randomizedChunkIndex < randomizedchunks.size());
             return randomizedchunks[randomizedChunkIndex].windowbegin;
         }
 
         size_t getChunkWindowEnd(size_t randomizedChunkIndex) const
         {
+            assert(m_sequencer == nullptr); // don't call in new mode
             assert(randomizedChunkIndex < randomizedchunks.size());
             return randomizedchunks[randomizedChunkIndex].windowend;
         }
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
+            assert(m_sequencer == nullptr); // don't call in new mode
             assert(sequenceIndex < positionchunkwindows.size());
             return positionchunkwindows[sequenceIndex].windowbegin();
         }
 
         size_t getSequenceWindowEnd(size_t sequenceIndex) const
         {
+            assert(m_sequencer == nullptr); // don't call in new mode
             assert(sequenceIndex < positionchunkwindows.size());
             return positionchunkwindows[sequenceIndex].windowend();
         }
 
         size_t getNumSequences() const
         {
+            assert(m_sequencer == nullptr); // don't call in new mode
             return randomizedsequencerefs.size();
         }
 
         const sequenceref & getSequenceRef(size_t sequenceIndex) const
         {
+            assert(m_sequencer == nullptr); // don't call in new mode
             assert(sequenceIndex < randomizedsequencerefs.size());
             return randomizedsequencerefs[sequenceIndex];
         }
