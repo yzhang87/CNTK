@@ -524,7 +524,7 @@ namespace msra { namespace dbn {
         return sweep;
     }
 
-    bool BlockRandomizer::timelineIsValid(const Timeline& timeline)
+    bool BlockRandomizer::IsValid(const Timeline& timeline) const
     {
         SequenceDescription previous = {
             static_cast<size_t>(-1),
@@ -542,7 +542,7 @@ namespace msra { namespace dbn {
                 previous = current;
                 return result;
             });
-        return it != timeline.end();
+        return it == timeline.end();
     }
 
     std::unique_ptr<Timeline> BlockRandomizer::getTimelineFromAllchunks(const std::vector<std::vector<utterancechunkdata>> & allchunks)

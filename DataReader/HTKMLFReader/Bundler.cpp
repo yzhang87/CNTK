@@ -355,12 +355,27 @@ namespace msra { namespace dbn {
         {
             foreach_index(j, chunks[i].utteranceset)
             {
-                SequenceDescription description;
-                description.id = sequenceId++;
-                description.chunkId = i;
-                description.numberOfSamples = chunks[i].utteranceset[j].numframes();
-                m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
-                m_timeline.push_back(description);
+                if (framemode)
+                {
+                    for (size_t k = 0; k < chunks[i].utteranceset[j].numframes(); ++k)
+                    {
+                        SequenceDescription description;
+                        description.id = sequenceId++;
+                        description.chunkId = i;
+                        description.numberOfSamples = 1;
+                        m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
+                        m_timeline.push_back(description);
+                    }
+                }
+                else
+                {
+                    SequenceDescription description;
+                    description.id = sequenceId++;
+                    description.chunkId = i;
+                    description.numberOfSamples = chunks[i].utteranceset[j].numframes();
+                    m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
+                    m_timeline.push_back(description);
+                }
             }
         }
     }

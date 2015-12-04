@@ -261,7 +261,7 @@ namespace msra { namespace dbn {
             // TODO new mode
             if (sequencer != nullptr)
             {
-                assert(timelineIsValid(sequencer->getTimeline()));
+                assert(IsValid(sequencer->getTimeline()));
                 // TODO more
             }
         }
@@ -334,7 +334,7 @@ namespace msra { namespace dbn {
             return randomizedsequencerefs[sequenceIndex];
         }
 
-        bool timelineIsValid(const Microsoft::MSR::CNTK::Timeline& timeline);
+        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
 
         std::unique_ptr<Microsoft::MSR::CNTK::Timeline> getTimelineFromAllchunks(
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
