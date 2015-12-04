@@ -404,7 +404,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_lattices.reset(new msra::dbn::latticesource(latticetocs, m_hset.getsymmap()));
 
             // now get the frame source. This has better randomization and doesn't create temp files
-            m_frameSource.reset(new msra::dbn::Bundler(infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true));
+            m_frameSource.reset(new msra::dbn::Bundler(infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true, m_featureFrameDescriptions, m_labelFrameDescriptions, m_inputs, m_nameToId, m_featureNameToIdMap, m_labelNameToIdMap, m_elementSize));
             m_frameSource->setverbosity(m_verbosity);
         }
         else
@@ -418,6 +418,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.workerRank < config.numberOfWorkers);
         assert((config.workerRank == 0) && (config.numberOfWorkers == 1));
         size_t requestedEpochSamples = config.totalSize;
+
+        m_frameSource->SetNumberOfWorkers(config.numberOfWorkers);
+        m_frameSource->SetWorkerRank(config.workerRank);
 
         m_mbNumTimeSteps = config.minibatchSize;       // note: ignored in frame mode and full-sequence mode
         m_numSeqsPerMB = m_numSeqsPerMBForAllEpochs[config.index];

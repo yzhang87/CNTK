@@ -69,7 +69,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class Sequencer
     {
     public:
-        virtual Timeline& getTimeline() const = 0;
+        virtual const Timeline& getTimeline() const = 0;
         virtual std::vector<InputDescriptionPtr> getInputs() const = 0;
         virtual std::map<InputId, Sequence> getSequenceById(size_t id) = 0;
         virtual ~Sequencer() = 0 {};

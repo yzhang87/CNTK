@@ -10,6 +10,7 @@
 #include "utterancesourcemultiNew.h"
 #include "minibatchiterator.h"
 #include <inner_interfaces.h>
+#include "Bundler.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -56,7 +57,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int m_verbosity;
         bool m_partialMinibatch;
         unique_ptr<msra::dbn::minibatchiterator> m_mbiter;
-        unique_ptr<msra::dbn::minibatchsource> m_frameSource;
+        unique_ptr<msra::dbn::Bundler> m_frameSource;
         size_t m_mbNumTimeSteps;                // number of time steps  to fill/filled (note: for frame randomization, this the #frames, and not 1 as later reported)
         vector<size_t> m_numFramesToProcess;    // [seq index] number of frames available (left to return) in each parallel sequence
         vector<size_t> m_numValidFrames;        // [seq index] valid #frames in each parallel sequence. Frames (s, t) with t >= m_numValidFrames[s] are NoInput.
