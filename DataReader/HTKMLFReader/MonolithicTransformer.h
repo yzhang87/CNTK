@@ -67,6 +67,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         vector<size_t> m_numValidFrames;        // [seq index] valid #frames in each parallel sequence. Frames (s, t) with t >= m_numValidFrames[s] are NoInput.
 
         std::map<std::wstring, size_t> m_nameToId;
+
+        unique_ptr<Transformer> m_transformer;
     };
 
     typedef std::shared_ptr<MonolithicTransformer> MonolithicTransformerPtr;
