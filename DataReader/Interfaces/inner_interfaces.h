@@ -28,7 +28,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     struct SequenceDescription
     {
         size_t id;
-        size_t length;
+        size_t numberOfSamples;
+        size_t chunkId;
     };
 
     // Defines a sequences, which consists of sequences description and a number
@@ -38,7 +39,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         SequenceDescription* description;
         FrameDescription* frameDescription;
         void* data;
-        size_t numberOfFrames;
+        size_t numberOfFrames; // TODO -> change to numberOfSamples? also elsewhere?
     };
 
     // Low-level input interface (for file, network, etc.).

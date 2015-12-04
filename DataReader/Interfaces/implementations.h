@@ -69,10 +69,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     typedef std::shared_ptr<HtkMlfBundler> HtkMlfBundlerPtr;
 
-    class ChunkRandomizer : public Randomizer
+    class ChunkRandomizer : public Randomizer // TODO change name to BlockRandomizer
     {
     public:
-        ChunkRandomizer(SequencerPtr, size_t chunkSize, int seed);
+        ChunkRandomizer(SequencerPtr, size_t chunkSize /* TODO should be windowRangeInSamples */, int seed);
 
         virtual std::vector<InputDescriptionPtr> getInputs() const override;
         virtual std::map<size_t, Sequence> getNextSequence() override;
