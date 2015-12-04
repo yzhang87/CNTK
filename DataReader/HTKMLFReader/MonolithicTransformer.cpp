@@ -38,9 +38,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     MonolithicTransformer::MonolithicTransformer(const ConfigParameters & readerConfig, size_t elementSize)
         : m_elementSize(elementSize)
     {
-        intargvector numberOfuttsPerMinibatchForAllEpochs =
-            readerConfig(L"nbruttsineachrecurrentiter", ConfigParameters::Array(intargvector(vector<int>{ 1 })));
-
         m_noData = false;
 
         wstring command(readerConfig(L"action", L"")); //look up in the config for the master command to determine whether we're writing output (inputs only) or training/evaluating (inputs and outputs)
