@@ -942,6 +942,11 @@ namespace msra { namespace dbn {
             tspos += uttref.numframes;
         }
 
+        if (tspos == 0)
+        {
+            return result;
+        }
+
         // resize feat and uids
         // eldak:s should return phone boundaries and sentendmark lattices transcripts etc.
         //feat.resize(vdim.size());
