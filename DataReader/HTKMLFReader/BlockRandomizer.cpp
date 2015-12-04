@@ -113,9 +113,9 @@ namespace msra { namespace dbn {
 
         // This completes chunk randomization.
         // Now set up the following members for sequence randomization (i.e., utterance or frame):
-        //  - positionchunkwindows
-        //  - newTimeline - this is the data structure being shuffled
-        //  - randomizedutteranceposmap
+        //  - positionchunkwindows // TODO not anymore
+        //  - m_randomTimeline - this is the data structure being shuffled
+        //  - randomizedutteranceposmap // TODO not anymore
 
         // TODO adapt comments below. TODO test in utterance mode
         // We will now introduce the concept of utterance *position*.
@@ -147,24 +147,23 @@ namespace msra { namespace dbn {
         }
         assert(positionchunkwindows.size() == numsequences);
 
-        // TODO instead just take a copy
-
-        Timeline newTimeline = timeline;
-        assert(newTimeline.size() == timeline.size()); // TODO we might consider only keeping the permutation
+        // Take a fresh copy
+        assert(timeline.size() <= m_randomTimeline.capacity()); // capacity already reserved
+        m_randomTimeline = timeline;
 
         // TODO skipped generation of randomizedsequencerefs[], work on timeline copy instead
 
         // check we got those setup right
-        foreach_index (i, newTimeline)
+        foreach_index (i, m_randomTimeline)
         {
-            auto & seqDesc = newTimeline[i];
+            auto & seqDesc = m_randomTimeline[i];
             assert(positionchunkwindows[i].isvalidforthisposition(seqDesc)); seqDesc;
         }
 
-        // TODO We now randomly shuffle newTimeLine, while considering the
+        // TODO We now randomly shuffle m_randomTimeline, while considering the
         // constraints of what chunk range needs to be in memory
         srand ((unsigned int) sweep + 1);
-        foreach_index (i, newTimeline)
+        foreach_index (i, m_randomTimeline)
         {
             // get valid randomization range, expressed in chunks
             const size_t windowbegin = positionchunkwindows[i].windowbegin();
@@ -200,15 +199,15 @@ namespace msra { namespace dbn {
                 // This is guaranteed for a so-far untouched utterance, but both i and j may have been touched by a previous swap.
 
                 // We want to use the utterance previously referenced at utterance position j at position i. Is that allowed?
-                if (!positionchunkwindows[i].isvalidforthisposition(newTimeline[j]))
+                if (!positionchunkwindows[i].isvalidforthisposition(m_randomTimeline[j]))
                     continue;   // nope --try another
 
                 // Likewise may we use the utterance previously referenced at utterance position i at position j?
-                if (!positionchunkwindows[j].isvalidforthisposition(newTimeline[i]))
+                if (!positionchunkwindows[j].isvalidforthisposition(m_randomTimeline[i]))
                     continue;   // nope --try another
 
                 // yep--swap them
-                ::swap (newTimeline[i], newTimeline[j]); // TODO old swap was perhaps more efficient
+                ::swap (m_randomTimeline[i], m_randomTimeline[j]); // TODO old swap was perhaps more efficient
                 break;
             }
         }
@@ -216,10 +215,10 @@ namespace msra { namespace dbn {
         // TODO skipped redoing the global timeline (starting from sweepts)
 
         // verify that we got it right (I got a knot in my head!)
-        foreach_index (i, newTimeline)
+        foreach_index (i, m_randomTimeline)
         {
             // get utterance referenced at this position
-            const auto & seqDesc = newTimeline[i];
+            const auto & seqDesc = m_randomTimeline[i];
             // check if it is valid for this position
             if (seqDesc.chunkId < positionchunkwindows[i].windowbegin() || seqDesc.chunkId >= positionchunkwindows[i].windowend())
                 LogicError("lazyrandomization: randomization logic mangled!");
@@ -229,9 +228,9 @@ namespace msra { namespace dbn {
         randomizedutteranceposmap.clear();      // [globalts] -> pos lookup table
         // TODO skipped, we don't have an updated timeline
 #if 0
-        foreach_index (pos, newTimeline)
+        foreach_index (pos, m_randomTimeline)
         {
-            auto & seqDesc = newTimeline[pos];
+            auto & seqDesc = m_randomTimeline[pos];
             randomizedutteranceposmap[seqDesc.sequenceId] = (size_t) pos;
         }
 
