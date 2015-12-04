@@ -59,11 +59,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int m_verbosity;
         bool m_partialMinibatch;
         unique_ptr<msra::dbn::minibatchiterator> m_mbiter;
-        unique_ptr<msra::dbn::Bundler> m_frameSource;
+        std::shared_ptr<msra::dbn::Bundler> m_frameSource;
 
         std::map<std::wstring, size_t> m_nameToId;
 
-        unique_ptr<Transformer> m_transformer;
+        TransformerPtr m_transformer;
     };
 
     typedef std::shared_ptr<MonolithicTransformer> MonolithicTransformerPtr;
