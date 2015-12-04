@@ -414,6 +414,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             sequences.push_back(sequence);
         }
 
+        // eldak: this will fail when no data is returned for the worker...
         if (sequences.size() != this->m_requestedMBSize)
         {
             if (parallelSequenceNumber == 0)
