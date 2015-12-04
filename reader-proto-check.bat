@@ -23,21 +23,26 @@ if not defined a_nodebug (
     msbuild /m /p:Platform=x64 /p:Configuration=Debug CNTK.sln
     if errorlevel 1 exit /b 1
 
-    .\x64\Debug\UnitTests\ReaderTests.exe -t ReaderTestSuite/HTKMLFReaderSimpleDataLoop
-    if errorlevel 1 exit /b 1
+if not defined a_notests (
+        .\x64\Debug\UnitTests\ReaderTests.exe -t ReaderTestSuite/HTKMLFReaderSimpleDataLoop
+        if errorlevel 1 exit /b 1
+)
 )
 
 if not defined a_norelease (
     msbuild /m /p:Platform=x64 /p:Configuration=Release CNTK.sln
     if errorlevel 1 exit /b 1
 
+if not defined a_notests (
     .\x64\Release\UnitTests\ReaderTests.exe -t ReaderTestSuite/HTKMLFReaderSimpleDataLoop
     if errorlevel 1 exit /b 1
+)
 )
 
 set PATH=%PATH%;%CYGWIN_BIN%
 
 if not defined a_noe2e (
+if not defined a_notests (
 if not defined a_norelease (
     python2.7.exe Tests/TestDriver.py run -d gpu -f release Speech/QuickE2E
     if errorlevel 1 exit /b 1
@@ -52,5 +57,6 @@ if not defined a_nodebug (
 
     python2.7.exe Tests/TestDriver.py run -d cpu -f debug Speech/QuickE2E
     if errorlevel 1 exit /b 1
+)
 )
 )
