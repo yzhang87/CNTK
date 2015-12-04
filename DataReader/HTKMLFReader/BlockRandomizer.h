@@ -16,6 +16,7 @@
 #include "biggrowablevectors.h"
 #include "ssematrix.h"
 #include "unordered_set"
+#include "inner_interfaces.h"
 
 namespace msra { namespace dbn {
 
@@ -228,6 +229,12 @@ namespace msra { namespace dbn {
                 // TODO by construction sequences cannot span chunks (check again)
             }
 
+            bool isvalidforthisposition (const Microsoft::MSR::CNTK::SequenceDescription & sequence) const
+            {
+                return sequence.chunkId >= windowbegin() && sequence.chunkId < windowend(); // check if 'sequence' lives in is in allowed range for this position
+                // TODO by construction sequences cannot span chunks (check again)
+            }
+
             positionchunkwindow (std::vector<chunk>::iterator definingchunk) : definingchunk (definingchunk) {}
         };
         std::vector<positionchunkwindow> positionchunkwindows;      // [utterance position] -> [windowbegin, windowend) for controlling paging
@@ -256,6 +263,17 @@ namespace msra { namespace dbn {
         size_t lazyrandomization(
             const size_t globalts,
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
+
+        // TODO temporary
+        size_t newLazyRandomize(
+            const size_t globalts,
+            const std::vector<std::vector<utterancechunkdata>> & allchunks);
+
+        // TODO temporary
+        void newRandomize(
+            const size_t sweep,
+            const size_t sweepts,
+            const Microsoft::MSR::CNTK::Timeline& timeline);
 
         size_t sequenceIndexForFramePos(const size_t t) const
         {
@@ -305,6 +323,11 @@ namespace msra { namespace dbn {
             assert(sequenceIndex < randomizedsequencerefs.size());
             return randomizedsequencerefs[sequenceIndex];
         }
+
+        bool timelineIsValid(Microsoft::MSR::CNTK::Timeline& timeline);
+
+        std::unique_ptr<Microsoft::MSR::CNTK::Timeline> getTimelineFromAllchunks(
+            const std::vector<std::vector<utterancechunkdata>> & allchunks);
     };
 
 } }
