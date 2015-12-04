@@ -263,7 +263,7 @@ namespace msra { namespace dbn {
             {
                 assert(IsValid(sequencer->getTimeline()));
                 m_randomTimeline.reserve(sequencer->getTimeline().size()); // TODO
-                // TODO more
+                // TODO reserve required memory
             }
         }
 
