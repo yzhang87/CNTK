@@ -92,22 +92,24 @@ namespace msra { namespace dbn {
         // If not, we'll plan to ignore the utterance, and inform the user
         // m indexes the feature stream
         // i indexes the files within a stream, i.e. in the SCP file
-        foreach_index(m, infiles) {
-            if (m == 0) {
-                numutts = infiles[m].size();
-                uttisvalid = std::vector<bool>(numutts, true);
-                uttduration = std::vector<size_t>(numutts, 0);
-            }
-            else if (infiles[m].size() != numutts)
-                RuntimeError("minibatchutterancesourcemulti: all feature files must have same number of utterances");
+        numutts = infiles[0].size();
+        uttisvalid = std::vector<bool>(numutts, true);
+        uttduration = std::vector<size_t>(numutts, 0);
 
-            foreach_index(i, infiles[m]){
+        foreach_index(m, infiles) 
+        {
+            if (infiles[m].size() != numutts)
+            {
+                RuntimeError("minibatchutterancesourcemulti: all feature files must have same number of utterances");
+            }
+
+            foreach_index(i, infiles[m])
+            {
                 utterancedesc utterance(msra::asr::htkfeatreader::parsedpath(infiles[m][i]), 0);  //mseltzer - is this foolproof for multiio? is classids always non-empty?
                 const size_t uttframes = utterance.numframes(); // will throw if frame bounds not given --required to be given in this mode
+
                 // we need at least 2 frames for boundary markers to work
-                if (uttframes < 2)
-                    RuntimeError("minibatchutterancesource: utterances < 2 frames not supported");
-                if (uttframes > 65535 /* TODO frameref::maxframesperutterance */)
+                if (uttframes < 2 || uttframes > 65535 /* TODO frameref::maxframesperutterance */)
                 {
                     fprintf(stderr, "minibatchutterancesource: skipping %d-th file (%d frames) because it exceeds max. frames (%d) for frameref bit field: %ls\n", i, (int)uttframes, (int)65535 /* frameref::maxframesperutterance */, key.c_str());
                     uttduration[i] = 0;
@@ -115,11 +117,13 @@ namespace msra { namespace dbn {
                 }
                 else
                 {
-                    if (m == 0){
+                    if (m == 0)
+                    {
                         uttduration[i] = uttframes;
                         uttisvalid[i] = true;
                     }
-                    else if (uttduration[i] != uttframes){
+                    else if (uttduration[i] != uttframes)
+                    {
                         fprintf(stderr, "minibatchutterancesource: skipping %d-th file due to inconsistency in duration in different feature streams (%d vs %d frames)\n", i, (int)uttduration[i], (int)uttframes);
                         uttduration[i] = 0;
                         uttisvalid[i] = false;
