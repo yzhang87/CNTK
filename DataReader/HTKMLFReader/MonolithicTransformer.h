@@ -48,8 +48,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         size_t m_elementSize; // size of the element, should go away probably and be taken from the layout?
         MemoryProviderPtr m_memoryProvider;
-        intargvector m_numSeqsPerMBForAllEpochs;
-        size_t m_numSeqsPerMB;                  // requested number of parallel sequences
         bool m_noData;
         std::vector<size_t> m_featDims;
         std::map<std::wstring, size_t> m_nameToTypeMap;
@@ -62,9 +60,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool m_partialMinibatch;
         unique_ptr<msra::dbn::minibatchiterator> m_mbiter;
         unique_ptr<msra::dbn::Bundler> m_frameSource;
-        size_t m_mbNumTimeSteps;                // number of time steps  to fill/filled (note: for frame randomization, this the #frames, and not 1 as later reported)
-        vector<size_t> m_numFramesToProcess;    // [seq index] number of frames available (left to return) in each parallel sequence
-        vector<size_t> m_numValidFrames;        // [seq index] valid #frames in each parallel sequence. Frames (s, t) with t >= m_numValidFrames[s] are NoInput.
 
         std::map<std::wstring, size_t> m_nameToId;
 

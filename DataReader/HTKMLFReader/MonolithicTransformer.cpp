@@ -41,18 +41,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         intargvector numberOfuttsPerMinibatchForAllEpochs =
             readerConfig(L"nbruttsineachrecurrentiter", ConfigParameters::Array(intargvector(vector<int>{ 1 })));
 
-        m_numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;
-
-        for (int i = 0; i < m_numSeqsPerMBForAllEpochs.size(); i++)
-        {
-            if (m_numSeqsPerMBForAllEpochs[i] < 1)
-            {
-                LogicError("nbrUttsInEachRecurrentIter cannot be less than 1.");
-            }
-        }
-
-        m_numSeqsPerMB = m_numSeqsPerMBForAllEpochs[0];
-
         m_noData = false;
 
         wstring command(readerConfig(L"action", L"")); //look up in the config for the master command to determine whether we're writing output (inputs only) or training/evaluating (inputs and outputs)
@@ -423,20 +411,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_frameSource->SetNumberOfWorkers(config.numberOfWorkers);
         m_frameSource->SetWorkerRank(config.workerRank);
-
-        m_mbNumTimeSteps = config.minibatchSize;       // note: ignored in frame mode and full-sequence mode
-        m_numSeqsPerMB = m_numSeqsPerMBForAllEpochs[config.index];
-
-        // resize the arrays
-        // These are sized to the requested number. If not all can be filled, it will still return this many, just with gaps.
-        // In frame mode, m_numSeqsPerMB must be 1. However, the returned layout has one 1-frame sequence per frame.
-        m_numFramesToProcess.assign(m_numSeqsPerMB, 0);
-        m_numValidFrames.assign(m_numSeqsPerMB, 0);
-
-        if ((m_numSeqsPerMB > 1))
-        {
-            LogicError("nbrUttsInEachRecurrentIter cannot be more than 1 in frame mode reading.");
-        }
 
         size_t datapasses = 1;
         size_t totalFrames = m_frameSource->totalframes();
