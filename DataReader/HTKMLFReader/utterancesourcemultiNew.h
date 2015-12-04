@@ -501,7 +501,7 @@ public:
             // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
 
             // Initialize the block randomizer
-            rand = std::make_unique<BlockRandomizer>(verbosity, framemode, _totalframes, numutterances, randomizationrange);
+            rand = std::make_unique<BlockRandomizer>(verbosity, framemode, _totalframes, numutterances, randomizationrange, nullptr);
         }
     }
 

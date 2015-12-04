@@ -143,7 +143,7 @@ namespace msra { namespace dbn {
         }
     };
 
-    class BlockRandomizer
+    class BlockRandomizer : public Microsoft::MSR::CNTK::Transformer
     {
         int m_verbosity;
         bool m_framemode;
@@ -243,7 +243,7 @@ namespace msra { namespace dbn {
         template<typename VECTOR> static void randomshuffle (VECTOR & v, size_t randomseed);
 
     public:
-        BlockRandomizer(int verbosity, bool framemode, size_t totalframes, size_t numutterances, size_t randomizationrange)
+        BlockRandomizer(int verbosity, bool framemode, size_t totalframes, size_t numutterances, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
             : m_verbosity(verbosity)
             , m_framemode(framemode)
             , m_totalframes(totalframes)
@@ -251,6 +251,7 @@ namespace msra { namespace dbn {
             , m_randomizationrange(randomizationrange)
             , m_currentsweep(SIZE_MAX)
         {
+            sequencer;
         }
 
         // big long helper to update all cached randomization information
@@ -328,6 +329,29 @@ namespace msra { namespace dbn {
 
         std::unique_ptr<Microsoft::MSR::CNTK::Timeline> getTimelineFromAllchunks(
             const std::vector<std::vector<utterancechunkdata>> & allchunks);
+
+        // Transformer interface
+
+        virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config) override
+        {
+            config;
+        };
+
+        virtual std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> getInputs() const override
+        {
+            std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> dummy;
+            return dummy;
+        }
+
+        virtual ~BlockRandomizer()
+        {
+        }
+
+        virtual std::map<Microsoft::MSR::CNTK::InputId, Microsoft::MSR::CNTK::Sequence> getNextSequence() override
+        {
+            std::map<Microsoft::MSR::CNTK::InputId, Microsoft::MSR::CNTK::Sequence> dummy;
+            return dummy;
+        };
     };
 
 } }

@@ -342,7 +342,7 @@ namespace msra { namespace dbn {
             // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
 
             // Initialize the block randomizer
-            rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, m_totalframes, m_numutterances, randomizationrange);
+            rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, m_totalframes, m_numutterances, randomizationrange, nullptr);
         }
 
         size_t sequenceId = 0;
