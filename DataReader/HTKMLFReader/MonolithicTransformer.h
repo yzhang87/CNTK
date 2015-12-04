@@ -23,6 +23,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual std::vector<InputDescriptionPtr> getInputs() const override;
         virtual std::map<InputId, Sequence> getNextSequence() override;
 
+
+        virtual std::map<InputId, Sequence> getNextSequence_new();
+
+
         virtual ~MonolithicTransformer()
         {}
 

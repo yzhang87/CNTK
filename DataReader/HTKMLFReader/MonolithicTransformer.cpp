@@ -411,6 +411,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             RuntimeError("readMethod must be 'rollingWindow' or 'blockRandomize'");
         }
+
+        m_transformer = nullptr; //eldak: should become randomizer.
     }
 
     void MonolithicTransformer::SetEpochConfiguration(const EpochConfiguration& config)
@@ -563,5 +565,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_noData = true;
 
         return result;
+    }
+
+    std::map<InputId, Sequence> MonolithicTransformer::getNextSequence_new()
+    {
+        return m_transformer->getNextSequence();
     }
 }}}
