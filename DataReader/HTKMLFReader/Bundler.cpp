@@ -365,6 +365,10 @@ namespace msra { namespace dbn {
                         description.numberOfSamples = 1;
                         m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
                         m_timeline.push_back(description);
+
+                        auto sq = BlockRandomizer::sequenceref(i, j, k);
+                        sq.numframes = 1;
+                        m_sequences.push_back(sq);
                     }
                 }
                 else
@@ -375,6 +379,10 @@ namespace msra { namespace dbn {
                     description.numberOfSamples = chunks[i].utteranceset[j].numframes();
                     m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
                     m_timeline.push_back(description);
+
+                    auto sq = BlockRandomizer::sequenceref(i, j, 0);
+                    sq.numframes = description.numberOfSamples;
+                    m_sequences.push_back(sq);
                 }
             }
         }
@@ -914,14 +922,11 @@ namespace msra { namespace dbn {
         const size_t numChunks = m_allchunks[0].size();
         const size_t numStreams = m_allchunks.size();
 
-        size_t mbframes = 0;
         const std::vector<char> noboundaryflags;    // dummy
 
         const size_t spos = id; // positer->second;
         const size_t epos = spos + 1;
 
-        // determine how many utterances will fit into the requested minibatch size
-        mbframes = rand->getSequenceRef(id).numframes;   // at least one utterance, even if too long
 
         // Determine window range
         const size_t windowbegin = rand->getSequenceWindowBegin(id);
@@ -929,7 +934,7 @@ namespace msra { namespace dbn {
 
         for (size_t k = 0; k < windowbegin; k++)
         {
-            RequireChunk(k);
+            ReleaseChunk(k);
         }
 
         for (size_t k = windowend; k < numChunks; k++)
@@ -941,7 +946,7 @@ namespace msra { namespace dbn {
         {
             if (m_timeline[id].chunkId % m_numberOfWorkers == m_workerRank)
             {
-                requirerandomizedchunk(m_timeline[id].chunkId, windowbegin, windowend); // (window range passed in for checking only)
+                RequireChunk(m_timeline[id].chunkId); // (window range passed in for checking only)
             }
         }
 
@@ -952,13 +957,13 @@ namespace msra { namespace dbn {
         size_t tspos = 0;
         for (size_t pos = spos; pos < epos; pos++)
         {
-            const auto & uttref = rand->getSequenceRef(id);
-            if ((uttref.chunkindex % m_numberOfWorkers) != m_workerRank)            // chunk not to be returned for this MPI node
+            auto chunkId = m_timeline[id].chunkId;
+            if ((chunkId % m_numberOfWorkers) != m_workerRank)            // chunk not to be returned for this MPI node
             {
                 continue;
             }
 
-            tspos += uttref.numframes;
+            tspos += m_timeline[id].numberOfSamples;
         }
 
         if (tspos == 0)
@@ -968,7 +973,7 @@ namespace msra { namespace dbn {
 
         // resize feat and uids
         // eldak:s should return phone boundaries and sentendmark lattices transcripts etc.
-        //feat.resize(vdim.size());
+        feat.resize(m_vdim.size());
         uids.resize(m_classids.size());
         //phoneboundaries.resize(m_classids.size());
         //sentendmark.resize(m_vdim.size());
@@ -1007,7 +1012,9 @@ namespace msra { namespace dbn {
         tspos = 0;   // relative start of utterance 'pos' within the returned minibatch
         for (size_t pos = spos; pos < epos; pos++)
         {
-            const auto & uttref = rand->getSequenceRef(id);
+            const auto& sequence = m_timeline[id];
+            const auto & uttref = m_sequences[id];
+
             if ((uttref.chunkindex % m_numberOfWorkers) != m_workerRank)            // chunk not to be returned for this MPI node
             {
                 continue;
@@ -1023,11 +1030,14 @@ namespace msra { namespace dbn {
                 auto uttframes = chunkdata.getutteranceframes(uttref.utteranceindex);
                 matrixasvectorofvectors uttframevectors(uttframes);    // (wrapper that allows m[j].size() and m[j][i] as required by augmentneighbors())
                 n = uttframevectors.size();
+
                 //sentendmark[i].push_back(n + tspos);
-                assert(n == uttframes.cols() && uttref.numframes == n && chunkdata.numframes(uttref.utteranceindex) == n);
+                assert(n == uttframes.cols() &&
+                      (uttref.numframes == n && !m_framemode || (uttref.numframes == 1 && m_framemode)) &&
+                      (chunkdata.numframes(uttref.utteranceindex) == n && !m_framemode || (uttref.numframes == 1 && m_framemode)));
 
                 // copy the frames and class labels
-                for (size_t t = 0; t < n; t++)          // t = time index into source utterance
+                for (size_t t = uttref.frameindex; t < uttref.frameindex + sequence.numberOfSamples; t++)          // t = time index into source utterance
                 {
                     size_t leftextent, rightextent;
                     // page in the needed range of frames
@@ -1047,11 +1057,11 @@ namespace msra { namespace dbn {
                 // copy the frames and class labels
                 if (i == 0)
                 {
-                    auto uttclassids = getclassids(uttref);
+                    auto uttclassids = GetClassIds(uttref);
                     //auto uttphoneboudaries = getphonebound(uttref);
                     foreach_index(j, uttclassids)
                     {
-                        for (size_t t = 0; t < n; t++)          // t = time index into source utterance
+                        for (size_t t = uttref.frameindex; t < sequence.numberOfSamples; t++)          // t = time index into source utterance
                         {
                             if (issupervised())
                             {
@@ -1076,7 +1086,7 @@ namespace msra { namespace dbn {
                     }
                 }
             }
-            tspos += n;
+            tspos += sequence.numberOfSamples;
         }
 
         foreach_index(i, feat)
