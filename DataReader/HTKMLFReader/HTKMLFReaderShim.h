@@ -3,7 +3,7 @@
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
-// HTKMLFReaderShim.h - Include file for the MTK and MLF format of features and samples 
+// HTKMLFReaderShim.cpp: header for shim that wraps new HTKMLF reader
 #pragma once
 #include "DataReader.h"
 #include "commandArgUtil.h"

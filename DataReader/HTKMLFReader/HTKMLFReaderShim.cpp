@@ -3,7 +3,7 @@
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
-// HTKMLFReader.cpp : Defines the exported functions for the DLL application.
+// HTKMLFReaderShim.cpp: implementation for shim that wraps new HTKMLF reader
 //
 
 #include "stdafx.h"
@@ -24,10 +24,8 @@
 #endif
 
 #ifdef __unix__
+// TODO probably not needed anymore
 #include <limits.h>
-typedef unsigned long DWORD;
-typedef unsigned short WORD;
-typedef unsigned int UNINT32;
 #endif
 
 #include "SubstitutingMemoryProvider.h"
@@ -109,7 +107,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             idToName.insert(std::make_pair(i->id, i->name));
         }
 
-        for(auto input : m.minibatch)
+        for (auto input : m.minibatch)
         {
             const std::wstring& name = idToName[input.first];
             if (matrices.find(name) == matrices.end())
