@@ -21,11 +21,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config);
         virtual std::vector<InputDescriptionPtr> getInputs() const override;
-        virtual std::map<InputId, Sequence> getNextSequence() override;
-
-
-        virtual std::map<InputId, Sequence> getNextSequence_new();
-
+        virtual SequenceData getNextSequence() override;
 
         virtual ~MonolithicTransformer()
         {}

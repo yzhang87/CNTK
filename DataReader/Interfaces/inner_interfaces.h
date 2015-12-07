@@ -64,6 +64,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // of a Sequence Reader or a Sequencer.
     typedef std::vector<size_t> TimelineOffsets;
 
+    struct SequenceData
+    {
+        SequenceData() : m_endOfEpoch(false)
+        {}
+
+        std::map<InputId, Sequence> m_data;
+        bool m_endOfEpoch;
+
+        SequenceData(SequenceData&& other)
+            : m_data(std::move(other.m_data))
+            , m_endOfEpoch(std::move(other.m_endOfEpoch))
+        {
+        }
+    };
+
     // A Sequencer composes Timeline information and a number of Sequence readers, providing
     // random-access to the Timeline as well as the composed Sequence readers.
     class Sequencer
@@ -71,7 +86,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         virtual const Timeline& getTimeline() const = 0;
         virtual std::vector<InputDescriptionPtr> getInputs() const = 0;
-        virtual std::map<InputId, Sequence> getSequenceById(size_t id) = 0;
+        virtual SequenceData getSequenceById(size_t id) = 0;
         virtual ~Sequencer() = 0 {};
     };
 
@@ -92,7 +107,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
         virtual std::vector<InputDescriptionPtr> getInputs() const = 0;
         virtual ~Transformer() = 0 {}
-        virtual std::map<InputId, Sequence> getNextSequence() = 0;
+        virtual SequenceData getNextSequence() = 0;
     };
 
     typedef std::shared_ptr<Transformer> TransformerPtr;

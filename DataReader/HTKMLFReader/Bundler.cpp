@@ -909,9 +909,9 @@ namespace msra { namespace dbn {
         return m_inputs;
     }
 
-    std::map<InputId, Sequence> Bundler::getSequenceById(size_t id)
+    SequenceData Bundler::getSequenceById(size_t id)
     {
-        std::map<InputId, Sequence> result;
+        SequenceData result;
 
         std::vector<msra::dbn::matrix> feat;              // buffer for holding curernt minibatch's frames
         std::vector<std::vector<size_t>> uids;               // buffer for storing current minibatch's frame-level label sequence
@@ -1126,7 +1126,7 @@ namespace msra { namespace dbn {
             memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
             r.data = buffer;
 
-            result.insert(std::make_pair(m_nameToId[it->first], r));
+            result.m_data.insert(std::make_pair(m_nameToId[it->first], r));
         }
 
         for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it)
@@ -1155,7 +1155,7 @@ namespace msra { namespace dbn {
                 r.numberOfFrames = 1;
                 r.frameDescription = &m_labelFrameDescriptions[id];
             }
-            result.insert(std::make_pair(m_nameToId[it->first], r));
+            result.m_data.insert(std::make_pair(m_nameToId[it->first], r));
         }
 
         return result;

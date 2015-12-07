@@ -363,7 +363,7 @@ namespace msra { namespace dbn {
         {
         }
 
-        virtual std::map<Microsoft::MSR::CNTK::InputId, Microsoft::MSR::CNTK::Sequence> getNextSequence() override;
+        virtual Microsoft::MSR::CNTK::SequenceData getNextSequence() override;
     };
 
 } }

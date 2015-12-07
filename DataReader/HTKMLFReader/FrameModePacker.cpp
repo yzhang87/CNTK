@@ -405,13 +405,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (size_t currentIndex = 0; currentIndex < this->m_requestedMBSize; ++currentIndex)
         {
             auto sequence = m_transformer->getNextSequence();
-            if (sequence.empty())
+            if (sequence.m_endOfEpoch)
             {
                 m_noData = true;
                 break;
             }
 
-            sequences.push_back(sequence);
+            sequences.push_back(sequence.m_data);
         }
 
         // eldak: this will fail when no data is returned for the worker...

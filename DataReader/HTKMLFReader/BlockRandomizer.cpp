@@ -495,7 +495,7 @@ namespace msra { namespace dbn {
         };
     }
 
-    std::map<InputId, Sequence> BlockRandomizer::getNextSequence()
+    SequenceData BlockRandomizer::getNextSequence()
     {
         newLazyRandomize();
         assert(m_currentSequenceId < m_randomTimeline.size());

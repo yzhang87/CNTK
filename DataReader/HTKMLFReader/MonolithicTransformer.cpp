@@ -457,12 +457,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_inputs;
     }
 
-    std::map<InputId, Sequence> MonolithicTransformer::getNextSequence()
+    SequenceData MonolithicTransformer::getNextSequence()
     {
-        if (m_noData)
+        /*if (m_noData)
         {
             return std::map<InputId, Sequence>();
-        }
+        }*/
 
         return m_transformer->getNextSequence();
 
@@ -541,10 +541,5 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_noData = true;
 
         return result;*/
-    }
-
-    std::map<InputId, Sequence> MonolithicTransformer::getNextSequence_new()
-    {
-        return m_transformer->getNextSequence();
     }
 }}}

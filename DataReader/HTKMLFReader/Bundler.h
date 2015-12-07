@@ -228,7 +228,7 @@ namespace msra {
 
             virtual std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> getInputs() const override;
 
-            virtual std::map<Microsoft::MSR::CNTK::InputId, Microsoft::MSR::CNTK::Sequence> getSequenceById(size_t id) override;
+            virtual Microsoft::MSR::CNTK::SequenceData getSequenceById(size_t id) override;
             bool RequireChunk(size_t chunkindex);
             void ReleaseChunk(size_t chunkIndex);
 
