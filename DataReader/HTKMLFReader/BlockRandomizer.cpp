@@ -337,7 +337,7 @@ namespace msra { namespace dbn {
         // TODO tune; not all is needed?
         std::vector<size_t> chunkNumSequences(numChunks);
         std::vector<size_t> chunkNumSamples(numChunks);
-        std::vector<size_t> chunkStart(numChunks);
+        std::vector<size_t> chunkStart(numChunks, static_cast<size_t>(-1));
 
         for (const auto & seqDesc : timeline)
         {
