@@ -489,9 +489,9 @@ namespace msra { namespace dbn {
             if (m_verbosity > 0)
                 fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
                     m_currentSweep, m_framemode ? "frame" : "utterance");
+            m_currentSweep++;
             newRandomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
             m_currentSequenceId = 0;
-            m_currentSweep++;
         };
     }
 
