@@ -391,14 +391,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // now get the frame source. This has better randomization and doesn't create temp files
             m_frameSource.reset(new msra::dbn::Bundler(infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true, m_featureFrameDescriptions, m_labelFrameDescriptions, m_inputs, m_nameToId, m_featureNameToIdMap, m_labelNameToIdMap, m_elementSize));
             m_frameSource->setverbosity(m_verbosity);
+
+            m_transformer = std::make_shared<msra::dbn::BlockRandomizer>(m_verbosity, true, 0, 0, randomize, m_frameSource);
+            m_frameSource->SetRandomizer(m_transformer);
         }
         else
         {
             RuntimeError("readMethod must be 'rollingWindow' or 'blockRandomize'");
         }
-
-        m_transformer = std::make_shared<msra::dbn::BlockRandomizer>(m_verbosity, true, 0, 0, randomize, m_frameSource);
-    }
+}
 
     void MonolithicTransformer::SetEpochConfiguration(const EpochConfiguration& config)
     {
@@ -409,7 +410,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_frameSource->SetNumberOfWorkers(config.numberOfWorkers);
         m_frameSource->SetWorkerRank(config.workerRank);
 
-        size_t datapasses = 1;
+        //size_t datapasses = 1;
         size_t totalFrames = m_frameSource->totalframes();
 
         size_t extraFrames = totalFrames%config.minibatchSize;
@@ -438,16 +439,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             requestedEpochSamples = totalFrames;
         }
 
+        /*
         m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, config.index, requestedEpochSamples, 1, config.workerRank, config.numberOfWorkers, datapasses));
         // Advance the MB iterator until we find some data or reach the end of epoch
         while ((m_mbiter->currentmbframes() == 0) && *m_mbiter)
         {
             (*m_mbiter)++;
         }
-
+        */
         m_noData = false;
-        if (!(*m_mbiter))
-            m_noData = true;
+        /*if (!(*m_mbiter))
+            m_noData = true;*/
     }
 
     std::vector<InputDescriptionPtr> MonolithicTransformer::getInputs() const
@@ -462,6 +464,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return std::map<InputId, Sequence>();
         }
 
+        return m_transformer->getNextSequence();
+
+        /*
         std::map<size_t, Sequence> result;
         for (auto it = m_featureNameToIdMap.begin(); it != m_featureNameToIdMap.end(); ++it)
         {
@@ -535,7 +540,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (!(*m_mbiter))
             m_noData = true;
 
-        return result;
+        return result;*/
     }
 
     std::map<InputId, Sequence> MonolithicTransformer::getNextSequence_new()
