@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Bundler.h"
+#include <DataReader.h>
 
 using namespace Microsoft::MSR::CNTK;
 
@@ -9,6 +10,7 @@ namespace msra { namespace dbn {
     // Pass empty labels to denote unsupervised training (so getbatch() will not return uids).
     // This mode requires utterances with time stamps.
     Bundler::Bundler(
+        const ConfigParameters & readerConfig,
         const std::vector<std::vector<wstring>> & infiles,
         const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels,
         std::vector<size_t> vdim,
@@ -48,6 +50,9 @@ namespace msra { namespace dbn {
         // [v-hansu] change framemode (lattices.empty()) into framemode (false) to run utterance mode without lattice
         // you also need to change another line, search : [v-hansu] comment out to run utterance mode without lattice
     {
+        wstring minibatchMode(readerConfig(L"minibatchMode", L"partial"));
+        m_partialMinibatch = !_wcsicmp(minibatchMode.c_str(), L"partial");
+
         // process infiles to know dimensions of things (but not loading features)
         size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
         size_t nolat = 0;                       // number of entries missing in lattice archive (diagnostics)
@@ -912,6 +917,13 @@ namespace msra { namespace dbn {
     SequenceData Bundler::getSequenceById(size_t id)
     {
         SequenceData result;
+        if (m_currentSampleCount >= m_epochSize)
+        {
+            result.m_endOfEpoch = true;
+            return result;
+        }
+
+        m_currentSampleCount += m_timeline[id].numberOfSamples;
 
         std::vector<msra::dbn::matrix> feat;              // buffer for holding curernt minibatch's frames
         std::vector<std::vector<size_t>> uids;               // buffer for storing current minibatch's frame-level label sequence
@@ -1161,4 +1173,41 @@ namespace msra { namespace dbn {
         return result;
     }
 
+    void Bundler::SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config)
+    {
+        m_workerRank = config.workerRank;
+        m_numberOfWorkers = config.numberOfWorkers;
+        m_currentSampleCount = 0;
+
+        size_t requestedEpochSamples = config.totalSize;
+        size_t totalFrames = m_totalframes;
+
+        size_t extraFrames = totalFrames % config.minibatchSize;
+        size_t minibatches = totalFrames / config.minibatchSize;
+
+        // if we are allowing partial minibatches, do nothing, and let it go through
+        if (!m_partialMinibatch)
+        {
+            // we don't want any partial frames, so round total frames to be an even multiple of our mbSize
+            if (totalFrames > config.minibatchSize)
+                totalFrames -= extraFrames;
+
+            if (requestedEpochSamples == requestDataSize)
+            {
+                requestedEpochSamples = totalFrames;
+            }
+            else if (minibatches > 0)   // if we have any full minibatches
+            {
+                // since we skip the extraFrames, we need to add them to the total to get the actual number of frames requested
+                size_t sweeps = (requestedEpochSamples - 1) / totalFrames; // want the number of sweeps we will skip the extra, so subtract 1 and divide
+                requestedEpochSamples += extraFrames*sweeps;
+            }
+        }
+        else if (requestedEpochSamples == requestDataSize)
+        {
+            requestedEpochSamples = totalFrames;
+        }
+
+        m_epochSize = requestedEpochSamples;
+    }
 }}

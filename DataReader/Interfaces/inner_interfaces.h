@@ -85,6 +85,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         virtual const Timeline& getTimeline() const = 0;
+        virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
         virtual std::vector<InputDescriptionPtr> getInputs() const = 0;
         virtual SequenceData getSequenceById(size_t id) = 0;
         virtual ~Sequencer() = 0 {};

@@ -20,6 +20,10 @@
 #include "unordered_set"
 #include "BlockRandomizer.h"
 
+namespace Microsoft{namespace MSR{namespace CNTK{
+    class ConfigParameters;
+}}}
+
 namespace msra {
     namespace dbn {
 
@@ -127,17 +131,6 @@ namespace msra {
                 return allphoneboundaries;   // nothing to return
             }
 
-            public:
-            void SetWorkerRank(size_t workerRank)
-            {
-                m_workerRank = workerRank;
-            }
-
-            void SetNumberOfWorkers(size_t numberOfWorkers)
-            {
-                m_numberOfWorkers = numberOfWorkers;
-            }
-
         private:
             class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors
             {
@@ -152,6 +145,7 @@ namespace msra {
 
         public:
             Bundler::Bundler(
+                const Microsoft::MSR::CNTK::ConfigParameters & readerConfig,
                 const std::vector<std::vector<wstring>> & infiles,
                 const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels,
                 std::vector<size_t> vdim,
@@ -175,6 +169,8 @@ namespace msra {
             {
                 m_rand = rand;
             }
+
+            virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config);
 
             void setverbosity(int newverbosity){ m_verbosity = newverbosity; }
 
@@ -238,6 +234,8 @@ namespace msra {
             std::map<size_t, const utterancedesc*> m_sequenceIdToSequence;
             size_t m_workerRank;
             size_t m_numberOfWorkers;
+            size_t m_epochSize;
+            size_t m_currentSampleCount;
             size_t m_elementSize;
             std::vector<size_t> m_udim;
             std::vector<Microsoft::MSR::CNTK::FrameDescription> m_featureFrameDescriptions;
@@ -276,6 +274,7 @@ namespace msra {
             }
 
             std::shared_ptr<BlockRandomizer> m_rand;
+            bool m_partialMinibatch;
         };
     }
 }

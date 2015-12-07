@@ -389,7 +389,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_lattices.reset(new msra::dbn::latticesource(latticetocs, m_hset.getsymmap()));
 
             // now get the frame source. This has better randomization and doesn't create temp files
-            m_frameSource.reset(new msra::dbn::Bundler(infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true, m_featureFrameDescriptions, m_labelFrameDescriptions, m_inputs, m_nameToId, m_featureNameToIdMap, m_labelNameToIdMap, m_elementSize));
+            m_frameSource.reset(new msra::dbn::Bundler(readerConfig, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true, m_featureFrameDescriptions, m_labelFrameDescriptions, m_inputs, m_nameToId, m_featureNameToIdMap, m_labelNameToIdMap, m_elementSize));
             m_frameSource->setverbosity(m_verbosity);
 
             m_transformer = std::make_shared<msra::dbn::BlockRandomizer>(m_verbosity, true, 0, 0, randomize, m_frameSource);
@@ -405,39 +405,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         assert(config.workerRank < config.numberOfWorkers);
         assert((config.workerRank == 0) && (config.numberOfWorkers == 1));
-        size_t requestedEpochSamples = config.totalSize;
+        
 
-        m_frameSource->SetNumberOfWorkers(config.numberOfWorkers);
-        m_frameSource->SetWorkerRank(config.workerRank);
-
-        //size_t datapasses = 1;
-        size_t totalFrames = m_frameSource->totalframes();
-
-        size_t extraFrames = totalFrames%config.minibatchSize;
-        size_t minibatches = totalFrames / config.minibatchSize;
-
-        // if we are allowing partial minibatches, do nothing, and let it go through
-        if (!m_partialMinibatch)
-        {
-            // we don't want any partial frames, so round total frames to be an even multiple of our mbSize
-            if (totalFrames > config.minibatchSize)
-                totalFrames -= extraFrames;
-
-            if (requestedEpochSamples == requestDataSize)
-            {
-                requestedEpochSamples = totalFrames;
-            }
-            else if (minibatches > 0)   // if we have any full minibatches
-            {
-                // since we skip the extraFrames, we need to add them to the total to get the actual number of frames requested
-                size_t sweeps = (requestedEpochSamples - 1) / totalFrames; // want the number of sweeps we will skip the extra, so subtract 1 and divide
-                requestedEpochSamples += extraFrames*sweeps;
-            }
-        }
-        else if (requestedEpochSamples == requestDataSize)
-        {
-            requestedEpochSamples = totalFrames;
-        }
+        m_frameSource->SetEpochConfiguration(config);
 
         /*
         m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, config.index, requestedEpochSamples, 1, config.workerRank, config.numberOfWorkers, datapasses));
