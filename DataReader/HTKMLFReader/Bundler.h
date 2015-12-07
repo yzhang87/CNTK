@@ -59,9 +59,6 @@ namespace msra {
             double m_timegetbatch;            // [v-hansu] for time measurement
             size_t m_chunksinram;             // (for diagnostics messages)
 
-
-            std::unique_ptr<BlockRandomizer> rand;
-
             // helper to page out a chunk with log message
             void releaserandomizedchunk(size_t k);
 
@@ -94,7 +91,7 @@ namespace msra {
                         allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), 0, 0)));
                     return allclassids;     // nothing to return
                 }
-                const size_t originalChunkIndex = rand->getOriginalChunkIndex(uttref.chunkindex);
+                const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(uttref.chunkindex);
                 const auto & chunkdata = m_allchunks[0][originalChunkIndex];
                 const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
                 const size_t n = chunkdata.numframes(uttref.utteranceindex);
@@ -172,6 +169,12 @@ namespace msra {
                 std::map<std::wstring, size_t> featureNameToIdMap,
                 std::map<std::wstring, size_t> labelNameToIdMap,
                 size_t elementSize);
+
+            // eldak: Should go away.
+            void SetRandomizer(std::shared_ptr<BlockRandomizer> rand)
+            {
+                m_rand = rand;
+            }
 
             void setverbosity(int newverbosity){ m_verbosity = newverbosity; }
 
@@ -271,6 +274,8 @@ namespace msra {
                 }
                 return allclassids;   // nothing to return
             }
+
+            std::shared_ptr<BlockRandomizer> m_rand;
         };
     }
 }

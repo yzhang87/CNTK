@@ -318,14 +318,12 @@ namespace msra { namespace dbn {
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
-            assert(m_sequencer == nullptr); // don't call in new mode
             assert(sequenceIndex < positionchunkwindows.size());
             return positionchunkwindows[sequenceIndex].windowbegin();
         }
 
         size_t getSequenceWindowEnd(size_t sequenceIndex) const
         {
-            assert(m_sequencer == nullptr); // don't call in new mode
             assert(sequenceIndex < positionchunkwindows.size());
             return positionchunkwindows[sequenceIndex].windowend();
         }

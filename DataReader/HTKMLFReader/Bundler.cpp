@@ -15,7 +15,7 @@ namespace msra { namespace dbn {
         std::vector<size_t> udim,
         std::vector<size_t> leftcontext,
         std::vector<size_t> rightcontext,
-        size_t randomizationrange,
+        size_t /*randomizationrange*/,
         const latticesource & lattices,
         const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & allwordtranscripts,
         const bool framemode,
@@ -346,7 +346,7 @@ namespace msra { namespace dbn {
             // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
 
             // Initialize the block randomizer
-            rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, m_totalframes, m_numutterances, randomizationrange, nullptr);
+            //rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, m_totalframes, m_numutterances, randomizationrange, nullptr);
         }
 
         size_t sequenceId = 0;
@@ -392,7 +392,7 @@ namespace msra { namespace dbn {
     {
         size_t numreleased = 0;
         const size_t numStreams = m_allchunks.size();
-        const size_t originalChunkIndex = rand->getOriginalChunkIndex(k);
+        const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(k);
         for (size_t m = 0; m < numStreams; m++)
         {
             auto & chunkdata = m_allchunks[m][originalChunkIndex];
@@ -429,7 +429,7 @@ namespace msra { namespace dbn {
             LogicError("requirerandomizedchunk: requested utterance outside in-memory chunk range");
 
         const size_t numStreams = m_allchunks.size();
-        const size_t originalChunkIndex = rand->getOriginalChunkIndex(chunkindex);
+        const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(chunkindex);
         for (size_t m = 0; m < numStreams; m++)
         {
             auto & chunkdata = m_allchunks[m][originalChunkIndex];
@@ -440,7 +440,7 @@ namespace msra { namespace dbn {
             return false;
         else if (numinram == 0)
         {
-            const size_t originalChunkIndex = rand->getOriginalChunkIndex(chunkindex);
+            const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(chunkindex);
             for (size_t m = 0; m < numStreams; m++)
             {
                 auto & chunkdata = m_allchunks[m][originalChunkIndex];
@@ -543,7 +543,7 @@ namespace msra { namespace dbn {
         assert(m_totalframes > 0);
 
         // update randomization if a new sweep is entered  --this is a complex operation that updates many of the data members used below
-        const size_t sweep = rand->lazyrandomization(globalts, m_allchunks);
+        const size_t sweep = m_rand->lazyrandomization(globalts, m_allchunks);
 
         size_t mbframes = 0;
         const std::vector<char> noboundaryflags;    // dummy
@@ -739,8 +739,8 @@ namespace msra { namespace dbn {
             const size_t numStreams = m_allchunks.size();
 
             // Determine window range
-            const size_t windowbegin = rand->getSequenceWindowBegin(globalts);
-            const size_t windowend = rand->getSequenceWindowEnd(globalte - 1);
+            const size_t windowbegin = m_rand->getSequenceWindowBegin(globalts);
+            const size_t windowend = m_rand->getSequenceWindowEnd(globalte - 1);
 
             if (m_verbosity > 0)
                 fprintf(stderr, "getbatch: getting randomized frames [%d..%d] (%d frames out of %d requested) in sweep %d; chunks [%d..%d] -> chunk window [%d..%d)\n",
@@ -762,7 +762,7 @@ namespace msra { namespace dbn {
             {
                 const size_t framepos = (globalts + i) % m_totalframes;  // (for comments, see main loop below)
                 //const sequenceref & frameref = randomizedframerefs[framepos];
-                const BlockRandomizer::sequenceref & frameref = rand->getSequenceRef(framepos);
+                const BlockRandomizer::sequenceref & frameref = m_rand->getSequenceRef(framepos);
                 subsetsizes[frameref.chunkindex % numsubsets]++;
             }
             size_t j = subsetsizes[subsetnum];        // return what we have  --TODO: we can remove the above full computation again now
@@ -799,7 +799,7 @@ namespace msra { namespace dbn {
                 // map to time index inside arrays
                 const size_t framepos = (globalts + j) % m_totalframes;  // using mod because we may actually run beyond the sweep for the last call
                 //const sequenceref & frameref = randomizedframerefs[framepos];
-                const BlockRandomizer::sequenceref & frameref = rand->getSequenceRef(framepos);
+                const BlockRandomizer::sequenceref & frameref = m_rand->getSequenceRef(framepos);
 
                 // in MPI/data-parallel mode, skip frames that are not in chunks loaded for this MPI node
                 if ((frameref.chunkindex % numsubsets) != subsetnum)
@@ -808,7 +808,7 @@ namespace msra { namespace dbn {
                 // random utterance
                 readfromdisk |= requirerandomizedchunk(frameref.chunkindex, windowbegin, windowend);    // (this is just a check; should not actually page in anything)
 
-                const size_t originalChunkIndex = rand->getOriginalChunkIndex(frameref.chunkindex);
+                const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(frameref.chunkindex);
 
                 for (size_t i = 0; i < numStreams; i++)
                 {
@@ -882,7 +882,7 @@ namespace msra { namespace dbn {
     /*implement*/ size_t Bundler::firstvalidglobalts(const size_t globalts) // TODO can be const
     {
         // update randomization if a new sweep is entered
-        const size_t sweep = rand->lazyrandomization(globalts, m_allchunks);
+        const size_t sweep = m_rand->lazyrandomization(globalts, m_allchunks);
 
         // frame mode: start at sweep boundary directly // TODO so globalts needs to be at sweep boundary?
         if (m_framemode)
@@ -893,10 +893,10 @@ namespace msra { namespace dbn {
         assert(globalts >= sweep * m_totalframes && globalts < (sweep + 1) * m_totalframes); sweep;
         // TODO use std::find
         size_t pos;
-        for (pos = 0; pos < rand->getNumSequences(); pos++)
-            if (rand->getSequenceRef(pos).globalts >= globalts)
-                return rand->getSequenceRef(pos).globalts;   // exact or inexact match
-        return rand->getSequenceRef(pos - 1).globalte();     // boundary case: requested time falls within the last utterance
+        for (pos = 0; pos < m_rand->getNumSequences(); pos++)
+            if (m_rand->getSequenceRef(pos).globalts >= globalts)
+                return m_rand->getSequenceRef(pos).globalts;   // exact or inexact match
+        return m_rand->getSequenceRef(pos - 1).globalte();     // boundary case: requested time falls within the last utterance
     }
 
     const Timeline& Bundler::getTimeline() const
@@ -929,8 +929,8 @@ namespace msra { namespace dbn {
 
 
         // Determine window range
-        const size_t windowbegin = rand->getSequenceWindowBegin(id);
-        const size_t windowend = rand->getSequenceWindowEnd(id);
+        const size_t windowbegin = m_rand->getSequenceWindowBegin(id);
+        const size_t windowend = m_rand->getSequenceWindowEnd(id);
 
         for (size_t k = 0; k < windowbegin; k++)
         {
@@ -1010,6 +1010,7 @@ namespace msra { namespace dbn {
         //if (verbosity > 0)
         //    fprintf(stderr, "getbatch: getting utterances %d..%d (%d subset of %d frames out of %d requested) in sweep %d\n", (int)spos, (int)(epos - 1), (int)tspos, (int)mbframes, (int)framesrequested, (int)sweep);
         tspos = 0;   // relative start of utterance 'pos' within the returned minibatch
+        size_t numberOfFrames = 0; // eldak: seems this should be changed for sequences though.
         for (size_t pos = spos; pos < epos; pos++)
         {
             const auto& sequence = m_timeline[id];
@@ -1037,7 +1038,7 @@ namespace msra { namespace dbn {
                       (chunkdata.numframes(uttref.utteranceindex) == n && !m_framemode || (uttref.numframes == 1 && m_framemode)));
 
                 // copy the frames and class labels
-                for (size_t t = uttref.frameindex; t < uttref.frameindex + sequence.numberOfSamples; t++)          // t = time index into source utterance
+                for (size_t t = 0; t < sequence.numberOfSamples; t++)          // t = time index into source utterance
                 {
                     size_t leftextent, rightextent;
                     // page in the needed range of frames
@@ -1051,7 +1052,7 @@ namespace msra { namespace dbn {
                         rightextent = m_rightcontext[i];
                     }
 
-                    augmentneighbors(uttframevectors, noboundaryflags, t, leftextent, rightextent, feat[i], t + tspos);
+                    augmentneighbors(uttframevectors, noboundaryflags, uttref.frameindex + t, leftextent, rightextent, feat[i], t + tspos);
                 }
 
                 // copy the frames and class labels
@@ -1061,11 +1062,11 @@ namespace msra { namespace dbn {
                     //auto uttphoneboudaries = getphonebound(uttref);
                     foreach_index(j, uttclassids)
                     {
-                        for (size_t t = uttref.frameindex; t < sequence.numberOfSamples; t++)          // t = time index into source utterance
+                        for (size_t t = 0; t < sequence.numberOfSamples; t++)          // t = time index into source utterance
                         {
                             if (issupervised())
                             {
-                                uids[j][t + tspos] = uttclassids[j][t];
+                                uids[j][t + tspos] = uttclassids[j][uttref.frameindex + t];
                                 //phoneboundaries[j][t + tspos] = uttphoneboudaries[j][t];
                             }
                         }
@@ -1087,6 +1088,7 @@ namespace msra { namespace dbn {
                 }
             }
             tspos += sequence.numberOfSamples;
+            numberOfFrames++;
         }
 
         foreach_index(i, feat)

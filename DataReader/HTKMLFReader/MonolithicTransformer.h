@@ -63,7 +63,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::map<std::wstring, size_t> m_nameToId;
 
-        TransformerPtr m_transformer;
+        std::shared_ptr<msra::dbn::BlockRandomizer> m_transformer;
     };
 
     typedef std::shared_ptr<MonolithicTransformer> MonolithicTransformerPtr;
