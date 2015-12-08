@@ -54,7 +54,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_numSeqsPerMB;                  // requested number of parallel sequences
         bool m_noData;
         MBLayoutPtr m_pMBLayout;
-        std::vector<size_t> m_featDims;
         std::map<std::wstring, size_t> m_nameToTypeMap;
         std::map<std::wstring, size_t> m_featureNameToIdMap;
         std::map<std::wstring, size_t> m_featureNameToDimMap;

@@ -22,9 +22,6 @@
 
 #ifdef __unix__
 #include <limits.h>
-typedef unsigned long DWORD;
-typedef unsigned short WORD;
-typedef unsigned int UNINT32;
 #endif
 #pragma warning (disable: 4127) // conditional expression is constant; "if (sizeof(ElemType)==sizeof(float))" triggers this
 
@@ -121,7 +118,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const std::wstring& featureName = featureNames[i];
             auto input = GetInputByName(featureName, inputs);
 
-            m_featDims.push_back(input->sampleLayout->GetNumElements());
             const ConfigParameters& thisFeature = readerConfig(featureName);
 
             wstring type = thisFeature(L"type", L"real");
@@ -135,7 +131,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
 
             m_featureNameToIdMap[featureName] = iFeat;
-            m_featureNameToDimMap[featureName] = m_featDims[i];
             m_featuresBufferMultiIO.push_back(nullptr);
             m_featuresBufferAllocatedMultiIO.push_back(0);
             iFeat++;
@@ -180,10 +175,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
     void FrameModePacker::StartDistributedMinibatchLoop(size_t requestedMBSize, size_t epoch, size_t /*subsetNum*/, size_t /*numSubsets*/, size_t /*requestedEpochSamples = requestDataSize*/)
     {
-        m_mbNumTimeSteps = requestedMBSize;       // note: ignored in frame mode and full-sequence mode
-
+        m_mbNumTimeSteps = requestedMBSize;
         m_numSeqsPerMB = m_numSeqsPerMBForAllEpochs[epoch];
-
         m_pMBLayout->Init(m_numSeqsPerMB, 0, false); // (SGD will ask before entering actual reading --TODO: This is hacky.)
 
         // resize the arrays
