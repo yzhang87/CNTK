@@ -3,8 +3,6 @@
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
-// BlockRandomizer.cpp -- implementation of the block randomizer
-//
 
 #include "stdafx.h"
 #include "BlockRandomizer.h"
@@ -16,10 +14,12 @@ namespace msra { namespace dbn {
     using namespace Microsoft::MSR::CNTK;
 
     // shuffle a vector into random order by randomly swapping elements
-    template<typename VECTOR> static void BlockRandomizer::randomshuffle (VECTOR & v, size_t randomseed)
+    template<typename VECTOR> static void BlockRandomizer::randomshuffle(VECTOR & v, size_t randomseed)
     {
         if (v.size() > RAND_MAX * (size_t) RAND_MAX)
+        {
             RuntimeError("randomshuffle: too large set: need to change to different random generator!");
+        }
         srand(static_cast<unsigned int>(randomseed));
         foreach_index (i, v)
         {

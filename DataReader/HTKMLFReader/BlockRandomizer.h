@@ -23,9 +23,7 @@ namespace msra { namespace dbn {
     class BlockRandomizer : public Microsoft::MSR::CNTK::Transformer
     {
         int m_verbosity;
-        bool m_framemode;
-        size_t m_totalframes;
-        size_t m_numutterances;
+        bool m_framemode; // TODO drop
         size_t m_randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
         size_t m_currentSweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
         Microsoft::MSR::CNTK::SequencerPtr m_sequencer;
@@ -100,11 +98,9 @@ namespace msra { namespace dbn {
         template<typename VECTOR> static void randomshuffle (VECTOR & v, size_t randomseed);
 
     public:
-        BlockRandomizer(int verbosity, bool framemode, size_t totalframes, size_t numutterances, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
+        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
             : m_verbosity(verbosity)
             , m_framemode(framemode)
-            , m_totalframes(totalframes)
-            , m_numutterances(numutterances)
             , m_randomizationrange(randomizationrange)
             , m_currentSweep(SIZE_MAX)
             , m_currentSequenceId(SIZE_MAX)
