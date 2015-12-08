@@ -23,60 +23,60 @@ namespace msra { namespace dbn {
     class BlockRandomizer : public Microsoft::MSR::CNTK::Transformer
     {
         int m_verbosity;
-        bool m_framemode; // TODO drop
+        bool m_framemode; // TODO drop?
+        Microsoft::MSR::CNTK::EpochConfiguration m_config;
+        size_t m_currentFrame;
+        size_t m_epochSize;
         Microsoft::MSR::CNTK::SequencerPtr m_sequencer;
         // Information maintained for original (non-randomized) chunks
         struct ChunkInformation
         {
             size_t numSequences;
             size_t numSamples;
-            size_t startSequencePosition;
+            size_t sequencePositionStart;
         };
         std::vector<ChunkInformation> m_chunkInformation;
         size_t m_randomizationrange; // full window measured in samples, one half to the left, the other to the right
         size_t m_currentSweep; // randomization is currently cached for this sweep; if it changes, rebuild all below
         size_t m_currentSequenceId; // position within the current sweep
 
-        // TODO note: numutterances / numframes could also be computed through neighbors
+        // TODO note: numSequences / numSamples could also be computed through neighbors
         struct RandomizedChunk          // chunk as used in actual processing order (randomized sequence)
         {
             size_t originalChunkIndex;
-            size_t numutterances;
-            size_t numframes;
+            size_t numSequences;
+            size_t numSamples;
 
-            // position in utterance-position space
-            size_t utteranceposbegin;
-            size_t utteranceposend() const { return utteranceposbegin + numutterances; }
+            // Sequence positions (on randomized timeline) that this chunk covers
+            size_t sequencePositionStart;
+            size_t sequencePositionEnd() const { return sequencePositionStart + numSequences; }
 
-            // TODO ts instead of globalts, merge with pos ?
+            // (Global) Sample position (on randomized timeline)
+            size_t globalSamplePositionStart;
+            size_t globalSamplePositionEnd() const { return globalSamplePositionStart + numSamples; }
+            // TODO only needed for window computation, change and drop that
 
-            // position on global time line
-            size_t globalts;            // start frame on global timeline (after randomization)
-            size_t globalte() const { return globalts + numframes; }
+            // Randomization range limits (randomized chunk positions)
+            size_t windowbegin;
+            size_t windowend;
 
-            // randomization range limits
-            size_t windowbegin;         // randomizedchunk index of earliest chunk that utterances in here can be randomized with
-            size_t windowend;           // and end index [windowbegin, windowend)
-            chunk(size_t originalChunkIndex,
-                size_t numutterances,
-                size_t numframes,
-                size_t utteranceposbegin,
-                size_t globalts)
+            RandomizedChunk(size_t originalChunkIndex,
+                size_t numSequences,
+                size_t numSamples,
+                size_t sequencePositionStart,
+                size_t globalSamplePositionStart)
                 : originalChunkIndex(originalChunkIndex)
-                , numutterances(numutterances)
-                , numframes(numframes)
-                , utteranceposbegin(utteranceposbegin)
-                , globalts(globalts) {}
+                , numSequences(numSequences)
+                , numSamples(numSamples)
+                , sequencePositionStart(sequencePositionStart)
+                , globalSamplePositionStart(globalSamplePositionStart) {}
         };
-        std::vector<chunk> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
+        std::vector<RandomizedChunk> m_randomizedChunks; // chunks after being brought into random order (we randomize within a rolling window over them)
         Microsoft::MSR::CNTK::Timeline m_randomTimeline;
-
-        // TODO rename
-        std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table // TODO not valid for new randomizer
 
         struct positionchunkwindow       // chunk window required in memory when at a certain position, for controlling paging
         {
-            std::vector<chunk>::iterator definingchunk;       // the chunk in randomizedchunks[] that defined the utterance position of this utterance
+            std::vector<RandomizedChunk>::iterator definingchunk;       // the chunk in m_randomizedChunks[] that defined the utterance position of this utterance
             size_t windowbegin() const { return definingchunk->windowbegin; }
             size_t windowend() const { return definingchunk->windowend; }
 
@@ -86,20 +86,16 @@ namespace msra { namespace dbn {
                 // TODO by construction sequences cannot span chunks (check again)
             }
 
-            positionchunkwindow (std::vector<chunk>::iterator definingchunk) : definingchunk (definingchunk) {}
+            positionchunkwindow(std::vector<RandomizedChunk>::iterator definingchunk) : definingchunk(definingchunk) {}
         };
         std::vector<positionchunkwindow> positionchunkwindows;      // [utterance position] -> [windowbegin, windowend) for controlling paging
         // TODO improve, use randomized timeline?
 
-        template<typename VECTOR> static void randomshuffle (VECTOR & v, size_t randomseed);
+        template<typename VECTOR> static void randomshuffle(VECTOR & v, size_t randomseed);
 
         void InitializeChunkInformation();
 
         bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
-
-        Microsoft::MSR::CNTK::EpochConfiguration m_config;
-        size_t m_currentFrame;
-        size_t m_epochSize;
 
         void LazyRandomize();
 
@@ -116,6 +112,8 @@ namespace msra { namespace dbn {
             , m_sequencer(sequencer)
             , m_currentSweep(SIZE_MAX)
             , m_currentSequenceId(SIZE_MAX)
+            , m_currentFrame(SIZE_MAX)
+            , m_epochSize(SIZE_MAX)
         {
             assert(sequencer != nullptr);
             InitializeChunkInformation();

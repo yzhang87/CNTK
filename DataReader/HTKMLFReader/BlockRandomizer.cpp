@@ -52,8 +52,8 @@ namespace msra { namespace dbn {
             auto & chunkInformation = m_chunkInformation[seqDesc.chunkId];
             chunkInformation.numSequences++;
             chunkInformation.numSamples += seqDesc.numberOfSamples;
-            chunkInformation.startSequencePosition =
-                min(chunkInformation.startSequencePosition, seqDesc.id);
+            chunkInformation.sequencePositionStart =
+                min(chunkInformation.sequencePositionStart, seqDesc.id);
             maxNumberOfSamples = max(maxNumberOfSamples, seqDesc.numberOfSamples);
         }
 
@@ -78,27 +78,27 @@ namespace msra { namespace dbn {
         randomshuffle(randomizedChunkIndices, sweep);
 
         // Place randomized chunks on global time line
-        randomizedchunks.clear();
-        randomizedchunks.reserve(numChunks);
+        m_randomizedChunks.clear();
+        m_randomizedChunks.reserve(numChunks);
         for (size_t chunkId = 0, t = sweepts /* TODO could drop */, pos = 0; chunkId < numChunks; chunkId++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[chunkId];
-            const size_t numutterances = m_chunkInformation[originalChunkIndex].numSequences;
-            const size_t numframes = m_chunkInformation[originalChunkIndex].numSamples;
-            randomizedchunks.push_back(chunk(
+            const size_t numSequences = m_chunkInformation[originalChunkIndex].numSequences;
+            const size_t numSamples = m_chunkInformation[originalChunkIndex].numSamples;
+            m_randomizedChunks.push_back(RandomizedChunk(
                 originalChunkIndex, // TODO this one still needed
-                numutterances,
-                numframes,
+                numSequences,
+                numSamples,
                 pos,
                 t)); // TODO this one still needed
-            t += numframes;
-            pos += numutterances;
+            t += numSamples;
+            pos += numSequences;
         }
 
         // For each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
-        foreach_index(chunkId, randomizedchunks)
+        foreach_index(chunkId, m_randomizedChunks)
         {
-            chunk & chunk = randomizedchunks[chunkId];
+            auto & chunk = m_randomizedChunks[chunkId];
             // start with the range of left neighbor
             if (chunkId == 0)
             {
@@ -107,13 +107,13 @@ namespace msra { namespace dbn {
             }
             else
             {
-                chunk.windowbegin = randomizedchunks[chunkId - 1].windowbegin;  // might be too early
-                chunk.windowend = randomizedchunks[chunkId - 1].windowend;      // might have more space
+                chunk.windowbegin = m_randomizedChunks[chunkId - 1].windowbegin;  // might be too early
+                chunk.windowend = m_randomizedChunks[chunkId - 1].windowend;      // might have more space
             }
-            while (chunk.globalts - randomizedchunks[chunk.windowbegin].globalts > m_randomizationrange / 2)
+            while (chunk.globalSamplePositionStart - m_randomizedChunks[chunk.windowbegin].globalSamplePositionStart > m_randomizationrange / 2)
                 chunk.windowbegin++;            // too early
             while (chunk.windowend < numChunks &&
-                randomizedchunks[chunk.windowend].globalte() - chunk.globalts < m_randomizationrange / 2)
+                m_randomizedChunks[chunk.windowend].globalSamplePositionEnd() - chunk.globalSamplePositionStart < m_randomizationrange / 2)
                 chunk.windowend++;              // got more space
         }
 
@@ -121,12 +121,12 @@ namespace msra { namespace dbn {
         // TODO just map position to randomized chunk index
         positionchunkwindows.clear();
         positionchunkwindows.reserve(numSequences);
-        foreach_index (k, randomizedchunks)
+        foreach_index (k, m_randomizedChunks)
         {
-            chunk & chunk = randomizedchunks[k];
-            for (size_t i = 0; i < chunk.numutterances; i++)
+            const auto & chunk = m_randomizedChunks[k];
+            for (size_t i = 0; i < chunk.numSequences; i++)
             {
-                positionchunkwindows.push_back(randomizedchunks.begin() + k);
+                positionchunkwindows.push_back(m_randomizedChunks.begin() + k);
             }
         }
         assert(positionchunkwindows.size() == numSequences);
@@ -134,10 +134,10 @@ namespace msra { namespace dbn {
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
         m_randomTimeline.reserve(numSequences);
-        for (const auto & chunk : randomizedchunks)
+        for (const auto & chunk : m_randomizedChunks)
         {
             // TODO pos -> iterator
-            for (size_t i = 0, pos = m_chunkInformation[chunk.originalChunkIndex].startSequencePosition; i < chunk.numutterances; i++, pos++)
+            for (size_t i = 0, pos = m_chunkInformation[chunk.originalChunkIndex].sequencePositionStart; i < chunk.numSequences; i++, pos++)
             {
                 m_randomTimeline.push_back(timeline[pos]);
             }
@@ -160,10 +160,10 @@ namespace msra { namespace dbn {
             const size_t windowend = positionchunkwindows[i].windowend();
 
             // Get valid randomization range, expressed in sequence positions.
-            size_t posbegin = randomizedchunks[windowbegin].utteranceposbegin;
-            size_t posend = randomizedchunks[windowend - 1].utteranceposend();
+            size_t posbegin = m_randomizedChunks[windowbegin].sequencePositionStart;
+            size_t posend = m_randomizedChunks[windowend - 1].sequencePositionEnd();
 
-            for(;;)
+            for (;;)
             {
                 // Pick a sequence position from [posbegin, posend)
                 const size_t j = msra::dbn::rand(posbegin, posend);
@@ -227,6 +227,7 @@ namespace msra { namespace dbn {
 
     SequenceData BlockRandomizer::getNextSequence()
     {
+        assert(m_currentFrame != SIZE_MAX); // SetEpochConfiguration() must be called first
         if (m_currentFrame >= m_epochSize)
         {
             SequenceData result;
