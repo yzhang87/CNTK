@@ -392,13 +392,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    bool FrameModePacker::ReNewBufferForMultiIO(size_t parallelSequenceNumber)
+    void FrameModePacker::ReNewBufferForMultiIO(size_t parallelSequenceNumber)
     {
         if (m_noData)
         {
             if (parallelSequenceNumber == 0)
                 m_numFramesToProcess[parallelSequenceNumber] = 0;
-            return false;
+            return;
         }
 
         std::vector<std::map<size_t, Sequence>> sequences;
@@ -411,15 +411,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 break;
             }
 
-            sequences.push_back(sequence.m_data);
+            if (!sequence.m_data.empty())
+            {
+                sequences.push_back(sequence.m_data);
+            }
         }
 
         // eldak: this will fail when no data is returned for the worker...
-        if (sequences.size() != this->m_requestedMBSize)
+        if (sequences.size() == 0)
         {
-            if (parallelSequenceNumber == 0)
-                m_numFramesToProcess[parallelSequenceNumber] = 0;
-            return false;
+            m_numFramesToProcess[parallelSequenceNumber] = 0;
+            return;
         }
 
         size_t numOfFea = m_featuresBufferMultiIO.size();
@@ -536,7 +538,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        return true;
+        return;
     }
 
     std::shared_ptr<void> FrameModePacker::AllocateIntermediateBuffer(size_t numElements, size_t elementSize)

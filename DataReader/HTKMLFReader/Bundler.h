@@ -235,7 +235,7 @@ namespace msra {
             size_t m_workerRank;
             size_t m_numberOfWorkers;
             size_t m_epochSize;
-            size_t m_currentSampleCount;
+            //size_t m_currentSampleCount;
             size_t m_elementSize;
             std::vector<size_t> m_udim;
             std::vector<Microsoft::MSR::CNTK::FrameDescription> m_featureFrameDescriptions;

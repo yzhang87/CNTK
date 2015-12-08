@@ -348,10 +348,7 @@ namespace msra { namespace dbn {
 
         // Transformer interface
 
-        virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config) override
-        {
-            config;
-        };
+        virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config) override;
 
         virtual std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> getInputs() const override
         {
@@ -364,6 +361,10 @@ namespace msra { namespace dbn {
         }
 
         virtual Microsoft::MSR::CNTK::SequenceData getNextSequence() override;
-    };
 
+        private:
+            Microsoft::MSR::CNTK::EpochConfiguration m_config;
+            size_t m_currentFrame;
+            size_t m_epochSize;
+    };
 } }

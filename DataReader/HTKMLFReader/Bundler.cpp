@@ -917,13 +917,18 @@ namespace msra { namespace dbn {
     SequenceData Bundler::getSequenceById(size_t id)
     {
         SequenceData result;
-        if (m_currentSampleCount >= m_epochSize)
+/*        if (m_currentSampleCount >= m_epochSize)
         {
             result.m_endOfEpoch = true;
             return result;
         }
 
         m_currentSampleCount += m_timeline[id].numberOfSamples;
+        if (m_currentSampleCount >= m_epochSize)
+        {
+            // Last chunk.
+            result.m_endOfEpoch = true;
+        }*/
 
         std::vector<msra::dbn::matrix> feat;              // buffer for holding curernt minibatch's frames
         std::vector<std::vector<size_t>> uids;               // buffer for storing current minibatch's frame-level label sequence
@@ -1177,7 +1182,7 @@ namespace msra { namespace dbn {
     {
         m_workerRank = config.workerRank;
         m_numberOfWorkers = config.numberOfWorkers;
-        m_currentSampleCount = 0;
+        //m_currentSampleCount = 0;
 
         size_t requestedEpochSamples = config.totalSize;
         size_t totalFrames = m_totalframes;

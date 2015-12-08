@@ -405,9 +405,49 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         assert(config.workerRank < config.numberOfWorkers);
         assert((config.workerRank == 0) && (config.numberOfWorkers == 1));
-        
 
         m_frameSource->SetEpochConfiguration(config);
+
+
+        // eldak: should be moved out of here:
+        size_t totalFrames = 0;
+        for (const auto& s : m_frameSource->getTimeline())
+        {
+            totalFrames += s.numberOfSamples;
+        }
+
+        size_t requestedEpochSamples = config.totalSize;
+        size_t extraFrames = totalFrames % config.minibatchSize;
+        size_t minibatches = totalFrames / config.minibatchSize;
+
+        // if we are allowing partial minibatches, do nothing, and let it go through
+        if (!m_partialMinibatch)
+        {
+            // we don't want any partial frames, so round total frames to be an even multiple of our mbSize
+            if (totalFrames > config.minibatchSize)
+                totalFrames -= extraFrames;
+
+            if (requestedEpochSamples == requestDataSize)
+            {
+                requestedEpochSamples = totalFrames;
+            }
+            else if (minibatches > 0)   // if we have any full minibatches
+            {
+                // since we skip the extraFrames, we need to add them to the total to get the actual number of frames requested
+                size_t sweeps = (requestedEpochSamples - 1) / totalFrames; // want the number of sweeps we will skip the extra, so subtract 1 and divide
+                requestedEpochSamples += extraFrames*sweeps;
+            }
+        }
+        else if (requestedEpochSamples == requestDataSize)
+        {
+            requestedEpochSamples = totalFrames;
+        }
+
+        EpochConfiguration transformerConfig(config);
+        transformerConfig.totalSize = requestedEpochSamples;
+
+        m_transformer->SetEpochConfiguration(transformerConfig);
+
 
         /*
         m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, config.index, requestedEpochSamples, 1, config.workerRank, config.numberOfWorkers, datapasses));

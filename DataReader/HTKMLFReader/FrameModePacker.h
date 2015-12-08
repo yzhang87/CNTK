@@ -38,7 +38,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void PackToMinibatch(Minibatch &mb);
         void FillOneUttDataforParallelmode(size_t startFr,
             size_t framenum, size_t channelIndex, size_t sourceChannelIndex);
-        bool ReNewBufferForMultiIO(size_t i);
+        void ReNewBufferForMultiIO(size_t i);
         std::shared_ptr<void> AllocateIntermediateBuffer(size_t numElements, size_t elementSize);
 
         enum InputOutputTypes

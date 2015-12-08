@@ -9,6 +9,7 @@
 #include "stdafx.h"
 #include "BlockRandomizer.h"
 #include <algorithm>
+#include <DataReader.h>
 
 namespace msra { namespace dbn {
 
@@ -497,11 +498,39 @@ namespace msra { namespace dbn {
 
     SequenceData BlockRandomizer::getNextSequence()
     {
+        if(m_currentFrame >= m_epochSize)
+        {
+            SequenceData result;
+            result.m_endOfEpoch = true;
+            return result;
+        }
+
         newLazyRandomize();
         assert(m_currentSequenceId < m_randomTimeline.size());
         const auto & seqDesc = m_randomTimeline[m_currentSequenceId++];
+        m_currentFrame += seqDesc.numberOfSamples;
+
         // TODO purge maybe
         return m_sequencer->getSequenceById(seqDesc.id);
     };
 
+    void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
+    {
+        m_config = config;
+        m_currentFrame = 0;
+        m_epochSize = config.totalSize;
+        size_t timeframe = m_epochSize * config.index;
+
+        size_t totalSize = 0;
+        for (const auto& t : m_sequencer->getTimeline())
+        {
+            totalSize += t.numberOfSamples;
+        }
+
+        assert(m_framemode);
+
+        m_currentSweep = timeframe / totalSize;
+        newRandomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
+        m_currentSequenceId = timeframe % totalSize;
+    };
 } }
