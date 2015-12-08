@@ -6,7 +6,7 @@
 #pragma once
 
 #include "Basics.h"
-#include "BlockRandomizer.h"
+#include "Bundler.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
