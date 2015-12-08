@@ -33,7 +33,34 @@ namespace msra { namespace dbn {
         }
     }
 
-    void BlockRandomizer::Randomize( // TODO rename
+    void BlockRandomizer::InitializeChunkInformation()
+    {
+        const Timeline & timeline = m_sequencer->getTimeline();
+        assert(IsValid(timeline));
+
+        const size_t numChunks = timeline.back().chunkId + 1;
+        assert(m_chunkInformation.size() == 0);
+
+        m_chunkInformation.insert(m_chunkInformation.begin(),
+            numChunks,
+            ChunkInformation { 0, 0, SIZE_MAX } );
+
+        size_t maxNumberOfSamples = 0;
+
+        for (const auto & seqDesc : timeline)
+        {
+            auto & chunkInformation = m_chunkInformation[seqDesc.chunkId];
+            chunkInformation.numSequences++;
+            chunkInformation.numSamples += seqDesc.numberOfSamples;
+            chunkInformation.startSequencePosition =
+                min(chunkInformation.startSequencePosition, seqDesc.id);
+            maxNumberOfSamples = max(maxNumberOfSamples, seqDesc.numberOfSamples);
+        }
+
+        assert(!m_framemode || maxNumberOfSamples == 1);
+    }
+
+    void BlockRandomizer::Randomize(
         const size_t sweep,
         const size_t sweepts, // TODO not needed anymore
         const Timeline& timeline)
@@ -50,28 +77,14 @@ namespace msra { namespace dbn {
         }
         randomshuffle(randomizedChunkIndices, sweep);
 
-        // Create some auxiliary data for the chunks
-        // TODO tune; not all is needed?
-        std::vector<size_t> chunkNumSequences(numChunks);
-        std::vector<size_t> chunkNumSamples(numChunks);
-        std::vector<size_t> chunkStart(numChunks, static_cast<size_t>(-1));
-
-        for (const auto & seqDesc : timeline)
-        {
-            size_t chunkId = seqDesc.chunkId;
-            chunkNumSequences[chunkId]++;
-            chunkNumSamples[chunkId] += seqDesc.numberOfSamples;
-            chunkStart[chunkId] = std::min(chunkStart[chunkId], seqDesc.id);
-        }
-
         // Place randomized chunks on global time line
         randomizedchunks.clear();
         randomizedchunks.reserve(numChunks);
         for (size_t chunkId = 0, t = sweepts /* TODO could drop */, pos = 0; chunkId < numChunks; chunkId++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[chunkId];
-            const size_t numutterances = chunkNumSequences[originalChunkIndex];
-            const size_t numframes = chunkNumSamples[originalChunkIndex];
+            const size_t numutterances = m_chunkInformation[originalChunkIndex].numSequences;
+            const size_t numframes = m_chunkInformation[originalChunkIndex].numSamples;
             randomizedchunks.push_back(chunk(
                 originalChunkIndex, // TODO this one still needed
                 numutterances,
@@ -124,7 +137,7 @@ namespace msra { namespace dbn {
         for (const auto & chunk : randomizedchunks)
         {
             // TODO pos -> iterator
-            for (size_t i = 0, pos = chunkStart[chunk.originalChunkIndex]; i < chunk.numutterances; i++, pos++)
+            for (size_t i = 0, pos = m_chunkInformation[chunk.originalChunkIndex].startSequencePosition; i < chunk.numutterances; i++, pos++)
             {
                 m_randomTimeline.push_back(timeline[pos]);
             }

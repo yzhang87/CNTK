@@ -32,6 +32,17 @@ namespace msra { namespace dbn {
         size_t m_currentSequenceId; // position within the current sweep
         Microsoft::MSR::CNTK::Timeline m_randomTimeline;
 
+        // Information maintained for original (non-randomized) chunks
+        struct ChunkInformation
+        {
+            size_t numSequences;
+            size_t numSamples;
+            size_t startSequencePosition;
+        };
+        std::vector<ChunkInformation> m_chunkInformation;
+
+        void InitializeChunkInformation();
+
         // TODO note: numutterances / numframes could also be computed through neighbors
         struct chunk                    // chunk as used in actual processing order (randomized sequence)
         {
@@ -100,6 +111,7 @@ namespace msra { namespace dbn {
             , m_sequencer(sequencer)
         {
             assert(sequencer != nullptr); // TODO only new mode
+            InitializeChunkInformation();
         }
 
         void LazyRandomize();
