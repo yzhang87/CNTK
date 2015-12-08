@@ -1,9 +1,7 @@
 //
-// <copyright file="utterancesourcemultiNew.h" company="Microsoft">
+// <copyright file="Bundler.h" company="Microsoft">
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
-//
-// utterancesourcemultiNew.h -- implementation of utterancesource.h that supports multiple feature and label sets
 //
 
 #pragma once
@@ -94,6 +92,7 @@ namespace msra {
                         allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), 0, 0)));
                     return allclassids;     // nothing to return
                 }
+                assert(0); // TODO can remove getOriginalChunkIndex()
                 const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(uttref.chunkindex);
                 const auto & chunkdata = m_allchunks[0][originalChunkIndex];
                 const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array

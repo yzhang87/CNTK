@@ -129,7 +129,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Timeline.h" />
     <ClInclude Include="Utils.h" />
-    <ClInclude Include="utterancesourcemultiNew.h" />
+    <ClInclude Include="utterancesourcemulti.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Common\TimerUtility.cpp">

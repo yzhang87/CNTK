@@ -258,15 +258,10 @@ namespace msra { namespace dbn {
             , m_currentSequenceId(SIZE_MAX)
             , m_sequencer(sequencer)
         {
-            // TODO new mode
-            if (sequencer != nullptr)
-            {
-                assert(IsValid(sequencer->getTimeline()));
-                m_randomTimeline.reserve(sequencer->getTimeline().size()); // TODO
-                // TODO reserve required memory
-            }
+            assert(sequencer != nullptr); // TODO only new mode
         }
 
+        // TODO old
         // big long helper to update all cached randomization information
         // This is a rather complex process since we randomize on two levels:
         //  - chunks of consecutive data in the feature archive
@@ -274,47 +269,13 @@ namespace msra { namespace dbn {
         //     - utterances (in utt mode), or
         //     - frames (in frame mode)
         // The 'globalts' parameter is the start time that triggered the rerandomization; it is NOT the base time of the randomized area.
-        size_t lazyrandomization(
-            const size_t globalts,
-            const std::vector<std::vector<utterancechunkdata>> & allchunks);
-
         void newLazyRandomize();
 
-        // TODO temporary
+        // TODO rename
         void newRandomize(
             const size_t sweep,
             const size_t sweepts,
             const Microsoft::MSR::CNTK::Timeline& timeline);
-
-        size_t sequenceIndexForFramePos(const size_t t) const
-        {
-            assert(m_sequencer == nullptr); // not valid in new mode
-            auto positer = randomizedutteranceposmap.find(t);
-            if (positer == randomizedutteranceposmap.end())
-                LogicError("sequenceIndexForFramePos: invalid 'globalts' parameter; must match an existing utterance boundary");
-            return positer->second;
-        }
-
-        size_t getOriginalChunkIndex(size_t randomizedChunkIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(randomizedChunkIndex < randomizedchunks.size());
-            return randomizedchunks[randomizedChunkIndex].originalChunkIndex;
-        }
-
-        size_t getChunkWindowBegin(size_t randomizedChunkIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(randomizedChunkIndex < randomizedchunks.size());
-            return randomizedchunks[randomizedChunkIndex].windowbegin;
-        }
-
-        size_t getChunkWindowEnd(size_t randomizedChunkIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(randomizedChunkIndex < randomizedchunks.size());
-            return randomizedchunks[randomizedChunkIndex].windowend;
-        }
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
@@ -326,19 +287,6 @@ namespace msra { namespace dbn {
         {
             assert(sequenceIndex < positionchunkwindows.size());
             return positionchunkwindows[sequenceIndex].windowend();
-        }
-
-        size_t getNumSequences() const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            return randomizedsequencerefs.size();
-        }
-
-        const sequenceref & getSequenceRef(size_t sequenceIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(sequenceIndex < randomizedsequencerefs.size());
-            return randomizedsequencerefs[sequenceIndex];
         }
 
         bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
@@ -362,9 +310,9 @@ namespace msra { namespace dbn {
 
         virtual Microsoft::MSR::CNTK::SequenceData getNextSequence() override;
 
-        private:
-            Microsoft::MSR::CNTK::EpochConfiguration m_config;
-            size_t m_currentFrame;
-            size_t m_epochSize;
+    private:
+        Microsoft::MSR::CNTK::EpochConfiguration m_config;
+        size_t m_currentFrame;
+        size_t m_epochSize;
     };
 } }

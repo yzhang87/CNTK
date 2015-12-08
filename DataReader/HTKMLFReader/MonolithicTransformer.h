@@ -7,7 +7,7 @@
 #include "commandArgUtil.h"
 
 #include "biggrowablevectors.h"
-#include "utterancesourcemultiNew.h"
+#include "utterancesourcemulti.h"
 #include "minibatchiterator.h"
 #include <inner_interfaces.h>
 #include "Bundler.h"

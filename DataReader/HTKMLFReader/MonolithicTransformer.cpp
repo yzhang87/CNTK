@@ -11,7 +11,7 @@
 #include "msra_mgram.h"                 // for unigram scores of ground-truth path in sequence training
 
 #include "rollingwindowsource.h"        // minibatch sources
-#include "utterancesourcemultiNew.h"
+#include "utterancesourcemulti.h"
 #include "chunkevalsource.h"
 #include "minibatchiterator.h"
 #define DATAREADER_EXPORTS  // creating the exports here
