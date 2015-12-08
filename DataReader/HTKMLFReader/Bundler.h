@@ -328,33 +328,26 @@ namespace msra {
             std::map<std::wstring, size_t> m_featureNameToIdMap;
             std::map<std::wstring, size_t> m_labelNameToIdMap;
     
-            // TODO
+            // TODO can more stuff be dropped?
             struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
             {
                 size_t chunkindex;          // lives in this chunk (index into randomizedchunks[])
                 size_t utteranceindex;      // utterance index in that chunk
                 size_t numframes;           // (cached since we cannot directly access the underlying data from here)
-                size_t globalts;            // start frame in global space after randomization (for mapping frame index to utterance position)
                 size_t frameindex;          // 0 for utterances
-
-                // TODO globalts - sweep cheaper?
-                size_t globalte() const { return globalts + numframes; }            // end frame
 
                 sequenceref()
                     : chunkindex (0)
                     , utteranceindex (0)
                     , frameindex (0)
-                    , globalts (SIZE_MAX)
-                    , numframes (0) {}
+                    , numframes (0)
+                {}
                 sequenceref (size_t chunkindex, size_t utteranceindex, size_t frameindex = 0)
                     : chunkindex (chunkindex)
                     , utteranceindex (utteranceindex)
                     , frameindex (frameindex)
-                    , globalts (SIZE_MAX)
-                    , numframes (0) {}
-
-                // TODO globalts and numframes only set after swapping, wouldn't need to swap them
-                // TODO old frameref was more tighly packed (less fields, smaller frameindex and utteranceindex). We need to bring these space optimizations back.
+                    , numframes (0)
+                {}
             };
 
             std::vector<sequenceref> m_sequences;
