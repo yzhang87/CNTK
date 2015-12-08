@@ -33,31 +33,7 @@ namespace msra { namespace dbn {
         }
     }
 
-    std::unique_ptr<Timeline> BlockRandomizer::getTimelineFromAllchunks(const std::vector<std::vector<utterancechunkdata>> & allchunks)
-    {
-        assert(0); // TODO remove this
-        const auto & primaryChunks = allchunks[0];
-        size_t sequenceId = 0;
-        auto timeline = std::make_unique<Timeline>();
-        foreach_index(chunkId, primaryChunks)
-        {
-            const auto & chunkdata = primaryChunks[chunkId];
-            foreach_index(utteranceIndex, primaryChunks)
-            {
-                // For frame mode, explode into #frames many single-element sequences.
-                // For utterance mode, keep a single sequence with the right number of frames.
-                const size_t numberOfSamples = m_framemode ? 1 : chunkdata.numframes(utteranceIndex);
-                const size_t numberOfSequences = m_framemode ? chunkdata.numframes(utteranceIndex) : 1;
-                for (size_t i = 0; i < numberOfSequences; i++, sequenceId++)
-                {
-                    timeline->push_back(SequenceDescription { sequenceId, numberOfSamples, chunkId });
-                }
-            }
-        }
-        return timeline;
-    }
-
-    void BlockRandomizer::newRandomize( // TODO rename
+    void BlockRandomizer::Randomize( // TODO rename
         const size_t sweep,
         const size_t sweepts, // TODO not needed anymore
         const Timeline& timeline)
@@ -223,7 +199,7 @@ namespace msra { namespace dbn {
         return it == timeline.end();
     }
 
-    void BlockRandomizer::newLazyRandomize()
+    void BlockRandomizer::LazyRandomize()
     {
         if (m_currentSequenceId >= m_randomTimeline.size())
         {
@@ -231,21 +207,21 @@ namespace msra { namespace dbn {
                 fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
                     m_currentSweep, m_framemode ? "frame" : "utterance");
             m_currentSweep++;
-            newRandomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
+            Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
             m_currentSequenceId = 0;
         };
     }
 
     SequenceData BlockRandomizer::getNextSequence()
     {
-        if(m_currentFrame >= m_epochSize)
+        if (m_currentFrame >= m_epochSize)
         {
             SequenceData result;
             result.m_endOfEpoch = true;
             return result;
         }
 
-        newLazyRandomize();
+        LazyRandomize();
         assert(m_currentSequenceId < m_randomTimeline.size());
         const auto & seqDesc = m_randomTimeline[m_currentSequenceId++];
         m_currentFrame += seqDesc.numberOfSamples;
@@ -269,8 +245,9 @@ namespace msra { namespace dbn {
 
         assert(m_framemode);
 
+        // TODO make sure this will use the lazy path as well...
         m_currentSweep = timeframe / totalSize;
-        newRandomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
+        Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
         m_currentSequenceId = timeframe % totalSize;
     };
 } }

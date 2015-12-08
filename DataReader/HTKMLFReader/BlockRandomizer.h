@@ -228,11 +228,6 @@ namespace msra { namespace dbn {
             std::vector<chunk>::iterator definingchunk;       // the chunk in randomizedchunks[] that defined the utterance position of this utterance
             size_t windowbegin() const { return definingchunk->windowbegin; }
             size_t windowend() const { return definingchunk->windowend; }
-            bool isvalidforthisposition (const sequenceref & sequence) const
-            {
-                return sequence.chunkindex >= windowbegin() && sequence.chunkindex < windowend(); // check if 'sequence' lives in is in allowed range for this position
-                // TODO by construction sequences cannot span chunks (check again)
-            }
 
             bool isvalidforthisposition (const Microsoft::MSR::CNTK::SequenceDescription & sequence) const
             {
@@ -261,18 +256,9 @@ namespace msra { namespace dbn {
             assert(sequencer != nullptr); // TODO only new mode
         }
 
-        // TODO old
-        // big long helper to update all cached randomization information
-        // This is a rather complex process since we randomize on two levels:
-        //  - chunks of consecutive data in the feature archive
-        //  - within a range of chunks that is paged into RAM
-        //     - utterances (in utt mode), or
-        //     - frames (in frame mode)
-        // The 'globalts' parameter is the start time that triggered the rerandomization; it is NOT the base time of the randomized area.
-        void newLazyRandomize();
+        void LazyRandomize();
 
-        // TODO rename
-        void newRandomize(
+        void Randomize(
             const size_t sweep,
             const size_t sweepts,
             const Microsoft::MSR::CNTK::Timeline& timeline);
@@ -289,13 +275,6 @@ namespace msra { namespace dbn {
             return positionchunkwindows[sequenceIndex].windowend();
         }
 
-        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
-
-        std::unique_ptr<Microsoft::MSR::CNTK::Timeline> getTimelineFromAllchunks(
-            const std::vector<std::vector<utterancechunkdata>> & allchunks);
-
-        // Transformer interface
-
         virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config) override;
 
         virtual std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> getInputs() const override
@@ -311,6 +290,8 @@ namespace msra { namespace dbn {
         virtual Microsoft::MSR::CNTK::SequenceData getNextSequence() override;
 
     private:
+        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
+
         Microsoft::MSR::CNTK::EpochConfiguration m_config;
         size_t m_currentFrame;
         size_t m_epochSize;
