@@ -38,8 +38,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     MonolithicTransformer::MonolithicTransformer(const ConfigParameters & readerConfig, size_t elementSize)
         : m_elementSize(elementSize)
     {
-        m_noData = false;
-
         wstring command(readerConfig(L"action", L"")); //look up in the config for the master command to determine whether we're writing output (inputs only) or training/evaluating (inputs and outputs)
 
         if (readerConfig.Exists(L"legacyMode"))
@@ -408,8 +406,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_frameSource->SetEpochConfiguration(config);
 
-
-        // eldak: should be moved out of here:
         size_t totalFrames = 0;
         for (const auto& s : m_frameSource->getTimeline())
         {
@@ -447,19 +443,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         transformerConfig.totalSize = requestedEpochSamples;
 
         m_transformer->SetEpochConfiguration(transformerConfig);
-
-
-        /*
-        m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, config.index, requestedEpochSamples, 1, config.workerRank, config.numberOfWorkers, datapasses));
-        // Advance the MB iterator until we find some data or reach the end of epoch
-        while ((m_mbiter->currentmbframes() == 0) && *m_mbiter)
-        {
-            (*m_mbiter)++;
-        }
-        */
-        m_noData = false;
-        /*if (!(*m_mbiter))
-            m_noData = true;*/
     }
 
     std::vector<InputDescriptionPtr> MonolithicTransformer::getInputs() const
@@ -469,87 +452,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     SequenceData MonolithicTransformer::getNextSequence()
     {
-        /*if (m_noData)
-        {
-            return std::map<InputId, Sequence>();
-        }*/
-
         return m_transformer->getNextSequence();
-
-        /*
-        std::map<size_t, Sequence> result;
-        for (auto it = m_featureNameToIdMap.begin(); it != m_featureNameToIdMap.end(); ++it)
-        {
-            Sequence r;
-            size_t id = m_featureNameToIdMap[it->first];
-
-            // eldak: leak here.
-            const msra::dbn::matrixstripe featOri = m_mbiter->frames(id);
-            const size_t dimensions = featOri.rows();
-            const void* tmp = &featOri(0, 0);
-
-            r.numberOfFrames = 1;
-            r.frameDescription = &m_featureFrameDescriptions[id];
-
-            // eldak: leak leak leak. who is responsible for clearing this? who does caching?
-            void* buffer = nullptr;
-            if (m_elementSize == sizeof(float))
-            {
-                buffer = new float[featOri.rows()];
-            }
-            else
-            {
-                buffer = new double[featOri.rows()];
-            }
-
-            memset(buffer, 0, m_elementSize * dimensions);
-            memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
-            r.data = buffer;
-
-            result.insert(std::make_pair(m_nameToId[it->first], r));
-        }
-
-        for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it)
-        {
-            Sequence r;
-            size_t id = m_labelNameToIdMap[it->first];
-            size_t dim = m_labelNameToDimMap[it->first];
-
-            const vector<size_t>& uids = m_mbiter->labels(id);
-
-            // eldak: leak here.
-            if (m_elementSize == sizeof(float))
-            {
-                float* tmp = new float[dim];
-                memset(tmp, 0, m_elementSize * dim);
-                tmp[uids[0]] = 1;
-                r.data = tmp;
-                r.numberOfFrames = 1;
-                r.frameDescription = &m_labelFrameDescriptions[id];
-            }
-            else
-            {
-                double* tmp = new double[dim];
-                tmp[uids[0]] = 1;
-                r.data = tmp;
-                r.numberOfFrames = 1;
-                r.frameDescription = &m_labelFrameDescriptions[id];
-            }
-            result.insert(std::make_pair(m_nameToId[it->first], r));
-        }
-
-        // Advance the MB iterator until we find some data or reach the end of epoch
-        ScopeTimer mbIterAdvancementTimer(m_verbosity, "Time to advance mbiter = %.8g\n");
-
-        do
-        {
-            (*m_mbiter)++;
-        }
-        while ((m_mbiter->currentmbframes() == 0) && *m_mbiter);
-
-        if (!(*m_mbiter))
-            m_noData = true;
-
-        return result;*/
     }
 }}}
