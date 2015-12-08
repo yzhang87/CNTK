@@ -24,12 +24,7 @@ namespace msra { namespace dbn {
     {
         int m_verbosity;
         bool m_framemode; // TODO drop
-        size_t m_randomizationrange; // parameter remembered; this is the full window (e.g. 48 hours), not the half window
-        size_t m_currentSweep;            // randomization is currently cached for this sweep; if it changes, rebuild all below
         Microsoft::MSR::CNTK::SequencerPtr m_sequencer;
-        size_t m_currentSequenceId; // position within the current sweep
-        Microsoft::MSR::CNTK::Timeline m_randomTimeline;
-
         // Information maintained for original (non-randomized) chunks
         struct ChunkInformation
         {
@@ -38,11 +33,12 @@ namespace msra { namespace dbn {
             size_t startSequencePosition;
         };
         std::vector<ChunkInformation> m_chunkInformation;
-
-        void InitializeChunkInformation();
+        size_t m_randomizationrange; // full window measured in samples, one half to the left, the other to the right
+        size_t m_currentSweep; // randomization is currently cached for this sweep; if it changes, rebuild all below
+        size_t m_currentSequenceId; // position within the current sweep
 
         // TODO note: numutterances / numframes could also be computed through neighbors
-        struct chunk                    // chunk as used in actual processing order (randomized sequence)
+        struct RandomizedChunk          // chunk as used in actual processing order (randomized sequence)
         {
             size_t originalChunkIndex;
             size_t numutterances;
@@ -73,8 +69,8 @@ namespace msra { namespace dbn {
                 , globalts(globalts) {}
         };
         std::vector<chunk> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
+        Microsoft::MSR::CNTK::Timeline m_randomTimeline;
 
-    private:
         // TODO rename
         std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table // TODO not valid for new randomizer
 
@@ -97,18 +93,13 @@ namespace msra { namespace dbn {
 
         template<typename VECTOR> static void randomshuffle (VECTOR & v, size_t randomseed);
 
-    public:
-        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
-            : m_verbosity(verbosity)
-            , m_framemode(framemode)
-            , m_randomizationrange(randomizationrange)
-            , m_currentSweep(SIZE_MAX)
-            , m_currentSequenceId(SIZE_MAX)
-            , m_sequencer(sequencer)
-        {
-            assert(sequencer != nullptr); // TODO only new mode
-            InitializeChunkInformation();
-        }
+        void InitializeChunkInformation();
+
+        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
+
+        Microsoft::MSR::CNTK::EpochConfiguration m_config;
+        size_t m_currentFrame;
+        size_t m_epochSize;
 
         void LazyRandomize();
 
@@ -116,6 +107,23 @@ namespace msra { namespace dbn {
             const size_t sweep,
             const size_t sweepts,
             const Microsoft::MSR::CNTK::Timeline& timeline);
+
+    public:
+        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
+            : m_verbosity(verbosity)
+            , m_framemode(framemode)
+            , m_randomizationrange(randomizationrange)
+            , m_sequencer(sequencer)
+            , m_currentSweep(SIZE_MAX)
+            , m_currentSequenceId(SIZE_MAX)
+        {
+            assert(sequencer != nullptr);
+            InitializeChunkInformation();
+        }
+
+        virtual ~BlockRandomizer()
+        {
+        }
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
@@ -137,17 +145,6 @@ namespace msra { namespace dbn {
             return dummy;
         }
 
-        virtual ~BlockRandomizer()
-        {
-        }
-
         virtual Microsoft::MSR::CNTK::SequenceData getNextSequence() override;
-
-    private:
-        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
-
-        Microsoft::MSR::CNTK::EpochConfiguration m_config;
-        size_t m_currentFrame;
-        size_t m_epochSize;
     };
 } }
