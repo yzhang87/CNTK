@@ -368,7 +368,7 @@ namespace msra { namespace dbn {
                         m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
                         m_timeline.push_back(description);
 
-                        auto sq = BlockRandomizer::sequenceref(i, j, k);
+                        auto sq = sequenceref(i, j, k);
                         sq.numframes = 1;
                         m_sequences.push_back(sq);
                     }
@@ -382,7 +382,7 @@ namespace msra { namespace dbn {
                     m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
                     m_timeline.push_back(description);
 
-                    auto sq = BlockRandomizer::sequenceref(i, j, 0);
+                    auto sq = sequenceref(i, j, 0);
                     sq.numframes = description.numberOfSamples;
                     m_sequences.push_back(sq);
                 }
