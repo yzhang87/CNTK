@@ -390,81 +390,6 @@ namespace msra { namespace dbn {
         }
     }
 
-    void Bundler::releaserandomizedchunk(size_t k)
-    {
-        size_t numreleased = 0;
-        const size_t numStreams = m_allchunks.size();
-        const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(k);
-        for (size_t m = 0; m < numStreams; m++)
-        {
-            auto & chunkdata = m_allchunks[m][originalChunkIndex];
-            if (chunkdata.isinram())
-            {
-#if 0 // TODO restore diagnostics
-                if (verbosity)
-                    fprintf(stderr, "releaserandomizedchunk: paging out randomized chunk %u (frame range [%d..%d]), %d resident in RAM\n",
-                    (int)k, (int)randomizedchunks[m][k].globalts, (int)(randomizedchunks[m][k].globalte() - 1), (int)(chunksinram - 1));
-#endif
-                chunkdata.releasedata();
-                numreleased++;
-            }
-        }
-        if (numreleased > 0 && numreleased < numStreams)
-        {
-            LogicError("releaserandomizedchunk: inconsistency detected - some inputs have chunks in ram, some not");
-        }
-        else if (numreleased == numStreams)
-        {
-            m_chunksinram--;
-        }
-        return;
-    }
-
-    // helper to page in a chunk for a given utterance
-    // (window range passed in for checking only)
-    // Returns true if we actually did read something.
-    bool Bundler::requirerandomizedchunk(const size_t chunkindex, const size_t windowbegin, const size_t windowend)
-    {
-        size_t numinram = 0;
-
-        if (chunkindex < windowbegin || chunkindex >= windowend)
-            LogicError("requirerandomizedchunk: requested utterance outside in-memory chunk range");
-
-        const size_t numStreams = m_allchunks.size();
-        const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(chunkindex);
-        for (size_t m = 0; m < numStreams; m++)
-        {
-            auto & chunkdata = m_allchunks[m][originalChunkIndex];
-            if (chunkdata.isinram())
-                numinram++;
-        }
-        if (numinram == numStreams)
-            return false;
-        else if (numinram == 0)
-        {
-            const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(chunkindex);
-            for (size_t m = 0; m < numStreams; m++)
-            {
-                auto & chunkdata = m_allchunks[m][originalChunkIndex];
-#if 0 // TODO restore diagnostics
-                if (verbosity)
-                    fprintf(stderr, "feature set %u: requirerandomizedchunk: paging in randomized chunk %llu (frame range [%llu..%llu]), %llu resident in RAM\n",
-                    m, chunkindex, chunk.globalts, (chunk.globalte() - 1), (chunksinram + 1));
-#endif
-                msra::util::attempt(5, [&]()   // (reading from network)
-                {
-                    chunkdata.requiredata(m_featkind[m], m_featdim[m], m_sampperiod[m], m_lattices, m_verbosity);
-                });
-            }
-            m_chunksinram++;
-            return true;
-        }
-        else
-        {
-            LogicError("requirerandomizedchunk: inconsistency detected - some inputs need chunks paged in, some not");
-        }
-    }
-
     bool Bundler::RequireChunk(size_t chunkindex)
     {
         size_t numinram = 0;
@@ -518,29 +443,6 @@ namespace msra { namespace dbn {
         {
             m_chunksinram--;
         }
-    }
-
-    // return first valid globalts to ask getbatch() for
-    // In utterance mode, the epoch start may fall in the middle of an utterance.
-    // We return the end time of that utterance (which, in pathological cases, may in turn be outside the epoch; handle that).
-    /*implement*/ size_t Bundler::firstvalidglobalts(const size_t globalts) // TODO can be const
-    {
-        // update randomization if a new sweep is entered
-        const size_t sweep = m_rand->lazyrandomization(globalts, m_allchunks);
-
-        // frame mode: start at sweep boundary directly // TODO so globalts needs to be at sweep boundary?
-        if (m_framemode)
-            return globalts;
-
-        assert(false);
-        // utterance mode
-        assert(globalts >= sweep * m_totalframes && globalts < (sweep + 1) * m_totalframes); sweep;
-        // TODO use std::find
-        size_t pos;
-        for (pos = 0; pos < m_rand->getNumSequences(); pos++)
-            if (m_rand->getSequenceRef(pos).globalts >= globalts)
-                return m_rand->getSequenceRef(pos).globalts;   // exact or inexact match
-        return m_rand->getSequenceRef(pos - 1).globalte();     // boundary case: requested time falls within the last utterance
     }
 
     const Timeline& Bundler::getTimeline() const

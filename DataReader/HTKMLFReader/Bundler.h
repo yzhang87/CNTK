@@ -17,7 +17,6 @@
 #include "minibatchiterator.h"
 #include "biggrowablevectors.h"
 #include "ssematrix.h"
-#include "unordered_set"
 #include "BlockRandomizer.h"
 
 namespace Microsoft{namespace MSR{namespace CNTK{
@@ -64,12 +63,12 @@ namespace msra {
             size_t m_chunksinram;             // (for diagnostics messages)
 
             // helper to page out a chunk with log message
-            void releaserandomizedchunk(size_t k);
+            //void releaserandomizedchunk(size_t k);
 
             // helper to page in a chunk for a given utterance
             // (window range passed in for checking only)
             // Returns true if we actually did read something.
-            bool requirerandomizedchunk(const size_t chunkindex, const size_t windowbegin, const size_t windowend);
+            //bool requirerandomizedchunk(const size_t chunkindex, const size_t windowbegin, const size_t windowend);
 
             // TODO: this may go away if we store classids directly in the utterance data
             template<class VECTOR> class shiftedvector  // accessing a vector with a non-0 starting index
@@ -131,7 +130,6 @@ namespace msra {
                 return allphoneboundaries;   // nothing to return
             }
 
-        private:
             class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors
             {
                 void operator= (const matrixasvectorofvectors &);  // non-assignable
@@ -181,7 +179,7 @@ namespace msra {
             // return first valid globalts to ask getbatch() for
             // In utterance mode, the epoch start may fall in the middle of an utterance.
             // We return the end time of that utterance (which, in pathological cases, may in turn be outside the epoch; handle that).
-            /*implement*/ size_t firstvalidglobalts(const size_t globalts); // TODO can be const
+            /*implement*/// size_t firstvalidglobalts(const size_t globalts); // TODO can be const
 
             const std::vector<size_t> & unitcounts() const { return m_counts[0]; }
 
