@@ -48,22 +48,26 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         };
 
     private:
+
         size_t m_elementSize; // size of the element, should go away probably and be taken from the layout?
         MemoryProviderPtr m_memoryProvider;
         intargvector m_numSeqsPerMBForAllEpochs;
         size_t m_numSeqsPerMB;                  // requested number of parallel sequences
         bool m_noData;
         MBLayoutPtr m_pMBLayout;
+
         std::map<std::wstring, size_t> m_nameToTypeMap;
         std::map<std::wstring, size_t> m_featureNameToIdMap;
         std::map<std::wstring, size_t> m_featureNameToDimMap;
         std::vector<std::shared_ptr<void>> m_featuresBufferMultiIO;
         std::vector<size_t> m_featuresBufferAllocatedMultiIO;
+
         std::vector<size_t> m_labelDims;
         std::map<std::wstring, size_t> m_labelNameToIdMap;
         std::map<std::wstring, size_t> m_labelNameToDimMap;
         std::vector<std::shared_ptr<void>> m_labelsBufferMultiIO;
         std::vector<size_t> m_labelsBufferAllocatedMultiIO;
+
         int m_verbosity;
         bool m_partialMinibatch;
         size_t m_mbNumTimeSteps;                // number of time steps  to fill/filled (note: for frame randomization, this the #frames, and not 1 as later reported)
@@ -71,13 +75,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::vector<std::shared_ptr<void>> m_featuresBufferMultiUtt;
         std::vector<size_t> m_featuresBufferAllocatedMultiUtt;
+        std::vector<size_t> m_featuresStartIndexMultiUtt;
+
         std::vector<std::shared_ptr<void>> m_labelsBufferMultiUtt;
         std::vector<size_t> m_labelsBufferAllocatedMultiUtt;
-        std::vector<size_t> m_featuresStartIndexMultiUtt;
         std::vector<size_t> m_labelsStartIndexMultiUtt;
+
         std::map<std::wstring, size_t> m_nameToId;
 
-        //for lattice uids and phoneboundaries
         TransformerPtr m_transformer;
         size_t m_requestedMBSize;
     };

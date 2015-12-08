@@ -1,32 +1,7 @@
 #include "stdafx.h"
 #include "FrameModePacker.h"
-
-#ifdef _WIN32
-#include <objbase.h>
-#endif
-#include "Basics.h"
-
-#include "htkfeatio.h"                  // for reading HTK features
-#include "latticearchive.h"             // for reading HTK phoneme lattices (MMI training)
-#include "msra_mgram.h"                 // for unigram scores of ground-truth path in sequence training
-
-// to be removed: #include "rollingwindowsource.h"        // minibatch sources
-#include "utterancesourcemulti.h"       // minibatch sources
-#include "chunkevalsource.h"
-#include "minibatchiterator.h"
-#define DATAREADER_EXPORTS  // creating the exports here
-#include "DataReader.h"
-#include "commandArgUtil.h"
-#include "ScriptableObjects.h"
 #include "TimerUtility.h"
-
-#ifdef __unix__
-#include <limits.h>
-#endif
-#pragma warning (disable: 4127) // conditional expression is constant; "if (sizeof(ElemType)==sizeof(float))" triggers this
-
 #include "Utils.h"
-
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
