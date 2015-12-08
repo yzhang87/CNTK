@@ -189,38 +189,8 @@ namespace msra { namespace dbn {
         };
         std::vector<chunk> randomizedchunks;  // utterance chunks after being brought into random order (we randomize within a rolling window over them)
 
-    public:
-        struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
-        {
-            size_t chunkindex;          // lives in this chunk (index into randomizedchunks[])
-            size_t utteranceindex;      // utterance index in that chunk
-            size_t numframes;           // (cached since we cannot directly access the underlying data from here)
-            size_t globalts;            // start frame in global space after randomization (for mapping frame index to utterance position)
-            size_t frameindex;          // 0 for utterances
-
-            // TODO globalts - sweep cheaper?
-            size_t globalte() const { return globalts + numframes; }            // end frame
-
-            sequenceref()
-                : chunkindex (0)
-                , utteranceindex (0)
-                , frameindex (0)
-                , globalts (SIZE_MAX)
-                , numframes (0) {}
-            sequenceref (size_t chunkindex, size_t utteranceindex, size_t frameindex = 0)
-                : chunkindex (chunkindex)
-                , utteranceindex (utteranceindex)
-                , frameindex (frameindex)
-                , globalts (SIZE_MAX)
-                , numframes (0) {}
-
-            // TODO globalts and numframes only set after swapping, wouldn't need to swap them
-            // TODO old frameref was more tighly packed (less fields, smaller frameindex and utteranceindex). We need to bring these space optimizations back.
-        };
-
     private:
         // TODO rename
-        std::vector<sequenceref> randomizedsequencerefs;          // [pos] randomized utterance ids
         std::unordered_map<size_t, size_t> randomizedutteranceposmap;     // [globalts] -> pos lookup table // TODO not valid for new randomizer
 
         struct positionchunkwindow       // chunk window required in memory when at a certain position, for controlling paging
@@ -228,11 +198,6 @@ namespace msra { namespace dbn {
             std::vector<chunk>::iterator definingchunk;       // the chunk in randomizedchunks[] that defined the utterance position of this utterance
             size_t windowbegin() const { return definingchunk->windowbegin; }
             size_t windowend() const { return definingchunk->windowend; }
-            bool isvalidforthisposition (const sequenceref & sequence) const
-            {
-                return sequence.chunkindex >= windowbegin() && sequence.chunkindex < windowend(); // check if 'sequence' lives in is in allowed range for this position
-                // TODO by construction sequences cannot span chunks (check again)
-            }
 
             bool isvalidforthisposition (const Microsoft::MSR::CNTK::SequenceDescription & sequence) const
             {
@@ -243,7 +208,7 @@ namespace msra { namespace dbn {
             positionchunkwindow (std::vector<chunk>::iterator definingchunk) : definingchunk (definingchunk) {}
         };
         std::vector<positionchunkwindow> positionchunkwindows;      // [utterance position] -> [windowbegin, windowend) for controlling paging
-        // TODO for now, just indirect over randomizedsequencerefs ? optimize later if there's need?
+        // TODO improve, use randomized timeline?
 
         template<typename VECTOR> static void randomshuffle (VECTOR & v, size_t randomseed);
 
@@ -258,63 +223,15 @@ namespace msra { namespace dbn {
             , m_currentSequenceId(SIZE_MAX)
             , m_sequencer(sequencer)
         {
-            // TODO new mode
-            if (sequencer != nullptr)
-            {
-                assert(IsValid(sequencer->getTimeline()));
-                m_randomTimeline.reserve(sequencer->getTimeline().size()); // TODO
-                // TODO reserve required memory
-            }
+            assert(sequencer != nullptr); // TODO only new mode
         }
 
-        // big long helper to update all cached randomization information
-        // This is a rather complex process since we randomize on two levels:
-        //  - chunks of consecutive data in the feature archive
-        //  - within a range of chunks that is paged into RAM
-        //     - utterances (in utt mode), or
-        //     - frames (in frame mode)
-        // The 'globalts' parameter is the start time that triggered the rerandomization; it is NOT the base time of the randomized area.
-        size_t lazyrandomization(
-            const size_t globalts,
-            const std::vector<std::vector<utterancechunkdata>> & allchunks);
+        void LazyRandomize();
 
-        void newLazyRandomize();
-
-        // TODO temporary
-        void newRandomize(
+        void Randomize(
             const size_t sweep,
             const size_t sweepts,
             const Microsoft::MSR::CNTK::Timeline& timeline);
-
-        size_t sequenceIndexForFramePos(const size_t t) const
-        {
-            assert(m_sequencer == nullptr); // not valid in new mode
-            auto positer = randomizedutteranceposmap.find(t);
-            if (positer == randomizedutteranceposmap.end())
-                LogicError("sequenceIndexForFramePos: invalid 'globalts' parameter; must match an existing utterance boundary");
-            return positer->second;
-        }
-
-        size_t getOriginalChunkIndex(size_t randomizedChunkIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(randomizedChunkIndex < randomizedchunks.size());
-            return randomizedchunks[randomizedChunkIndex].originalChunkIndex;
-        }
-
-        size_t getChunkWindowBegin(size_t randomizedChunkIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(randomizedChunkIndex < randomizedchunks.size());
-            return randomizedchunks[randomizedChunkIndex].windowbegin;
-        }
-
-        size_t getChunkWindowEnd(size_t randomizedChunkIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(randomizedChunkIndex < randomizedchunks.size());
-            return randomizedchunks[randomizedChunkIndex].windowend;
-        }
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
@@ -327,26 +244,6 @@ namespace msra { namespace dbn {
             assert(sequenceIndex < positionchunkwindows.size());
             return positionchunkwindows[sequenceIndex].windowend();
         }
-
-        size_t getNumSequences() const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            return randomizedsequencerefs.size();
-        }
-
-        const sequenceref & getSequenceRef(size_t sequenceIndex) const
-        {
-            assert(m_sequencer == nullptr); // don't call in new mode
-            assert(sequenceIndex < randomizedsequencerefs.size());
-            return randomizedsequencerefs[sequenceIndex];
-        }
-
-        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
-
-        std::unique_ptr<Microsoft::MSR::CNTK::Timeline> getTimelineFromAllchunks(
-            const std::vector<std::vector<utterancechunkdata>> & allchunks);
-
-        // Transformer interface
 
         virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config) override;
 
@@ -362,9 +259,11 @@ namespace msra { namespace dbn {
 
         virtual Microsoft::MSR::CNTK::SequenceData getNextSequence() override;
 
-        private:
-            Microsoft::MSR::CNTK::EpochConfiguration m_config;
-            size_t m_currentFrame;
-            size_t m_epochSize;
+    private:
+        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
+
+        Microsoft::MSR::CNTK::EpochConfiguration m_config;
+        size_t m_currentFrame;
+        size_t m_epochSize;
     };
 } }

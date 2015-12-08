@@ -1,9 +1,7 @@
 //
-// <copyright file="utterancesourcemultiNew.h" company="Microsoft">
+// <copyright file="Bundler.h" company="Microsoft">
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
-//
-// utterancesourcemultiNew.h -- implementation of utterancesource.h that supports multiple feature and label sets
 //
 
 #pragma once
@@ -94,6 +92,7 @@ namespace msra {
                         allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), 0, 0)));
                     return allclassids;     // nothing to return
                 }
+                assert(0); // TODO can remove getOriginalChunkIndex()
                 const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(uttref.chunkindex);
                 const auto & chunkdata = m_allchunks[0][originalChunkIndex];
                 const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
@@ -205,12 +204,41 @@ namespace msra {
             std::map<std::wstring, size_t> m_nameToId;
             std::map<std::wstring, size_t> m_featureNameToIdMap;
             std::map<std::wstring, size_t> m_labelNameToIdMap;
+    
+            // TODO
+            struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
+            {
+                size_t chunkindex;          // lives in this chunk (index into randomizedchunks[])
+                size_t utteranceindex;      // utterance index in that chunk
+                size_t numframes;           // (cached since we cannot directly access the underlying data from here)
+                size_t globalts;            // start frame in global space after randomization (for mapping frame index to utterance position)
+                size_t frameindex;          // 0 for utterances
 
-            std::vector<BlockRandomizer::sequenceref> m_sequences;
+                // TODO globalts - sweep cheaper?
+                size_t globalte() const { return globalts + numframes; }            // end frame
+
+                sequenceref()
+                    : chunkindex (0)
+                    , utteranceindex (0)
+                    , frameindex (0)
+                    , globalts (SIZE_MAX)
+                    , numframes (0) {}
+                sequenceref (size_t chunkindex, size_t utteranceindex, size_t frameindex = 0)
+                    : chunkindex (chunkindex)
+                    , utteranceindex (utteranceindex)
+                    , frameindex (frameindex)
+                    , globalts (SIZE_MAX)
+                    , numframes (0) {}
+
+                // TODO globalts and numframes only set after swapping, wouldn't need to swap them
+                // TODO old frameref was more tighly packed (less fields, smaller frameindex and utteranceindex). We need to bring these space optimizations back.
+            };
+
+            std::vector<sequenceref> m_sequences;
 
             // return sub-vector of classids[] for a given utterance
             std::vector<shiftedvector<biggrowablevector<CLASSIDTYPE>>> GetClassIds(
-                const BlockRandomizer::sequenceref& uttref)
+                const sequenceref& uttref)
             {
                 std::vector<shiftedvector<biggrowablevector<CLASSIDTYPE>>> allclassids;
                 allclassids.empty();
