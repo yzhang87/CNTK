@@ -32,7 +32,7 @@ namespace msra {
         // This also implements a frame-wise mode, which is layered on top of the utterance-wise mode
         // and thus benefits from its goodies such as corpus-wide high-level randomization and chunk paging.
         // ---------------------------------------------------------------------------
-        class Bundler : public minibatchsource, public Microsoft::MSR::CNTK::Sequencer
+        class Bundler : public Microsoft::MSR::CNTK::Sequencer
         {
             void operator=(const Bundler & other); // non-assignable
             std::vector<size_t> m_vdim;                    // feature dimension after augmenting neighhors
@@ -174,42 +174,7 @@ namespace msra {
 
             void setverbosity(int newverbosity){ m_verbosity = newverbosity; }
 
-            // get the next minibatch
-            // A minibatch is made up of one or more utterances.
-            // We will return less than 'framesrequested' unless the first utterance is too long.
-            // Note that this may return frames that are beyond the epoch end, but the first frame is always within the epoch.
-            // We specify the utterance by its global start time (in a space of a infinitely repeated training set).
-            // This is efficient since getbatch() is called with sequential 'globalts' except at epoch start.
-            // Note that the start of an epoch does not necessarily fall onto an utterance boundary. The caller must use firstvalidglobalts() to find the first valid globalts at or after a given time.
-            // Support for data parallelism:  If mpinodes > 1 then we will
-            //  - load only a subset of blocks from the disk
-            //  - skip frames/utterances in not-loaded blocks in the returned data
-            //  - 'framesadvanced' will still return the logical #frames; that is, by how much the global time index is advanced
-            void getbatch(const size_t globalts, const size_t framesrequested,
-                const size_t subsetnum, const size_t numsubsets, size_t & framesadvanced,
-                std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
-                std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
-                std::vector<shared_ptr<const latticesource::latticepair>> & latticepairs, std::vector<std::vector<size_t>> & sentendmark,
-                std::vector<std::vector<size_t>> & phoneboundaries) override;
-
-            bool supportsbatchsubsetting() const override
-            {
-                return true;
-            }
-
-            void getbatch(const size_t globalts,
-                const size_t framesrequested, std::vector<msra::dbn::matrix> & feat, std::vector<std::vector<size_t>> & uids,
-                std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & transcripts,
-                std::vector<shared_ptr<const latticesource::latticepair>> & lattices, std::vector<std::vector<size_t>> & sentendmark,
-                std::vector<std::vector<size_t>> & phoneboundaries);
-
             double gettimegetbatch() { return m_timegetbatch; }
-
-            // alternate (updated) definition for multiple inputs/outputs - read as a vector of feature matrixes or a vector of label strings
-            void getbatch(const size_t /*globalts*/,
-                const size_t /*framesrequested*/, msra::dbn::matrix & /*feat*/, std::vector<size_t> & /*uids*/,
-                std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> & /*transcripts*/,
-                std::vector<shared_ptr<const latticesource::latticepair>> & /*latticepairs*/);
 
             size_t totalframes() const { return m_totalframes; }
 
