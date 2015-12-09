@@ -5,8 +5,6 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    // eldak: provide this interface on a class
-
     InputDescriptionPtr GetInputByName(const std::wstring& name, const std::vector<InputDescriptionPtr>& inputs)
     {
         auto predicate = [name](InputDescriptionPtr input) {
@@ -94,6 +92,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             auto input = GetInputByName(featureName, inputs);
 
             const ConfigParameters& thisFeature = readerConfig(featureName);
+            m_featDims.push_back(input->sampleLayout->GetNumElements());
 
             wstring type = thisFeature(L"type", L"real");
             if (!_wcsicmp(type.c_str(), L"real"))
@@ -105,6 +104,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 InvalidArgument("feature type must be 'real'");
             }
 
+            m_featureNameToDimMap[featureName] = m_featDims[i];
             m_featureNameToIdMap[featureName] = iFeat;
             m_featuresBufferMultiIO.push_back(nullptr);
             m_featuresBufferAllocatedMultiIO.push_back(0);
@@ -319,7 +319,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 if (m_featuresBufferMultiIO[id] == nullptr || m_featuresBufferAllocatedMultiIO[id] < dim*m_mbNumTimeSteps*m_numSeqsPerMB)
                 {
-                    m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(dim*m_mbNumTimeSteps*m_numSeqsPerMB, m_elementSize);
+                    m_featuresBufferMultiIO[id] = AllocateExternalBuffer(dim*m_mbNumTimeSteps*m_numSeqsPerMB, m_elementSize);
                     memset(m_featuresBufferMultiIO[id].get(), 0, m_elementSize*dim*m_mbNumTimeSteps*m_numSeqsPerMB);
                     m_featuresBufferAllocatedMultiIO[id] = dim*m_mbNumTimeSteps*m_numSeqsPerMB;
                 }
@@ -340,21 +340,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 dim = m_labelNameToDimMap[name.first];
                 if (m_labelsBufferMultiIO[id] == nullptr || m_labelsBufferAllocatedMultiIO[id] < dim*m_mbNumTimeSteps*m_numSeqsPerMB)
                 {
-                    m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(dim*m_mbNumTimeSteps*m_numSeqsPerMB, m_elementSize);
+                    m_labelsBufferMultiIO[id] = AllocateExternalBuffer(dim*m_mbNumTimeSteps*m_numSeqsPerMB, m_elementSize);
                     memset(m_labelsBufferMultiIO[id].get(), 0, m_elementSize*dim*m_mbNumTimeSteps*m_numSeqsPerMB);
                     m_labelsBufferAllocatedMultiIO[id] = dim*m_mbNumTimeSteps*m_numSeqsPerMB;
                 }
 
                 for (size_t j = 0, k = startFr; j < framenum; j++, k++)
                 {
-                    for (int d = 0; d < dim; d++)
-                    {
-                        memcpy_s(
+                    memcpy_s(
                             &((char*)m_labelsBufferMultiIO[id].get())[(k*m_numSeqsPerMB + channelIndex)*dim*m_elementSize],
                             m_elementSize*dim,
                             &((char*)m_labelsBufferMultiUtt[parallelSequenceNumber].get())[(j*dim + m_labelsStartIndexMultiUtt[id + parallelSequenceNumber*numOfFea])*m_elementSize],
                             m_elementSize*dim);
-                    }
                 }
             }
         }
@@ -509,7 +506,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return;
     }
 
-    std::shared_ptr<void> FrameModePacker::AllocateIntermediateBuffer(size_t numElements, size_t elementSize)
+    std::shared_ptr<void> FrameModePacker::AllocateExternalBuffer(size_t numElements, size_t elementSize)
     {
         return std::shared_ptr<void>(
             m_memoryProvider->alloc(elementSize, numElements),

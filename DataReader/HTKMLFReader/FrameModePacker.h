@@ -39,7 +39,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void FillOneUttDataforParallelmode(size_t startFr,
             size_t framenum, size_t channelIndex, size_t sourceChannelIndex);
         void ReNewBufferForMultiIO(size_t i);
-        std::shared_ptr<void> AllocateIntermediateBuffer(size_t numElements, size_t elementSize);
+        std::shared_ptr<void> AllocateExternalBuffer(size_t numElements, size_t elementSize);
 
         enum InputOutputTypes
         {
@@ -85,6 +85,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         TransformerPtr m_transformer;
         size_t m_requestedMBSize;
+        std::vector<size_t> m_featDims;
     };
 
     typedef std::shared_ptr<FrameModePacker> FrameModePackerPtr;
