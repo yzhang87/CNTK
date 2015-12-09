@@ -36,9 +36,9 @@ namespace msra { namespace dbn {
     // TODO order methods (same order in header)
     // TODO fix casing in parameter names (also in header)
 
-    BlockRandomizer::BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
+    BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer)
         : m_verbosity(verbosity)
-        , m_randomizationRangeInSamples(randomizationrange)
+        , m_randomizationRangeInSamples(randomizationRangeInSamples)
         , m_sequencer(sequencer)
         , m_currentSweep(SIZE_MAX)
         , m_currentSequencePositionInSweep(SIZE_MAX)
@@ -48,8 +48,6 @@ namespace msra { namespace dbn {
         assert(sequencer != nullptr);
         const Timeline & timeline = m_sequencer->getTimeline();
         assert(IsValid(timeline));
-
-        framemode; // TODO drop parameter
 
         m_numSequences = timeline.back().id + 1;
         m_numChunks = timeline.back().chunkId + 1;

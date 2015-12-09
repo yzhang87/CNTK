@@ -103,7 +103,7 @@ namespace msra { namespace dbn {
         }
 
     public:
-        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, SequencerPtr sequencer);
+        BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer);
 
         virtual ~BlockRandomizer()
         {

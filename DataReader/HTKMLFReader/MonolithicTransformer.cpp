@@ -391,7 +391,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_frameSource.reset(new msra::dbn::Bundler(readerConfig, true, m_elementSize));
             m_frameSource->setverbosity(m_verbosity);
 
-            m_transformer = std::make_shared<msra::dbn::BlockRandomizer>(m_verbosity, true, randomize, m_frameSource);
+            m_transformer = std::make_shared<msra::dbn::BlockRandomizer>(m_verbosity, randomize, m_frameSource);
         }
         else
         {
