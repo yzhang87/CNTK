@@ -95,6 +95,8 @@ namespace msra { namespace dbn {
 
         void InitializeChunkInformation();
 
+        bool IsValidForPosition(size_t targetPosition, const Microsoft::MSR::CNTK::SequenceDescription & seqDesc) const;
+
         bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
 
         void LazyRandomize();

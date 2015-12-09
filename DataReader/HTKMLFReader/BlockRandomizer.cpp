@@ -152,7 +152,7 @@ namespace msra { namespace dbn {
         // Check we got those setup right
         foreach_index (i, m_randomTimeline)
         {
-            assert(positionchunkwindows[i].isvalidforthisposition(m_randomTimeline[i]));
+            assert(IsValidForPosition(i, m_randomTimeline[i]));
         }
 
         // Now randomly shuffle m_randomTimeline, while considering the
@@ -174,11 +174,11 @@ namespace msra { namespace dbn {
                 const size_t j = msra::dbn::rand(posbegin, posend);
 
                 // Try again if the sequence currently at j cannot be placed at position i.
-                if (!positionchunkwindows[i].isvalidforthisposition(m_randomTimeline[j]))
+                if (!IsValidForPosition(i, m_randomTimeline[j]))
                     continue;
 
                 // Try again if the sequence currently at i cannot be placed at position j.
-                if (!positionchunkwindows[j].isvalidforthisposition(m_randomTimeline[i]))
+                if (!IsValidForPosition(j, m_randomTimeline[i]))
                     continue;
 
                 // Swap and break out.
@@ -191,9 +191,14 @@ namespace msra { namespace dbn {
         foreach_index (i, m_randomTimeline)
         {
             // TODO assert only
-            if (!positionchunkwindows[i].isvalidforthisposition(m_randomTimeline[i]))
+            if (!IsValidForPosition(i, m_randomTimeline[i]))
                 LogicError("lazyrandomization: randomization logic mangled!");
         }
+    }
+
+    bool BlockRandomizer::IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const
+    {
+        return positionchunkwindows[targetPosition].isvalidforthisposition(seqDesc);
     }
 
     bool BlockRandomizer::IsValid(const Timeline& timeline) const
