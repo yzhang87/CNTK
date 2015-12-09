@@ -120,17 +120,18 @@ namespace msra { namespace dbn {
 
         // Compute the randomization range for sequence positions.
         // TODO just map position to randomized chunk index
-        positionchunkwindows.clear();
-        positionchunkwindows.reserve(numSequences);
+
+        sequencePositionToChunkIndex.clear();
+        sequencePositionToChunkIndex.reserve(numSequences);
         foreach_index (k, m_randomizedChunks)
         {
             const auto & chunk = m_randomizedChunks[k];
             for (size_t i = 0; i < chunk.numSequences; i++)
             {
-                positionchunkwindows.push_back(m_randomizedChunks.begin() + k);
+                sequencePositionToChunkIndex.push_back(k);
             }
         }
-        assert(positionchunkwindows.size() == numSequences);
+        assert(sequencePositionToChunkIndex.size() == numSequences);
 
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
@@ -161,8 +162,9 @@ namespace msra { namespace dbn {
         foreach_index (i, m_randomTimeline)
         {
             // Get valid randomization range, expressed in chunks
-            const size_t windowbegin = positionchunkwindows[i].windowbegin();
-            const size_t windowend = positionchunkwindows[i].windowend();
+            const size_t chunkId = sequencePositionToChunkIndex[i];
+            const size_t windowbegin = m_randomizedChunks[chunkId].windowbegin;
+            const size_t windowend = m_randomizedChunks[chunkId].windowend;
 
             // Get valid randomization range, expressed in sequence positions.
             size_t posbegin = m_randomizedChunks[windowbegin].sequencePositionStart;
@@ -198,7 +200,8 @@ namespace msra { namespace dbn {
 
     bool BlockRandomizer::IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const
     {
-        return positionchunkwindows[targetPosition].isvalidforthisposition(seqDesc);
+        const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[targetPosition]];
+        return chunk.windowbegin <= seqDesc.chunkId && seqDesc.chunkId < chunk.windowend;
     }
 
     bool BlockRandomizer::IsValid(const Timeline& timeline) const

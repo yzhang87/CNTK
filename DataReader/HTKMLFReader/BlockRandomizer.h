@@ -74,22 +74,7 @@ namespace msra { namespace dbn {
         std::vector<RandomizedChunk> m_randomizedChunks; // chunks after being brought into random order (we randomize within a rolling window over them)
         Microsoft::MSR::CNTK::Timeline m_randomTimeline;
 
-        struct positionchunkwindow       // chunk window required in memory when at a certain position, for controlling paging
-        {
-            std::vector<RandomizedChunk>::iterator definingchunk;       // the chunk in m_randomizedChunks[] that defined the utterance position of this utterance
-            size_t windowbegin() const { return definingchunk->windowbegin; }
-            size_t windowend() const { return definingchunk->windowend; }
-
-            bool isvalidforthisposition (const Microsoft::MSR::CNTK::SequenceDescription & sequence) const
-            {
-                return sequence.chunkId >= windowbegin() && sequence.chunkId < windowend(); // check if 'sequence' lives in is in allowed range for this position
-                // TODO by construction sequences cannot span chunks (check again)
-            }
-
-            positionchunkwindow(std::vector<RandomizedChunk>::iterator definingchunk) : definingchunk(definingchunk) {}
-        };
-        std::vector<positionchunkwindow> positionchunkwindows;      // [utterance position] -> [windowbegin, windowend) for controlling paging
-        // TODO improve, use randomized timeline?
+        std::vector<size_t> sequencePositionToChunkIndex;
 
         template<typename VECTOR> static void randomshuffle(VECTOR & v, size_t randomseed);
 
@@ -127,14 +112,16 @@ namespace msra { namespace dbn {
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
-            assert(sequenceIndex < positionchunkwindows.size());
-            return positionchunkwindows[sequenceIndex].windowbegin();
+            assert(sequenceIndex < sequencePositionToChunkIndex.size());
+            const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[sequenceIndex]];
+            return chunk.windowbegin;
         }
 
         size_t getSequenceWindowEnd(size_t sequenceIndex) const
         {
-            assert(sequenceIndex < positionchunkwindows.size());
-            return positionchunkwindows[sequenceIndex].windowend();
+            assert(sequenceIndex < sequencePositionToChunkIndex.size());
+            const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[sequenceIndex]];
+            return chunk.windowend;
         }
 
         virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config) override;
