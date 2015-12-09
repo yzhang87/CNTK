@@ -135,12 +135,16 @@ namespace msra { namespace dbn {
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
         m_randomTimeline.reserve(numSequences);
-        for (const auto & chunk : m_randomizedChunks)
+        foreach_index (chunkId, m_randomizedChunks)
         {
+            const auto & chunk = m_randomizedChunks[chunkId];
+
             // TODO pos -> iterator
             for (size_t i = 0, pos = m_chunkInformation[chunk.originalChunkIndex].sequencePositionStart; i < chunk.numSequences; i++, pos++)
             {
-                m_randomTimeline.push_back(timeline[pos]);
+                SequenceDescription randomizedSeqDesc = timeline[pos];
+                randomizedSeqDesc.chunkId = chunkId;
+                m_randomTimeline.push_back(randomizedSeqDesc);
             }
         }
         assert(m_randomTimeline.size() == numSequences);
