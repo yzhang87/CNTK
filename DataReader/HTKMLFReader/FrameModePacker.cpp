@@ -503,7 +503,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        return;
+        for (const auto& s : sequences)
+        {
+            for(const auto& i : s)
+            {
+                delete[] i.second.data;
+            }
+        }
     }
 
     std::shared_ptr<void> FrameModePacker::AllocateExternalBuffer(size_t numElements, size_t elementSize)

@@ -40,8 +40,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_layout = make_shared<MBLayout>();
 
         assert(config(L"frameMode", true));
-        m_memoryProvider = std::make_shared<SubstitutingMemoryProvider>();
-        m_providerSet = false;
+        m_memoryProvider = std::make_shared<HeapMemoryProvider>();
         m_packer = std::make_shared<FrameModePacker>(config, m_memoryProvider, sizeof(ElemType));
 
         intargvector numberOfuttsPerMinibatchForAllEpochs =
@@ -81,17 +80,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             {
                 assert(false);
             }
-        }
-
-        if (!m_providerSet)
-        {
-
-            if (deviceId < 0)
-                m_memoryProvider->SetMemoryProvider(std::make_shared<HeapMemoryProvider>());
-            else
-                m_memoryProvider->SetMemoryProvider(std::make_shared<CudaMemoryProvider>(deviceId));
-
-            m_providerSet = true;
         }
 
         Minibatch m = m_epoch->readMinibatch();
