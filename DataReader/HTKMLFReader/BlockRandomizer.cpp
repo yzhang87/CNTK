@@ -7,7 +7,7 @@
 #include "stdafx.h"
 #include "BlockRandomizer.h"
 #include <algorithm>
-#include <DataReader.h>
+#include <utility> // std::swap
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -22,12 +22,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         foreach_index (i, v)
         {
             // pick a random location
-            const size_t irand = msra::dbn::rand (0, v.size());
+            const size_t irand = msra::dbn::rand(0, v.size());
 
             // swap element i with it
             if (irand == static_cast<size_t>(i))
                 continue;
-            ::swap (v[i], v[irand]);
+            std::swap(v[i], v[irand]);
         }
     }
 
@@ -204,7 +204,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     continue;
 
                 // Swap and break out.
-                ::swap (m_randomTimeline[i], m_randomTimeline[j]); // TODO old swap was perhaps more efficient
+                std::swap(m_randomTimeline[i], m_randomTimeline[j]); // TODO old swap was perhaps more efficient
                 break;
             }
         }

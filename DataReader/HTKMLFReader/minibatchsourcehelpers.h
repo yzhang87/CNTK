@@ -203,7 +203,7 @@ public:
     std::pair<size_t,size_t> bounds (size_t ts, size_t te) const
     {
         size_t tbegin = max (ts, randomizationrange/2) - randomizationrange/2;
-        size_t tend = min (te + randomizationrange/2, map.size());
+        size_t tend = std::min (te + randomizationrange/2, map.size());
         return std::make_pair<size_t, size_t>(std::move(tbegin), std::move(tend));
     }
 
@@ -234,7 +234,7 @@ public:
                         // Random positions are limited to t+randomizationrange.
                         // This ensures some locality suitable for paging with a sliding window.
                         const size_t tbegin = max ((size_t) t, randomizationrange/2) - randomizationrange/2; // range of window  --TODO: use bounds() function above
-                        const size_t tend = min (t + randomizationrange/2, map.size());
+                        const size_t tend = std::min (t + randomizationrange/2, map.size());
                         assert (tend >= tbegin);                    // (guard against potential numeric-wraparound bug)
                         const size_t trand = rand (tbegin, tend);   // random number within windows
                         assert ((size_t) t <= trand + randomizationrange/2 && trand < (size_t) t + randomizationrange/2);
