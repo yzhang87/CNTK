@@ -210,30 +210,7 @@ namespace msra {
                 // TODO: the following is not templated--do it if needed; also should return a const reference then
                 size_t operator[] (size_t i) const { check(i); return v[first + i]; }
             };
-            template<class UTTREF> std::vector<shiftedvector<biggrowablevector<CLASSIDTYPE>>> getclassids(const UTTREF & uttref)  // return sub-vector of classids[] for a given utterance
-            {
-                std::vector<shiftedvector<biggrowablevector<CLASSIDTYPE>>> allclassids;
-                allclassids.empty();
 
-                if (!issupervised())
-                {
-                    foreach_index(i, m_classids)
-                        allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), 0, 0)));
-                    return allclassids;     // nothing to return
-                }
-                assert(0); // TODO can remove getOriginalChunkIndex()
-                const size_t originalChunkIndex = m_rand->getOriginalChunkIndex(uttref.chunkindex);
-                const auto & chunkdata = m_allchunks[0][originalChunkIndex];
-                const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
-                const size_t n = chunkdata.numframes(uttref.utteranceindex);
-                foreach_index(i, m_classids)
-                {
-                    if ((*m_classids[i])[classidsbegin + n] != (CLASSIDTYPE)-1)
-                        LogicError("getclassids: expected boundary marker not found, internal data structure screwed up");
-                    allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), classidsbegin, n)));
-                }
-                return allclassids;   // nothing to return
-            }
             template<class UTTREF> std::vector<shiftedvector<biggrowablevector<HMMIDTYPE>>> getphonebound(const UTTREF & uttref)  // return sub-vector of classids[] for a given utterance
             {
                 std::vector<shiftedvector<biggrowablevector<HMMIDTYPE>>> allphoneboundaries;
@@ -271,12 +248,6 @@ namespace msra {
 
         public:
             Bundler::Bundler(const Microsoft::MSR::CNTK::ConfigParameters& readerConfig, bool framemode, size_t elementSize);
-
-            // eldak: Should go away.
-            void SetRandomizer(std::shared_ptr<BlockRandomizer> rand)
-            {
-                m_rand = rand;
-            }
 
             virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config);
 
@@ -360,13 +331,13 @@ namespace msra {
                 foreach_index(i, m_classids)
                 {
                     if ((*m_classids[i])[classidsbegin + n] != (CLASSIDTYPE)-1)
+                    {
                         LogicError("getclassids: expected boundary marker not found, internal data structure screwed up");
+                    }
                     allclassids.push_back(std::move(shiftedvector<biggrowablevector<CLASSIDTYPE>>((*m_classids[i]), classidsbegin, n)));
                 }
                 return allclassids;   // nothing to return
             }
-
-            std::shared_ptr<BlockRandomizer> m_rand;
         };
     }
 }

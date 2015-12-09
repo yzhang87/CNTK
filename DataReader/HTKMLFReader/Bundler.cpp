@@ -106,11 +106,6 @@ namespace msra { namespace dbn {
         //look up in the config for the master command to determine whether we're writing output (inputs only) or training/evaluating (inputs and outputs)
         wstring command(readerConfig(L"action", L""));
 
-        if (readerConfig.Exists(L"legacyMode"))
-        {
-            RuntimeError("legacy mode has been deprecated\n");
-        }
-
         //size_t randomize = ConfigHelper::GetRandomizationWindow(readerConfig);
         std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
 
