@@ -28,6 +28,8 @@ namespace msra { namespace dbn {
         size_t m_currentFrame;
         size_t m_epochSize;
         Microsoft::MSR::CNTK::SequencerPtr m_sequencer;
+        size_t m_numSequences;
+        size_t m_numChunks;
         // Information maintained for original (non-randomized) chunks
         struct ChunkInformation
         {
@@ -78,8 +80,6 @@ namespace msra { namespace dbn {
 
         template<typename VECTOR> static void randomshuffle(VECTOR & v, size_t randomseed);
 
-        void InitializeChunkInformation();
-
         bool IsValidForPosition(size_t targetPosition, const Microsoft::MSR::CNTK::SequenceDescription & seqDesc) const;
 
         bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
@@ -92,19 +92,7 @@ namespace msra { namespace dbn {
             const Microsoft::MSR::CNTK::Timeline& timeline);
 
     public:
-        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
-            : m_verbosity(verbosity)
-            , m_framemode(framemode)
-            , m_randomizationrange(randomizationrange)
-            , m_sequencer(sequencer)
-            , m_currentSweep(SIZE_MAX)
-            , m_currentSequenceId(SIZE_MAX)
-            , m_currentFrame(SIZE_MAX)
-            , m_epochSize(SIZE_MAX)
-        {
-            assert(sequencer != nullptr);
-            InitializeChunkInformation();
-        }
+        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer);
 
         virtual ~BlockRandomizer()
         {
@@ -112,14 +100,14 @@ namespace msra { namespace dbn {
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
-            assert(sequenceIndex < sequencePositionToChunkIndex.size());
+            assert(sequenceIndex < m_numSequences);
             const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[sequenceIndex]];
             return chunk.windowbegin;
         }
 
         size_t getSequenceWindowEnd(size_t sequenceIndex) const
         {
-            assert(sequenceIndex < sequencePositionToChunkIndex.size());
+            assert(sequenceIndex < m_numSequences);
             const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[sequenceIndex]];
             return chunk.windowend;
         }

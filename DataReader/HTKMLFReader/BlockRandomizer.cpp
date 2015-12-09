@@ -33,16 +33,27 @@ namespace msra { namespace dbn {
         }
     }
 
-    void BlockRandomizer::InitializeChunkInformation()
+    BlockRandomizer::BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
+        : m_verbosity(verbosity)
+        , m_framemode(framemode)
+        , m_randomizationrange(randomizationrange)
+        , m_sequencer(sequencer)
+        , m_currentSweep(SIZE_MAX)
+        , m_currentSequenceId(SIZE_MAX)
+        , m_currentFrame(SIZE_MAX)
+        , m_epochSize(SIZE_MAX)
     {
+        assert(sequencer != nullptr);
         const Timeline & timeline = m_sequencer->getTimeline();
         assert(IsValid(timeline));
 
-        const size_t numChunks = timeline.back().chunkId + 1;
-        assert(m_chunkInformation.size() == 0);
+        m_numSequences = timeline.back().id + 1;
+        m_numChunks = timeline.back().chunkId + 1;
 
+        // Generate additional information about physical chunks
+        assert(m_chunkInformation.size() == 0);
         m_chunkInformation.insert(m_chunkInformation.begin(),
-            numChunks,
+            m_numChunks,
             ChunkInformation { 0, 0, SIZE_MAX } );
 
         size_t maxNumberOfSamples = 0;
@@ -65,14 +76,10 @@ namespace msra { namespace dbn {
         const size_t sweepts, // TODO not needed anymore
         const Timeline& timeline)
     {
-        // TODO make a members
-        const size_t numChunks = timeline.back().chunkId + 1;
-        const size_t numSequences = timeline.back().id + 1;
-
         // Create vector of chunk indices and shuffle them using current sweep as seed
         std::vector<size_t> randomizedChunkIndices;
-        randomizedChunkIndices.reserve(numChunks);
-        for (size_t i = 0; i < numChunks; i++)
+        randomizedChunkIndices.reserve(m_numChunks);
+        for (size_t i = 0; i < m_numChunks; i++)
         {
             randomizedChunkIndices.push_back(i);
         }
@@ -80,8 +87,8 @@ namespace msra { namespace dbn {
 
         // Place randomized chunks on global time line
         m_randomizedChunks.clear();
-        m_randomizedChunks.reserve(numChunks);
-        for (size_t chunkId = 0, t = sweepts /* TODO could drop */, pos = 0; chunkId < numChunks; chunkId++)
+        m_randomizedChunks.reserve(m_numChunks);
+        for (size_t chunkId = 0, t = sweepts /* TODO could drop */, pos = 0; chunkId < m_numChunks; chunkId++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[chunkId];
             const size_t numSequences = m_chunkInformation[originalChunkIndex].numSequences;
@@ -113,7 +120,7 @@ namespace msra { namespace dbn {
             }
             while (chunk.globalSamplePositionStart - m_randomizedChunks[chunk.windowbegin].globalSamplePositionStart > m_randomizationrange / 2)
                 chunk.windowbegin++;            // too early
-            while (chunk.windowend < numChunks &&
+            while (chunk.windowend < m_numChunks &&
                 m_randomizedChunks[chunk.windowend].globalSamplePositionEnd() - chunk.globalSamplePositionStart < m_randomizationrange / 2)
                 chunk.windowend++;              // got more space
         }
@@ -122,7 +129,7 @@ namespace msra { namespace dbn {
         // TODO just map position to randomized chunk index
 
         sequencePositionToChunkIndex.clear();
-        sequencePositionToChunkIndex.reserve(numSequences);
+        sequencePositionToChunkIndex.reserve(m_numSequences);
         foreach_index (k, m_randomizedChunks)
         {
             const auto & chunk = m_randomizedChunks[k];
@@ -131,11 +138,11 @@ namespace msra { namespace dbn {
                 sequencePositionToChunkIndex.push_back(k);
             }
         }
-        assert(sequencePositionToChunkIndex.size() == numSequences);
+        assert(sequencePositionToChunkIndex.size() == m_numSequences);
 
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
-        m_randomTimeline.reserve(numSequences);
+        m_randomTimeline.reserve(m_numSequences);
         foreach_index (chunkId, m_randomizedChunks)
         {
             const auto & chunk = m_randomizedChunks[chunkId];
@@ -148,7 +155,7 @@ namespace msra { namespace dbn {
                 m_randomTimeline.push_back(randomizedSeqDesc);
             }
         }
-        assert(m_randomTimeline.size() == numSequences);
+        assert(m_randomTimeline.size() == m_numSequences);
 
         // Check we got those setup right
         foreach_index (i, m_randomTimeline)
@@ -227,7 +234,7 @@ namespace msra { namespace dbn {
 
     void BlockRandomizer::LazyRandomize()
     {
-        if (m_currentSequenceId >= m_randomTimeline.size())
+        if (m_currentSequenceId >= m_numSequences)
         {
             if (m_verbosity > 0)
                 fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
@@ -249,15 +256,14 @@ namespace msra { namespace dbn {
         }
 
         LazyRandomize();
-        assert(m_currentSequenceId < m_randomTimeline.size());
+        assert(m_currentSequenceId < m_numSequences);
         const auto & seqDesc = m_randomTimeline[m_currentSequenceId];
 
         // Require and release chunks from the sequencer
         const size_t windowbegin = getSequenceWindowBegin(m_currentSequenceId);
         const size_t windowend = getSequenceWindowEnd(m_currentSequenceId);
-        const size_t numChunks = m_sequencer->getTimeline().back().chunkId + 1;
 
-        for (size_t chunkId = 0; chunkId < numChunks; chunkId++)
+        for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
         {
             auto originalChunkIndex = m_randomizedChunks[chunkId].originalChunkIndex;
 
