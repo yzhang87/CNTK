@@ -3,8 +3,6 @@
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
-// BlockRandomizer.h -- interface of the block randomizer
-//
 
 #pragma once
 
@@ -38,11 +36,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Structure that will be maintained for each randomized chunk
         struct RandomizedChunk
         {
-            struct ChunkInformation info; // sample positions are global // TODO could drop?
+            struct ChunkInformation info; // sample positions are global // TODO could drop 'global' requirement?
 
             size_t originalChunkIndex;
 
-            // Randomization range limits (randomized chunk positions)
+            // Randomization range (in randomized chunk positions)
             size_t windowbegin;
             size_t windowend;
         };
@@ -79,33 +77,28 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         bool IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const;
 
-        void Randomize(
-            const size_t sweep,
-            const size_t sweepts, // TODO drop sweepts?
-            const Timeline& timeline);
+        void Randomize(const size_t sweep, const size_t sweepts, const Timeline& timeline); // TODO drop sweepts? 
 
         void LazyRandomize();
 
-        size_t getSequenceWindowBegin(size_t sequenceIndex) const
+        size_t getSequenceWindowBegin(size_t sequencePosition) const
         {
-            assert(sequenceIndex < m_numSequences);
-            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequenceIndex]];
+            assert(sequencePosition < m_numSequences);
+            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequencePosition]];
             return chunk.windowbegin;
         }
 
-        size_t getSequenceWindowEnd(size_t sequenceIndex) const
+        size_t getSequenceWindowEnd(size_t sequencePosition) const
         {
-            assert(sequenceIndex < m_numSequences);
-            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequenceIndex]];
+            assert(sequencePosition < m_numSequences);
+            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequencePosition]];
             return chunk.windowend;
         }
 
     public:
         BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer);
 
-        virtual ~BlockRandomizer()
-        {
-        }
+        virtual ~BlockRandomizer() { }
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
