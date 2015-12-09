@@ -18,9 +18,7 @@
 #include "unordered_set"
 #include "inner_interfaces.h"
 
-namespace msra { namespace dbn {
-
-    using namespace Microsoft::MSR::CNTK;
+namespace Microsoft { namespace MSR { namespace CNTK {
 
     class BlockRandomizer : public Transformer
     {
@@ -119,4 +117,5 @@ namespace msra { namespace dbn {
 
         virtual SequenceData getNextSequence() override;
     };
-} }
+
+} } }

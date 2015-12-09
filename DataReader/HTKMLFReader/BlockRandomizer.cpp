@@ -9,9 +9,7 @@
 #include <algorithm>
 #include <DataReader.h>
 
-namespace msra { namespace dbn {
-
-    using namespace Microsoft::MSR::CNTK;
+namespace Microsoft { namespace MSR { namespace CNTK {
 
     // shuffle a vector into random order by randomly swapping elements
     template<typename VECTOR> static void BlockRandomizer::randomshuffle(VECTOR & v, size_t randomseed)
@@ -307,4 +305,5 @@ namespace msra { namespace dbn {
         Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
         m_currentSequencePositionInSweep = timeframe % m_numSamples;
     };
-} }
+
+} } }
