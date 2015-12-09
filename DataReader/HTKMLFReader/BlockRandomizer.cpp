@@ -11,10 +11,10 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    // shuffle a vector into random order by randomly swapping elements
+    // Shuffle a vector into random order by randomly swapping elements
     template<typename VECTOR> static void BlockRandomizer::randomshuffle(VECTOR & v, size_t randomseed)
     {
-        if (v.size() > RAND_MAX * (size_t) RAND_MAX)
+        if (v.size() > RAND_MAX * static_cast<size_t>(RAND_MAX))
         {
             RuntimeError("randomshuffle: too large set: need to change to different random generator!");
         }
@@ -25,7 +25,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const size_t irand = msra::dbn::rand (0, v.size());
 
             // swap element i with it
-            if (irand == (size_t) i)
+            if (irand == static_cast<size_t>(i))
                 continue;
             ::swap (v[i], v[irand]);
         }
