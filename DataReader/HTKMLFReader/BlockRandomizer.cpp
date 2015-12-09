@@ -33,19 +33,23 @@ namespace msra { namespace dbn {
         }
     }
 
+    // TODO order methods (same order in header)
+    // TODO fix casing in parameter names (also in header)
+
     BlockRandomizer::BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer)
         : m_verbosity(verbosity)
-        , m_framemode(framemode)
-        , m_randomizationrange(randomizationrange)
+        , m_randomizationRangeInSamples(randomizationrange)
         , m_sequencer(sequencer)
         , m_currentSweep(SIZE_MAX)
-        , m_currentSequenceId(SIZE_MAX)
-        , m_currentFrame(SIZE_MAX)
+        , m_currentSequencePositionInSweep(SIZE_MAX)
+        , m_currentSamplePositionInEpoch(SIZE_MAX)
         , m_epochSize(SIZE_MAX)
     {
         assert(sequencer != nullptr);
         const Timeline & timeline = m_sequencer->getTimeline();
         assert(IsValid(timeline));
+
+        framemode; // TODO drop parameter
 
         m_numSequences = timeline.back().id + 1;
         m_numChunks = timeline.back().chunkId + 1;
@@ -54,10 +58,11 @@ namespace msra { namespace dbn {
         assert(m_chunkInformation.size() == 0);
         m_chunkInformation.insert(m_chunkInformation.begin(),
             m_numChunks,
-            ChunkInformation { 0, 0, SIZE_MAX } );
+            ChunkInformation { 0, 0, SIZE_MAX, SIZE_MAX } );
 
         size_t maxNumberOfSamples = 0;
 
+        m_numSamples = 0;
         for (const auto & seqDesc : timeline)
         {
             auto & chunkInformation = m_chunkInformation[seqDesc.chunkId];
@@ -65,16 +70,18 @@ namespace msra { namespace dbn {
             chunkInformation.numSamples += seqDesc.numberOfSamples;
             chunkInformation.sequencePositionStart =
                 min(chunkInformation.sequencePositionStart, seqDesc.id);
+            chunkInformation.sequencePositionStart =
+                min(chunkInformation.sequencePositionStart, seqDesc.id);
+            chunkInformation.samplePositionStart = m_numSamples;
             maxNumberOfSamples = max(maxNumberOfSamples, seqDesc.numberOfSamples);
+            m_numSamples += chunkInformation.numSamples;
         }
 
-        assert(!m_framemode || maxNumberOfSamples == 1);
+        // Frame mode to the randomizer just means there are only single-sample sequences
+        m_framemode = (maxNumberOfSamples == 1);
     }
 
-    void BlockRandomizer::Randomize(
-        const size_t sweep,
-        const size_t sweepts, // TODO not needed anymore
-        const Timeline& timeline)
+    void BlockRandomizer::RandomizeChunks(const size_t sweep, const size_t sweepts)
     {
         // Create vector of chunk indices and shuffle them using current sweep as seed
         std::vector<size_t> randomizedChunkIndices;
@@ -88,22 +95,21 @@ namespace msra { namespace dbn {
         // Place randomized chunks on global time line
         m_randomizedChunks.clear();
         m_randomizedChunks.reserve(m_numChunks);
-        for (size_t chunkId = 0, t = sweepts /* TODO could drop */, pos = 0; chunkId < m_numChunks; chunkId++)
+        for (size_t chunkId = 0, samplePosition = sweepts, sequencePosition = 0; chunkId < m_numChunks; chunkId++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[chunkId];
             const size_t numSequences = m_chunkInformation[originalChunkIndex].numSequences;
             const size_t numSamples = m_chunkInformation[originalChunkIndex].numSamples;
-            m_randomizedChunks.push_back(RandomizedChunk(
-                originalChunkIndex, // TODO this one still needed
-                numSequences,
-                numSamples,
-                pos,
-                t)); // TODO this one still needed
-            t += numSamples;
-            pos += numSequences;
+            m_randomizedChunks.push_back(RandomizedChunk {
+                numSequences, numSamples, sequencePosition, samplePosition,
+                originalChunkIndex
+            });
+            samplePosition += numSamples;
+            sequencePosition += numSequences;
         }
 
         // For each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
+        size_t halfWindowRange = m_randomizationRangeInSamples / 2;
         foreach_index(chunkId, m_randomizedChunks)
         {
             auto & chunk = m_randomizedChunks[chunkId];
@@ -118,27 +124,39 @@ namespace msra { namespace dbn {
                 chunk.windowbegin = m_randomizedChunks[chunkId - 1].windowbegin;  // might be too early
                 chunk.windowend = m_randomizedChunks[chunkId - 1].windowend;      // might have more space
             }
-            while (chunk.globalSamplePositionStart - m_randomizedChunks[chunk.windowbegin].globalSamplePositionStart > m_randomizationrange / 2)
+            while (chunk.info.samplePositionStart - m_randomizedChunks[chunk.windowbegin].info.samplePositionStart > halfWindowRange)
                 chunk.windowbegin++;            // too early
             while (chunk.windowend < m_numChunks &&
-                m_randomizedChunks[chunk.windowend].globalSamplePositionEnd() - chunk.globalSamplePositionStart < m_randomizationrange / 2)
+                m_randomizedChunks[chunk.windowend].info.samplePositionEnd() - chunk.info.samplePositionStart < halfWindowRange)
                 chunk.windowend++;              // got more space
         }
 
         // Compute the randomization range for sequence positions.
-        // TODO just map position to randomized chunk index
-
-        sequencePositionToChunkIndex.clear();
-        sequencePositionToChunkIndex.reserve(m_numSequences);
+        m_sequencePositionToChunkIndex.clear();
+        m_sequencePositionToChunkIndex.reserve(m_numSequences);
         foreach_index (k, m_randomizedChunks)
         {
             const auto & chunk = m_randomizedChunks[k];
-            for (size_t i = 0; i < chunk.numSequences; i++)
+            for (size_t i = 0; i < chunk.info.numSequences; i++)
             {
-                sequencePositionToChunkIndex.push_back(k);
+                m_sequencePositionToChunkIndex.push_back(k);
             }
         }
-        assert(sequencePositionToChunkIndex.size() == m_numSequences);
+        assert(m_sequencePositionToChunkIndex.size() == m_numSequences);
+    }
+
+    bool BlockRandomizer::IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const
+    {
+        const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[targetPosition]];
+        return chunk.windowbegin <= seqDesc.chunkId && seqDesc.chunkId < chunk.windowend;
+    }
+
+    void BlockRandomizer::Randomize(
+        const size_t sweep,
+        const size_t sweepts,
+        const Timeline& timeline)
+    {
+        RandomizeChunks(sweep, sweepts);
 
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
@@ -147,10 +165,9 @@ namespace msra { namespace dbn {
         {
             const auto & chunk = m_randomizedChunks[chunkId];
 
-            // TODO pos -> iterator
-            for (size_t i = 0, pos = m_chunkInformation[chunk.originalChunkIndex].sequencePositionStart; i < chunk.numSequences; i++, pos++)
+            for (size_t i = 0, sequencePosition = m_chunkInformation[chunk.originalChunkIndex].sequencePositionStart; i < chunk.info.numSequences; i++, sequencePosition++)
             {
-                SequenceDescription randomizedSeqDesc = timeline[pos];
+                SequenceDescription randomizedSeqDesc = timeline[sequencePosition];
                 randomizedSeqDesc.chunkId = chunkId;
                 m_randomTimeline.push_back(randomizedSeqDesc);
             }
@@ -169,13 +186,13 @@ namespace msra { namespace dbn {
         foreach_index (i, m_randomTimeline)
         {
             // Get valid randomization range, expressed in chunks
-            const size_t chunkId = sequencePositionToChunkIndex[i];
+            const size_t chunkId = m_sequencePositionToChunkIndex[i];
             const size_t windowbegin = m_randomizedChunks[chunkId].windowbegin;
             const size_t windowend = m_randomizedChunks[chunkId].windowend;
 
             // Get valid randomization range, expressed in sequence positions.
-            size_t posbegin = m_randomizedChunks[windowbegin].sequencePositionStart;
-            size_t posend = m_randomizedChunks[windowend - 1].sequencePositionEnd();
+            size_t posbegin = m_randomizedChunks[windowbegin].info.sequencePositionStart;
+            size_t posend = m_randomizedChunks[windowend - 1].info.sequencePositionEnd();
 
             for (;;)
             {
@@ -205,12 +222,6 @@ namespace msra { namespace dbn {
         }
     }
 
-    bool BlockRandomizer::IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const
-    {
-        const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[targetPosition]];
-        return chunk.windowbegin <= seqDesc.chunkId && seqDesc.chunkId < chunk.windowend;
-    }
-
     bool BlockRandomizer::IsValid(const Timeline& timeline) const
     {
         SequenceDescription previous = {
@@ -224,8 +235,7 @@ namespace msra { namespace dbn {
                 bool result = previous.id + 1 == current.id
                     && previous.chunkId <= current.chunkId
                     && current.chunkId <= previous.chunkId + 1
-                    && 0 < current.numberOfSamples
-                    && (!m_framemode || current.numberOfSamples == 1);
+                    && 0 < current.numberOfSamples;
                 previous = current;
                 return result;
             });
@@ -234,21 +244,21 @@ namespace msra { namespace dbn {
 
     void BlockRandomizer::LazyRandomize()
     {
-        if (m_currentSequenceId >= m_numSequences)
+        if (m_currentSequencePositionInSweep >= m_numSequences)
         {
             if (m_verbosity > 0)
                 fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
                     m_currentSweep, m_framemode ? "frame" : "utterance");
             m_currentSweep++;
             Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
-            m_currentSequenceId = 0;
+            m_currentSequencePositionInSweep = 0;
         };
     }
 
     SequenceData BlockRandomizer::getNextSequence()
     {
-        assert(m_currentFrame != SIZE_MAX); // SetEpochConfiguration() must be called first
-        if (m_currentFrame >= m_epochSize)
+        assert(m_currentSamplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
+        if (m_currentSamplePositionInEpoch >= m_epochSize)
         {
             SequenceData result;
             result.m_endOfEpoch = true;
@@ -256,12 +266,12 @@ namespace msra { namespace dbn {
         }
 
         LazyRandomize();
-        assert(m_currentSequenceId < m_numSequences);
-        const auto & seqDesc = m_randomTimeline[m_currentSequenceId];
+        assert(m_currentSequencePositionInSweep < m_numSequences);
+        const auto & seqDesc = m_randomTimeline[m_currentSequencePositionInSweep];
 
         // Require and release chunks from the sequencer
-        const size_t windowbegin = getSequenceWindowBegin(m_currentSequenceId);
-        const size_t windowend = getSequenceWindowEnd(m_currentSequenceId);
+        const size_t windowbegin = getSequenceWindowBegin(m_currentSequencePositionInSweep);
+        const size_t windowend = getSequenceWindowEnd(m_currentSequencePositionInSweep);
 
         for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
         {
@@ -278,30 +288,25 @@ namespace msra { namespace dbn {
             }
         }
 
-        m_currentFrame += seqDesc.numberOfSamples;
-        m_currentSequenceId++;
+        m_currentSamplePositionInEpoch += seqDesc.numberOfSamples;
+        m_currentSequencePositionInSweep++;
 
         return m_sequencer->getSequenceById(seqDesc.id);
     };
 
     void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
     {
+        // TODO some asserts on EpochConfiguration
         m_config = config;
-        m_currentFrame = 0;
+        m_currentSamplePositionInEpoch = 0;
         m_epochSize = config.totalSize;
         size_t timeframe = m_epochSize * config.index;
-
-        size_t totalSize = 0;
-        for (const auto& t : m_sequencer->getTimeline())
-        {
-            totalSize += t.numberOfSamples;
-        }
 
         assert(m_framemode);
 
         // TODO make sure this will use the lazy path as well...
-        m_currentSweep = timeframe / totalSize;
+        m_currentSweep = timeframe / m_numSamples;
         Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
-        m_currentSequenceId = timeframe % totalSize;
+        m_currentSequencePositionInSweep = timeframe % m_numSamples;
     };
 } }

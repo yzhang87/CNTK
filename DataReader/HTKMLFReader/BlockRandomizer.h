@@ -20,106 +20,103 @@
 
 namespace msra { namespace dbn {
 
-    class BlockRandomizer : public Microsoft::MSR::CNTK::Transformer
+    using namespace Microsoft::MSR::CNTK;
+
+    class BlockRandomizer : public Transformer
     {
-        int m_verbosity;
-        bool m_framemode; // TODO drop?
-        Microsoft::MSR::CNTK::EpochConfiguration m_config;
-        size_t m_currentFrame;
-        size_t m_epochSize;
-        Microsoft::MSR::CNTK::SequencerPtr m_sequencer;
-        size_t m_numSequences;
-        size_t m_numChunks;
-        // Information maintained for original (non-randomized) chunks
+        // Structure for per-chunk information
+        // TODO note: numSequences / numSamples could also be computed through neighbors
         struct ChunkInformation
         {
             size_t numSequences;
             size_t numSamples;
             size_t sequencePositionStart;
-        };
-        std::vector<ChunkInformation> m_chunkInformation;
-        size_t m_randomizationrange; // full window measured in samples, one half to the left, the other to the right
-        size_t m_currentSweep; // randomization is currently cached for this sweep; if it changes, rebuild all below
-        size_t m_currentSequenceId; // position within the current sweep
+            size_t samplePositionStart;
 
-        // TODO note: numSequences / numSamples could also be computed through neighbors
-        struct RandomizedChunk          // chunk as used in actual processing order (randomized sequence)
-        {
-            size_t originalChunkIndex;
-            size_t numSequences;
-            size_t numSamples;
-
-            // Sequence positions (on randomized timeline) that this chunk covers
-            size_t sequencePositionStart;
             size_t sequencePositionEnd() const { return sequencePositionStart + numSequences; }
+            size_t samplePositionEnd() const { return samplePositionStart + numSamples; }
+        };
 
-            // (Global) Sample position (on randomized timeline)
-            size_t globalSamplePositionStart;
-            size_t globalSamplePositionEnd() const { return globalSamplePositionStart + numSamples; }
-            // TODO only needed for window computation, change and drop that
+        // Structure that will be maintained for each randomized chunk
+        struct RandomizedChunk
+        {
+            struct ChunkInformation info; // sample positions are global // TODO could drop?
+
+            size_t originalChunkIndex;
 
             // Randomization range limits (randomized chunk positions)
             size_t windowbegin;
             size_t windowend;
-
-            RandomizedChunk(size_t originalChunkIndex,
-                size_t numSequences,
-                size_t numSamples,
-                size_t sequencePositionStart,
-                size_t globalSamplePositionStart)
-                : originalChunkIndex(originalChunkIndex)
-                , numSequences(numSequences)
-                , numSamples(numSamples)
-                , sequencePositionStart(sequencePositionStart)
-                , globalSamplePositionStart(globalSamplePositionStart) {}
         };
-        std::vector<RandomizedChunk> m_randomizedChunks; // chunks after being brought into random order (we randomize within a rolling window over them)
-        Microsoft::MSR::CNTK::Timeline m_randomTimeline;
 
-        std::vector<size_t> sequencePositionToChunkIndex;
+        // General configuration
+        int m_verbosity;
+        size_t m_randomizationRangeInSamples; // full window
+
+        // Sequencer and information on the original timeline
+        SequencerPtr m_sequencer;
+        size_t m_numSequences;
+        size_t m_numChunks;
+        size_t m_numSamples;
+        bool m_framemode; // true iff only single-sample sequences
+        std::vector<ChunkInformation> m_chunkInformation;
+
+        // Per-epoch configuration
+        EpochConfiguration m_config;
+        size_t m_epochSize;
+        size_t m_currentSamplePositionInEpoch;
+
+        // Per-randomization-sweep information
+        size_t m_currentSweep;
+        size_t m_currentSequencePositionInSweep; // position within the current sweep
+        std::vector<RandomizedChunk> m_randomizedChunks;
+        std::vector<size_t> m_sequencePositionToChunkIndex;
+        Timeline m_randomTimeline;
 
         template<typename VECTOR> static void randomshuffle(VECTOR & v, size_t randomseed);
 
-        bool IsValidForPosition(size_t targetPosition, const Microsoft::MSR::CNTK::SequenceDescription & seqDesc) const;
+        bool IsValid(const Timeline& timeline) const;
 
-        bool IsValid(const Microsoft::MSR::CNTK::Timeline& timeline) const;
+        void RandomizeChunks(const size_t sweep, const size_t sweepts); // TODO drop sweepts?
 
-        void LazyRandomize();
+        bool IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const;
 
         void Randomize(
             const size_t sweep,
-            const size_t sweepts,
-            const Microsoft::MSR::CNTK::Timeline& timeline);
+            const size_t sweepts, // TODO drop sweepts?
+            const Timeline& timeline);
 
-    public:
-        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, Microsoft::MSR::CNTK::SequencerPtr sequencer);
-
-        virtual ~BlockRandomizer()
-        {
-        }
+        void LazyRandomize();
 
         size_t getSequenceWindowBegin(size_t sequenceIndex) const
         {
             assert(sequenceIndex < m_numSequences);
-            const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[sequenceIndex]];
+            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequenceIndex]];
             return chunk.windowbegin;
         }
 
         size_t getSequenceWindowEnd(size_t sequenceIndex) const
         {
             assert(sequenceIndex < m_numSequences);
-            const auto & chunk = m_randomizedChunks[sequencePositionToChunkIndex[sequenceIndex]];
+            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequenceIndex]];
             return chunk.windowend;
         }
 
-        virtual void SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config) override;
+    public:
+        BlockRandomizer(int verbosity, bool framemode /* TODO drop */, size_t randomizationrange, SequencerPtr sequencer);
 
-        virtual std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> getInputs() const override
+        virtual ~BlockRandomizer()
         {
-            std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> dummy;
+        }
+
+        virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
+
+        virtual std::vector<InputDescriptionPtr> getInputs() const override
+        {
+            std::vector<InputDescriptionPtr> dummy;
             return dummy;
         }
 
-        virtual Microsoft::MSR::CNTK::SequenceData getNextSequence() override;
+        virtual SequenceData getNextSequence() override;
     };
 } }
