@@ -65,6 +65,7 @@ namespace msra { namespace dbn {
         const size_t sweepts, // TODO not needed anymore
         const Timeline& timeline)
     {
+        // TODO make a members
         const size_t numChunks = timeline.back().chunkId + 1;
         const size_t numSequences = timeline.back().id + 1;
 
@@ -134,12 +135,16 @@ namespace msra { namespace dbn {
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
         m_randomTimeline.reserve(numSequences);
-        for (const auto & chunk : m_randomizedChunks)
+        foreach_index (chunkId, m_randomizedChunks)
         {
+            const auto & chunk = m_randomizedChunks[chunkId];
+
             // TODO pos -> iterator
             for (size_t i = 0, pos = m_chunkInformation[chunk.originalChunkIndex].sequencePositionStart; i < chunk.numSequences; i++, pos++)
             {
-                m_randomTimeline.push_back(timeline[pos]);
+                SequenceDescription randomizedSeqDesc = timeline[pos];
+                randomizedSeqDesc.chunkId = chunkId;
+                m_randomTimeline.push_back(randomizedSeqDesc);
             }
         }
         assert(m_randomTimeline.size() == numSequences);
@@ -237,10 +242,31 @@ namespace msra { namespace dbn {
 
         LazyRandomize();
         assert(m_currentSequenceId < m_randomTimeline.size());
-        const auto & seqDesc = m_randomTimeline[m_currentSequenceId++];
-        m_currentFrame += seqDesc.numberOfSamples;
+        const auto & seqDesc = m_randomTimeline[m_currentSequenceId];
 
-        // TODO purge maybe
+        // Require and release chunks from the sequencer
+        const size_t windowbegin = getSequenceWindowBegin(m_currentSequenceId);
+        const size_t windowend = getSequenceWindowEnd(m_currentSequenceId);
+        const size_t numChunks = m_sequencer->getTimeline().back().chunkId + 1;
+
+        for (size_t chunkId = 0; chunkId < numChunks; chunkId++)
+        {
+            auto originalChunkIndex = m_randomizedChunks[chunkId].originalChunkIndex;
+
+            if (windowbegin <= chunkId && chunkId < windowend)
+            {
+                // TODO missing: for distributed case only need some of the chunks
+                m_sequencer->RequireChunk(originalChunkIndex);
+            }
+            else
+            {
+                m_sequencer->ReleaseChunk(originalChunkIndex);
+            }
+        }
+
+        m_currentFrame += seqDesc.numberOfSamples;
+        m_currentSequenceId++;
+
         return m_sequencer->getSequenceById(seqDesc.id);
     };
 

@@ -88,6 +88,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
         virtual std::vector<InputDescriptionPtr> getInputs() const = 0;
         virtual SequenceData getSequenceById(size_t id) = 0;
+
+        // TODO
+        virtual bool RequireChunk(size_t chunkIndex) = 0;
+        virtual void ReleaseChunk(size_t chunkIndex) = 0;
+
         virtual ~Sequencer() = 0 {};
     };
 

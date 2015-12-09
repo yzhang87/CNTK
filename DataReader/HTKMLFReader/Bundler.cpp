@@ -580,36 +580,12 @@ namespace msra { namespace dbn {
         auto_timer timergetbatch;
         assert(m_totalframes > 0);
 
-        const size_t numChunks = m_allchunks[0].size();
         const size_t numStreams = m_allchunks.size();
 
         const std::vector<char> noboundaryflags;    // dummy
 
         const size_t spos = id; // positer->second;
         const size_t epos = spos + 1;
-
-
-        // Determine window range
-        const size_t windowbegin = m_rand->getSequenceWindowBegin(id);
-        const size_t windowend = m_rand->getSequenceWindowEnd(id);
-
-        for (size_t k = 0; k < windowbegin; k++)
-        {
-            ReleaseChunk(k);
-        }
-
-        for (size_t k = windowend; k < numChunks; k++)
-        {
-            ReleaseChunk(k);
-        }
-
-        for (size_t pos = spos; pos < epos; pos++)
-        {
-            if (m_timeline[id].chunkId % m_numberOfWorkers == m_workerRank)
-            {
-                RequireChunk(m_timeline[id].chunkId); // (window range passed in for checking only)
-            }
-        }
 
         // Note that the above loop loops over all chunks incl. those that we already should have.
         // This has an effect, e.g., if 'numsubsets' has changed (we will fill gaps).
