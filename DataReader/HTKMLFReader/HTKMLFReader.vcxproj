@@ -112,6 +112,7 @@
     <ClInclude Include="..\..\Common\Include\fileutil.h" />
     <ClInclude Include="..\..\Common\Include\DebugUtil.h" />
     <ClInclude Include="BlockRandomizer.h" />
+    <ClInclude Include="ConfigHelper.h" />
     <ClInclude Include="CudaMemoryProvider.h" />
     <ClInclude Include="FrameModePacker.h" />
     <ClInclude Include="HeapMemoryProvider.h" />
@@ -136,6 +137,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Bundler.cpp" />
+    <ClCompile Include="ConfigHelper.cpp" />
     <ClCompile Include="DataReader.cpp" />
     <ClCompile Include="DataWriter.cpp" />
     <ClCompile Include="dllmain.cpp">

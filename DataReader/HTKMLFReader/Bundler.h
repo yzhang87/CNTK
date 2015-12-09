@@ -154,8 +154,13 @@ namespace msra {
         // ---------------------------------------------------------------------------
         class Bundler : public Microsoft::MSR::CNTK::Sequencer
         {
+            std::unordered_map<std::string, size_t> m_notused;
+            std::vector<size_t> m_featureIndices;
+            std::vector<size_t> m_labelIndices;
+
+
             void operator=(const Bundler & other); // non-assignable
-            std::vector<size_t> m_vdim;                    // feature dimension after augmenting neighhors
+            //std::vector<size_t> m_vdim;                    // feature dimension after augmenting neighhors
             std::vector<size_t> m_leftcontext;             // number of frames to the left of the target frame in the context window
             std::vector<size_t> m_rightcontext;            // number of frames to the right of the target frame in the context window
             std::vector<unsigned int> m_sampperiod;        // (for reference and to check against model)
@@ -165,12 +170,13 @@ namespace msra {
             std::vector<std::vector<size_t>> m_counts;     // [s] occurrence count for all states (used for priors)
             int m_verbosity;
             // lattice reader
-            //const std::vector<unique_ptr<latticesource>> &lattices;
-            const latticesource & m_lattices;
+            // const std::vector<unique_ptr<latticesource>> lattices;
+            latticesource m_lattices;
+
 
             //std::vector<latticesource> lattices;
             // word-level transcripts (for MMI mode when adding best path to lattices)
-            const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & m_allwordtranscripts; // (used for getting word-level transcripts)
+            //const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & m_allwordtranscripts; // (used for getting word-level transcripts)
             //std::vector<map<wstring,msra::lattices::lattice::htkmlfwordsequence>> allwordtranscripts;
 
             std::vector<std::vector<utterancechunkdata>> m_allchunks;          // set of utterances organized in chunks, referred to by an iterator (not an index)
@@ -264,25 +270,7 @@ namespace msra {
 
 
         public:
-            Bundler::Bundler(
-                const Microsoft::MSR::CNTK::ConfigParameters & readerConfig,
-                const std::vector<std::vector<wstring>> & infiles,
-                const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels,
-                std::vector<size_t> vdim,
-                std::vector<size_t> udim,
-                std::vector<size_t> leftcontext,
-                std::vector<size_t> rightcontext,
-                size_t randomizationrange,
-                const latticesource & lattices,
-                const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & allwordtranscripts,
-                const bool framemode,
-                std::vector<Microsoft::MSR::CNTK::FrameDescription> featureFrameDescriptions,
-                std::vector<Microsoft::MSR::CNTK::FrameDescription> labelFrameDescriptions,
-                std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> inputs,
-                std::map<std::wstring, size_t> nameToId,
-                std::map<std::wstring, size_t> featureNameToIdMap,
-                std::map<std::wstring, size_t> labelNameToIdMap,
-                size_t elementSize);
+            Bundler::Bundler(const Microsoft::MSR::CNTK::ConfigParameters& readerConfig, bool framemode, size_t elementSize);
 
             // eldak: Should go away.
             void SetRandomizer(std::shared_ptr<BlockRandomizer> rand)
@@ -320,13 +308,13 @@ namespace msra {
             size_t m_workerRank;
             size_t m_numberOfWorkers;
             size_t m_elementSize;
-            std::vector<size_t> m_udim;
+            //std::vector<size_t> m_udim;
             std::vector<Microsoft::MSR::CNTK::FrameDescription> m_featureFrameDescriptions;
             std::vector<Microsoft::MSR::CNTK::FrameDescription> m_labelFrameDescriptions;
             std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> m_inputs;
-            std::map<std::wstring, size_t> m_nameToId;
-            std::map<std::wstring, size_t> m_featureNameToIdMap;
-            std::map<std::wstring, size_t> m_labelNameToIdMap;
+            //std::map<std::wstring, size_t> m_nameToId;
+            //std::map<std::wstring, size_t> m_featureNameToIdMap;
+            //std::map<std::wstring, size_t> m_labelNameToIdMap;
     
             // TODO can more stuff be dropped?
             struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)

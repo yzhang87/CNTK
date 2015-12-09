@@ -387,7 +387,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_lattices.reset(new msra::dbn::latticesource(latticetocs, m_hset.getsymmap()));
 
             // now get the frame source. This has better randomization and doesn't create temp files
-            m_frameSource.reset(new msra::dbn::Bundler(readerConfig, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true, m_featureFrameDescriptions, m_labelFrameDescriptions, m_inputs, m_nameToId, m_featureNameToIdMap, m_labelNameToIdMap, m_elementSize));
+            //m_frameSource.reset(new msra::dbn::Bundler(readerConfig, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true, m_featureFrameDescriptions, m_labelFrameDescriptions, m_inputs, m_nameToId, m_featureNameToIdMap, m_labelNameToIdMap, m_elementSize));
+            m_frameSource.reset(new msra::dbn::Bundler(readerConfig, true, m_elementSize));
             m_frameSource->setverbosity(m_verbosity);
 
             m_transformer = std::make_shared<msra::dbn::BlockRandomizer>(m_verbosity, true, randomize, m_frameSource);

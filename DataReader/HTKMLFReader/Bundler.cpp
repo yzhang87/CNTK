@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include "Bundler.h"
 #include <DataReader.h>
+#include "Utils.h"
+#include "ConfigHelper.h"
+#include "msra_mgram.h"
 
 using namespace Microsoft::MSR::CNTK;
 
@@ -8,48 +11,156 @@ namespace msra { namespace dbn {
 
     // constructor
     // Pass empty labels to denote unsupervised training (so getbatch() will not return uids).
-    // This mode requires utterances with time stamps.
+    // eldak: utterance mode, support for lattices and hmm is missing.
     Bundler::Bundler(
-        const ConfigParameters &,
-        const std::vector<std::vector<wstring>> & infiles,
-        const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels,
-        std::vector<size_t> vdim,
-        std::vector<size_t> udim,
-        std::vector<size_t> leftcontext,
-        std::vector<size_t> rightcontext,
-        size_t /*randomizationrange*/,
-        const latticesource & lattices,
-        const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & allwordtranscripts,
-        const bool framemode,
-        std::vector<FrameDescription> featureFrameDescriptions,
-        std::vector<FrameDescription> labelFrameDescriptions,
-        std::vector<InputDescriptionPtr> inputs,
-        std::map<std::wstring, size_t> nameToId,
-        std::map<std::wstring, size_t> featureNameToIdMap,
-        std::map<std::wstring, size_t> labelNameToIdMap,
+        const ConfigParameters& readerConfig,
+        bool framemode,
         size_t elementSize)
-        : m_vdim(vdim)
-        , m_udim(udim)
-        , m_leftcontext(leftcontext)
-        , m_rightcontext(rightcontext)
-        , m_sampperiod(0)
-        , m_featdim(0)
-        , m_lattices(lattices)
-        , m_allwordtranscripts(allwordtranscripts)
-        , m_framemode(framemode)
+        : m_framemode(framemode)
         , m_chunksinram(0)
         , m_timegetbatch(0)
         , m_verbosity(2)
-        , m_featureFrameDescriptions(featureFrameDescriptions)
-        , m_labelFrameDescriptions(labelFrameDescriptions)
-        , m_inputs(inputs)
-        , m_nameToId(nameToId)
-        , m_featureNameToIdMap(featureNameToIdMap)
-        , m_labelNameToIdMap(labelNameToIdMap)
         , m_elementSize(elementSize)
-        // [v-hansu] change framemode (lattices.empty()) into framemode (false) to run utterance mode without lattice
-        // you also need to change another line, search : [v-hansu] comment out to run utterance mode without lattice
+        , m_lattices(std::pair<std::vector<std::wstring>, std::vector<std::wstring>>(), m_notused)
     {
+        std::vector<std::wstring> featureNames;
+        std::vector<std::wstring> labelNames;
+
+        std::vector<std::wstring> notused;
+        Utils::GetDataNamesFromConfig(readerConfig, featureNames, labelNames, notused, notused);
+        if (featureNames.size() < 1 || labelNames.size() < 1)
+        {
+            InvalidArgument("network needs at least 1 input and 1 output specified!");
+        }
+
+        std::vector<InputDescriptionPtr> inputs;
+        std::vector<size_t> contextLeft;
+        std::vector<size_t> contextRight;
+        std::vector<std::vector<std::wstring>> featurePaths;
+        foreach_index(i, featureNames)
+        {
+            InputDescriptionPtr input = std::make_shared<InputDescription>();
+            input->id = inputs.size();
+            inputs.push_back(input);
+
+            const std::wstring& featureName = featureNames[i];
+            input->name = featureName;
+
+            const ConfigParameters& thisFeature = readerConfig(featureName);
+            ConfigHelper::CheckFeatureType(thisFeature);
+
+            auto context = ConfigHelper::GetContextWindow(thisFeature);
+            contextLeft.push_back(context.first);
+            contextRight.push_back(context.second);
+
+            size_t dim = thisFeature(L"dim");
+            dim = dim * (1 + context.first + context.second);
+
+            FrameDescription frameDescription;
+            frameDescription.elementSize = m_elementSize;
+            frameDescription.dimensions.push_back(dim);
+            m_featureFrameDescriptions.push_back(frameDescription);
+
+            SampleLayoutPtr layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ dim }));
+            input->sampleLayout = layout;
+
+            // eldak TODO: check that all script files for multi io have the same length.
+            featurePaths.push_back(std::move(ConfigHelper::GetFeaturePaths(thisFeature)));
+            m_featureIndices.push_back(input->id);
+        }
+
+        std::vector<std::wstring> stateListPaths;
+        std::vector<std::vector<std::wstring>> mlfPaths;
+        foreach_index(i, labelNames)
+        {
+            InputDescriptionPtr input = std::make_shared<InputDescription>();
+            input->id = inputs.size();
+            inputs.push_back(input);
+
+            const std::wstring& labelName = labelNames[i];
+            input->name = labelName;
+
+            const ConfigParameters& thisLabel = readerConfig(labelName);
+            ConfigHelper::CheckLabelType(thisLabel);
+
+            size_t dim = ConfigHelper::GetLabelDimension(thisLabel);
+
+            FrameDescription labelFrameDescription;
+            labelFrameDescription.elementSize = m_elementSize;
+            labelFrameDescription.dimensions.push_back(dim);
+            m_labelFrameDescriptions.push_back(labelFrameDescription);
+
+            SampleLayoutPtr layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t> { dim }));
+            input->sampleLayout = layout;
+
+            stateListPaths.push_back(thisLabel(L"labelMappingFile", L""));
+
+            mlfPaths.push_back(std::move(ConfigHelper::GetMlfPaths(thisLabel)));
+            m_labelIndices.push_back(input->id);
+        }
+
+        assert(featurePaths.size() == m_featureIndices.size() && mlfPaths.size() == m_labelIndices.size());
+
+        m_verbosity = readerConfig(L"verbosity", 2);
+
+        //look up in the config for the master command to determine whether we're writing output (inputs only) or training/evaluating (inputs and outputs)
+        wstring command(readerConfig(L"action", L""));
+
+        if (readerConfig.Exists(L"legacyMode"))
+        {
+            RuntimeError("legacy mode has been deprecated\n");
+        }
+
+        //size_t randomize = ConfigHelper::GetRandomizationWindow(readerConfig);
+        std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
+
+        m_verbosity = readerConfig(L"verbosity", 2);
+
+        msra::lm::CSymbolSet unigramSymbols;
+        std::unique_ptr<msra::lm::CMGramLM> unigram;
+
+        // currently assumes all Mlfs will have same root name (key)
+        set<wstring> restrictmlftokeys;     // restrict MLF reader to these files--will make stuff much faster without having to use shortened input files
+        if (featurePaths[0].size() <= 100)
+        {
+            foreach_index(i, featurePaths[0])
+            {
+                msra::asr::htkfeatreader::parsedpath ppath(featurePaths[0][i]);
+                // delete extension (or not if none)
+                const wstring key = regex_replace(static_cast<wstring>(ppath), wregex(L"\\.[^\\.\\\\/:]*$"), wstring());
+                restrictmlftokeys.insert(key);
+            }
+        }
+
+        // get labels
+        double htktimetoframe = 100000.0; // default is 10ms 
+        std::vector<std::map<std::wstring, std::vector<msra::asr::htkmlfentry>>> labelsmulti;
+        foreach_index(i, mlfPaths)
+        {
+            msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence>
+                l(mlfPaths[i], restrictmlftokeys, stateListPaths[i], (const msra::lm::CSymbolSet*) NULL, (map<string, size_t>*) NULL, htktimetoframe);
+            labelsmulti.push_back(std::move(l));
+
+            // label MLF
+            // get the temp file name for the page file
+
+            // Make sure 'msra::asr::htkmlfreader' type has a move constructor
+            static_assert(std::is_move_constructible<msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence>>::value,
+                "Type 'msra::asr::htkmlfreader' should be move constructible!");
+        }
+
+        if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
+        {
+            RuntimeError("readMethod must be 'blockRandomize'");
+        }
+
+        const std::vector<std::vector<wstring>>& infiles = featurePaths;
+        const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels = labelsmulti;
+        m_leftcontext = contextLeft;
+        m_rightcontext = contextRight;
+        m_inputs = inputs;
+        m_elementSize = elementSize;
+
         // process infiles to know dimensions of things (but not loading features)
         size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
         size_t nolat = 0;                       // number of entries missing in lattice archive (diagnostics)
@@ -65,10 +176,10 @@ namespace msra { namespace dbn {
         std::vector<size_t> classidsbegin;
 
         assert(infiles.size() == 1); // we are only looking at a single file here...
-        assert(leftcontext.size() == 1);
-        assert(leftcontext[0] == 0);
-        assert(rightcontext.size() == 1);
-        assert(rightcontext[0] == 0);
+        assert(m_leftcontext.size() == 1);
+        assert(m_leftcontext[0] == 0);
+        assert(m_rightcontext.size() == 1);
+        assert(m_rightcontext[0] == 0);
         assert(labels.size() == 1); // only have one
 
         m_allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
@@ -98,7 +209,7 @@ namespace msra { namespace dbn {
         uttisvalid = std::vector<bool>(numutts, true);
         uttduration = std::vector<size_t>(numutts, 0);
 
-        foreach_index(m, infiles) 
+        foreach_index(m, infiles)
         {
             if (infiles[m].size() != numutts)
             {
@@ -195,12 +306,13 @@ namespace msra { namespace dbn {
                         if (lacksmlf)
                             if (nomlf++ < 5)
                                 fprintf(stderr, " [no labels for  %ls]", key.c_str());
+
                         // check if lattice is available (when in lattice mode)
                         // TODO: also check the #frames here; requires a design change of the TOC format & a rerun
-                        const bool lackslat = !lattices.empty() && !lattices.haslattice(key); // ('true' if we have no lattices)
-                        if (lackslat)
+                        const bool lackslat = false;// !lattices.empty() && !lattices.haslattice(key); // ('true' if we have no lattices)
+/*                        if (lackslat)
                             if (nolat++ < 5)
-                                fprintf(stderr, " [no lattice for %ls]", key.c_str());
+                                fprintf(stderr, " [no lattice for %ls]", key.c_str());*/
                         // skip if either one is missing
                         if (lacksmlf || lackslat){
                             uttisvalid[i] = false;
@@ -249,9 +361,12 @@ namespace msra { namespace dbn {
                                             // TODO Why will these yield a run-time error as opposed to making the utterance invalid?
                                             // TODO check this at the source. Saves storing numframes field.
                                         }
-                                        if (e.classid >= udim[j])
+
+                                        auto dimension = m_inputs[m_labelIndices[j]]->sampleLayout->GetDims()[0];
+
+                                        if (e.classid >= dimension) //udim[j])
                                         {
-                                            RuntimeError("minibatchutterancesource: class id %d exceeds model output dimension %d in file %ls", (int)e.classid, (int)udim[j], key.c_str());
+                                            RuntimeError("minibatchutterancesource: class id %d exceeds model output dimension %d in file %ls", (int)e.classid, (int)dimension, key.c_str());
                                         }
                                         if (e.classid != (CLASSIDTYPE)e.classid)
                                             RuntimeError("CLASSIDTYPE has too few bits");
@@ -519,7 +634,7 @@ namespace msra { namespace dbn {
 
         // resize feat and uids
         // eldak:s should return phone boundaries and sentendmark lattices transcripts etc.
-        feat.resize(m_vdim.size());
+        feat.resize(m_featureIndices.size());
         uids.resize(m_classids.size());
         //phoneboundaries.resize(m_classids.size());
         //sentendmark.resize(m_vdim.size());
@@ -527,7 +642,8 @@ namespace msra { namespace dbn {
         //assert(feat.size() == randomizedchunks.size());
         foreach_index(i, feat)
         {
-            feat[i].resize(m_vdim[i], tspos);
+            //feat[i].resize(m_vdim[i], tspos);
+            feat[i].resize(m_inputs[m_featureIndices[i]]->sampleLayout->GetDim(0), tspos);
 
             if (i == 0)
             {
@@ -571,6 +687,7 @@ namespace msra { namespace dbn {
             for (size_t i = 0; i < numStreams; ++i)
             {
                 const auto & chunkdata = m_allchunks[i][uttref.chunkindex];
+                size_t dimension = m_inputs[m_featureIndices[i]]->sampleLayout->GetDim(0);
 
                 // eldak - does it mean we have read the who?
                 // assert((m_numberOfWorkers > 1) || (uttref.globalts == globalts + tspos));
@@ -590,7 +707,8 @@ namespace msra { namespace dbn {
                     // page in the needed range of frames
                     if (m_leftcontext[i] == 0 && m_rightcontext[i] == 0)
                     {
-                        leftextent = rightextent = augmentationextent(uttframevectors[t].size(), m_vdim[i]);
+                        //leftextent = rightextent = augmentationextent(uttframevectors[t].size(), m_vdim[i]);
+                        leftextent = rightextent = augmentationextent(uttframevectors[t].size(), dimension);
                     }
                     else
                     {
@@ -644,10 +762,11 @@ namespace msra { namespace dbn {
 
         m_timegetbatch = timergetbatch;
 
-        for (auto it = m_featureNameToIdMap.begin(); it != m_featureNameToIdMap.end(); ++it)
+        for (auto it = m_featureIndices.begin(); it != m_featureIndices.end(); ++it)
+        //for (auto it = m_featureNameToIdMap.begin(); it != m_featureNameToIdMap.end(); ++it)
         {
             Sequence r;
-            size_t id = m_featureNameToIdMap[it->first];
+            size_t id = *it;
 
             // eldak: leak here.
             const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat[id], 0, feat[0].cols());
@@ -672,14 +791,19 @@ namespace msra { namespace dbn {
             memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
             r.data = buffer;
 
-            result.m_data.insert(std::make_pair(m_nameToId[it->first], r));
+            result.m_data.insert(std::make_pair(m_inputs[*it]->id, r));
         }
 
-        for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it)
+        for (size_t l = 0; l < m_labelIndices.size(); ++l)
+        //for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it)
         {
             Sequence r;
-            size_t id = m_labelNameToIdMap[it->first];
-            size_t dim = m_udim[id];
+            size_t id = l;
+
+            auto dimension = m_inputs[m_labelIndices[l]]->sampleLayout->GetDims()[0];
+            size_t dim = dimension;
+
+            //size_t dim = m_udim[id];
 
             const std::vector<size_t>& x = uids[id];
 
@@ -701,7 +825,7 @@ namespace msra { namespace dbn {
                 r.numberOfFrames = 1;
                 r.frameDescription = &m_labelFrameDescriptions[id];
             }
-            result.m_data.insert(std::make_pair(m_nameToId[it->first], r));
+            result.m_data.insert(std::make_pair(m_inputs[m_labelIndices[l]]->id, r));
         }
 
         return result;

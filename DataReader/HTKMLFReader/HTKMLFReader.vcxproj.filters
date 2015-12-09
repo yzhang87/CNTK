@@ -24,6 +24,7 @@
     <ClCompile Include="Utils.cpp" />
     <ClCompile Include="Bundler.cpp" />
     <ClCompile Include="ScpDataDeserializer.cpp" />
+    <ClCompile Include="ConfigHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
@@ -67,6 +68,7 @@
     <ClInclude Include="Bundler.h" />
     <ClInclude Include="Timeline.h" />
     <ClInclude Include="ScpDataDeserializer.h" />
+    <ClInclude Include="ConfigHelper.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
