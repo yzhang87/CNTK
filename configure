@@ -132,12 +132,12 @@ function is_hardlinked ()
 
 function default_use_cuda () 
 {
-    if test x$(find_cuda) = x || test x$(find_gdk) = x
-    then
+#    if test x$(find_cuda) = x || test x$(find_gdk) = x
+#    then
         echo no
-    else
-        echo yes
-    fi
+#    else
+#        echo yes
+#    fi
 }
 enable_cuda=$(default_use_cuda)
 
@@ -461,11 +461,11 @@ case $mathlib in
         echo MKL_PATH=$mkl_path >> $config
         ;;
 esac
-if test $enable_cuda = yes ; then
-    echo CUDA_PATH=$cuda_path >> $config
-    echo GDK_PATH=$gdk_path >> $config
-    echo CUB_PATH=$cub_path >> $config
-fi
+#if test $enable_cuda = yes ; then
+#    echo CUDA_PATH=$cuda_path >> $config
+#    echo GDK_PATH=$gdk_path >> $config
+#    echo CUB_PATH=$cub_path >> $config
+#fi
 if test x$kaldi_path != x ; then
     echo KALDI_PATH=$kaldi_path >> $config
 fi
