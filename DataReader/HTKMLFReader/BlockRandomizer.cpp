@@ -11,12 +11,36 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    //
+    // Private methods
+    //
+
+    bool BlockRandomizer::IsValid(const Timeline& timeline) const
+    {
+        SequenceDescription previous = {
+            static_cast<size_t>(-1),
+            0,
+            0
+        };
+        auto it = std::find_if_not(timeline.begin(), timeline.end(),
+            [&](const SequenceDescription& current)
+            {
+                bool result = previous.id + 1 == current.id
+                    && previous.chunkId <= current.chunkId
+                    && current.chunkId <= previous.chunkId + 1
+                    && 0 < current.numberOfSamples;
+                previous = current;
+                return result;
+            });
+        return it == timeline.end();
+    }
+
     // Shuffle a vector into random order by randomly swapping elements
-    template<typename VECTOR> static void BlockRandomizer::randomshuffle(VECTOR & v, size_t randomseed)
+    template<typename VECTOR> static void BlockRandomizer::randomShuffle(VECTOR & v, size_t randomseed)
     {
         if (v.size() > RAND_MAX * static_cast<size_t>(RAND_MAX))
         {
-            RuntimeError("randomshuffle: too large set: need to change to different random generator!");
+            RuntimeError("randomShuffle: too large set: need to change to different random generator!");
         }
         srand(static_cast<unsigned int>(randomseed));
         foreach_index (i, v)
@@ -31,52 +55,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    // TODO order methods (same order in header)
-    // TODO fix casing in parameter names (also in header)
-
-    BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer)
-        : m_verbosity(verbosity)
-        , m_randomizationRangeInSamples(randomizationRangeInSamples)
-        , m_sequencer(sequencer)
-        , m_currentSweep(SIZE_MAX)
-        , m_currentSequencePositionInSweep(SIZE_MAX)
-        , m_currentSamplePositionInEpoch(SIZE_MAX)
-        , m_epochSize(SIZE_MAX)
-    {
-        assert(sequencer != nullptr);
-        const Timeline & timeline = m_sequencer->getTimeline();
-        assert(IsValid(timeline));
-
-        m_numSequences = timeline.back().id + 1;
-        m_numChunks = timeline.back().chunkId + 1;
-
-        // Generate additional information about physical chunks
-        assert(m_chunkInformation.size() == 0);
-        m_chunkInformation.insert(m_chunkInformation.begin(),
-            m_numChunks,
-            ChunkInformation { 0, 0, SIZE_MAX, SIZE_MAX } );
-
-        size_t maxNumberOfSamples = 0;
-
-        m_numSamples = 0;
-        for (const auto & seqDesc : timeline)
-        {
-            auto & chunkInformation = m_chunkInformation[seqDesc.chunkId];
-            chunkInformation.numSequences++;
-            chunkInformation.numSamples += seqDesc.numberOfSamples;
-            chunkInformation.sequencePositionStart =
-                min(chunkInformation.sequencePositionStart, seqDesc.id);
-            chunkInformation.sequencePositionStart =
-                min(chunkInformation.sequencePositionStart, seqDesc.id);
-            chunkInformation.samplePositionStart = m_numSamples;
-            maxNumberOfSamples = max(maxNumberOfSamples, seqDesc.numberOfSamples);
-            m_numSamples += chunkInformation.numSamples;
-        }
-
-        // Frame mode to the randomizer just means there are only single-sample sequences
-        m_framemode = (maxNumberOfSamples == 1);
-    }
-
     void BlockRandomizer::RandomizeChunks(const size_t sweep, const size_t sweepts)
     {
         // Create vector of chunk indices and shuffle them using current sweep as seed
@@ -86,7 +64,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             randomizedChunkIndices.push_back(i);
         }
-        randomshuffle(randomizedChunkIndices, sweep);
+        randomShuffle(randomizedChunkIndices, sweep);
 
         // Place randomized chunks on global time line
         m_randomizedChunks.clear();
@@ -218,38 +196,81 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    bool BlockRandomizer::IsValid(const Timeline& timeline) const
-    {
-        SequenceDescription previous = {
-            static_cast<size_t>(-1),
-            0,
-            0
-        };
-        auto it = std::find_if_not(timeline.begin(), timeline.end(),
-            [&](const SequenceDescription& current)
-            {
-                bool result = previous.id + 1 == current.id
-                    && previous.chunkId <= current.chunkId
-                    && current.chunkId <= previous.chunkId + 1
-                    && 0 < current.numberOfSamples;
-                previous = current;
-                return result;
-            });
-        return it == timeline.end();
-    }
-
     void BlockRandomizer::LazyRandomize()
     {
         if (m_currentSequencePositionInSweep >= m_numSequences)
         {
             if (m_verbosity > 0)
                 fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
-                    m_currentSweep, m_framemode ? "frame" : "utterance");
+                    m_currentSweep, m_frameMode ? "frame" : "utterance");
             m_currentSweep++;
             Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
             m_currentSequencePositionInSweep = 0;
         };
     }
+
+    //
+    // Public methods
+    //
+
+    BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer)
+        : m_verbosity(verbosity)
+        , m_randomizationRangeInSamples(randomizationRangeInSamples)
+        , m_sequencer(sequencer)
+        , m_currentSweep(SIZE_MAX)
+        , m_currentSequencePositionInSweep(SIZE_MAX)
+        , m_currentSamplePositionInEpoch(SIZE_MAX)
+        , m_epochSize(SIZE_MAX)
+    {
+        assert(sequencer != nullptr);
+        const Timeline & timeline = m_sequencer->getTimeline();
+        assert(IsValid(timeline));
+
+        m_numSequences = timeline.back().id + 1;
+        m_numChunks = timeline.back().chunkId + 1;
+
+        // Generate additional information about physical chunks
+        assert(m_chunkInformation.size() == 0);
+        m_chunkInformation.insert(m_chunkInformation.begin(),
+            m_numChunks,
+            ChunkInformation { 0, 0, SIZE_MAX, SIZE_MAX } );
+
+        size_t maxNumberOfSamples = 0;
+
+        m_numSamples = 0;
+        for (const auto & seqDesc : timeline)
+        {
+            auto & chunkInformation = m_chunkInformation[seqDesc.chunkId];
+            chunkInformation.numSequences++;
+            chunkInformation.numSamples += seqDesc.numberOfSamples;
+            chunkInformation.sequencePositionStart =
+                min(chunkInformation.sequencePositionStart, seqDesc.id);
+            chunkInformation.sequencePositionStart =
+                min(chunkInformation.sequencePositionStart, seqDesc.id);
+            chunkInformation.samplePositionStart = m_numSamples;
+            maxNumberOfSamples = max(maxNumberOfSamples, seqDesc.numberOfSamples);
+            m_numSamples += chunkInformation.numSamples;
+        }
+
+        // Frame mode to the randomizer just means there are only single-sample sequences
+        m_frameMode = (maxNumberOfSamples == 1);
+    }
+
+    void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
+    {
+        // TODO some asserts on EpochConfiguration
+        m_config = config;
+        m_currentSamplePositionInEpoch = 0;
+        m_epochSize = config.totalSize;
+        size_t timeframe = m_epochSize * config.index;
+
+        assert(m_frameMode);
+
+        // TODO make sure this will use the lazy path as well...
+        m_currentSweep = timeframe / m_numSamples;
+        Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
+        m_currentSequencePositionInSweep = timeframe % m_numSamples;
+    };
 
     SequenceData BlockRandomizer::getNextSequence()
     {
@@ -266,8 +287,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const auto & seqDesc = m_randomTimeline[m_currentSequencePositionInSweep];
 
         // Require and release chunks from the sequencer
-        const size_t windowbegin = getSequenceWindowBegin(m_currentSequencePositionInSweep);
-        const size_t windowend = getSequenceWindowEnd(m_currentSequencePositionInSweep);
+        const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[m_currentSequencePositionInSweep]];
+        const size_t windowbegin = chunk.windowbegin;
+        const size_t windowend = chunk.windowend;
 
         for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
         {
@@ -288,22 +310,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_currentSequencePositionInSweep++;
 
         return m_sequencer->getSequenceById(seqDesc.id);
-    };
-
-    void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
-    {
-        // TODO some asserts on EpochConfiguration
-        m_config = config;
-        m_currentSamplePositionInEpoch = 0;
-        m_epochSize = config.totalSize;
-        size_t timeframe = m_epochSize * config.index;
-
-        assert(m_framemode);
-
-        // TODO make sure this will use the lazy path as well...
-        m_currentSweep = timeframe / m_numSamples;
-        Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
-        m_currentSequencePositionInSweep = timeframe % m_numSamples;
     };
 
 } } }

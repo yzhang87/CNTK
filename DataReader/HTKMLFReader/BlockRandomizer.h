@@ -48,7 +48,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_numSequences;
         size_t m_numChunks;
         size_t m_numSamples;
-        bool m_framemode; // true iff only single-sample sequences
+        bool m_frameMode; // true iff only single-sample sequences
         std::vector<ChunkInformation> m_chunkInformation;
 
         // Per-epoch configuration
@@ -63,31 +63,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<size_t> m_sequencePositionToChunkIndex;
         Timeline m_randomTimeline;
 
-        template<typename VECTOR> static void randomshuffle(VECTOR & v, size_t randomseed);
-
         bool IsValid(const Timeline& timeline) const;
 
-        void RandomizeChunks(const size_t sweep, const size_t sweepts); // TODO drop sweepts?
+        template<typename VECTOR> static void randomShuffle(VECTOR & v, size_t randomseed);
+
+        void RandomizeChunks(const size_t sweep, const size_t sweepts); // TODO drop sweepts? // TODO rename?
 
         bool IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const;
 
         void Randomize(const size_t sweep, const size_t sweepts, const Timeline& timeline); // TODO drop sweepts? 
 
         void LazyRandomize();
-
-        size_t getSequenceWindowBegin(size_t sequencePosition) const
-        {
-            assert(sequencePosition < m_numSequences);
-            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequencePosition]];
-            return chunk.windowbegin;
-        }
-
-        size_t getSequenceWindowEnd(size_t sequencePosition) const
-        {
-            assert(sequencePosition < m_numSequences);
-            const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[sequencePosition]];
-            return chunk.windowend;
-        }
 
     public:
         BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer);
