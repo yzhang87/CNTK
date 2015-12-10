@@ -30,6 +30,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t id;
         size_t numberOfSamples;
         size_t chunkId;
+        bool isValid;
     };
 
     // Defines a sequences, which consists of sequences description and a number
@@ -49,11 +50,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         virtual void Get(char* buffer, size_t offset, size_t size) = 0;
         virtual ~BlockReader() = 0 {}
-    };
-
-    // Interface to for structured reading from a single datasource
-    class DataDeserializer
-    {
     };
 
     // Timeline specifies a vector of Sequence IDs and lengths.
@@ -78,6 +74,25 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
         }
     };
+
+    // Interface to for structured reading from a single data source
+    class DataDeserializer
+    {
+    public:
+        virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
+
+        virtual const Timeline& GetTimeline() const = 0;
+
+        virtual InputDescriptionPtr GetInput() const = 0;
+        virtual Sequence GetSequenceById(size_t id) = 0;
+        virtual Sequence GetSampleById(size_t sequenceId, size_t sampleId) = 0;
+
+        virtual bool RequireChunk(size_t chunkIndex) = 0;
+        virtual void ReleaseChunk(size_t chunkIndex) = 0;
+
+        virtual ~DataDeserializer() = 0 {};
+    };
+
 
     // A Sequencer composes Timeline information and a number of Sequence readers, providing
     // random-access to the Timeline as well as the composed Sequence readers.

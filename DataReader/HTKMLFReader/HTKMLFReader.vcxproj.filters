@@ -23,8 +23,10 @@
     <ClCompile Include="MonolithicTransformer.cpp" />
     <ClCompile Include="Utils.cpp" />
     <ClCompile Include="Bundler.cpp" />
-    <ClCompile Include="ScpDataDeserializer.cpp" />
     <ClCompile Include="ConfigHelper.cpp" />
+    <ClCompile Include="MLFDataDeserializer.cpp" />
+    <ClCompile Include="HTKDataDeserializer.cpp" />
+    <ClCompile Include="ScpParser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
@@ -67,8 +69,10 @@
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Bundler.h" />
     <ClInclude Include="Timeline.h" />
-    <ClInclude Include="ScpDataDeserializer.h" />
     <ClInclude Include="ConfigHelper.h" />
+    <ClInclude Include="HTKDataDeserializer.h" />
+    <ClInclude Include="MLFDataDeserializer.h" />
+    <ClInclude Include="ScpParser.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />

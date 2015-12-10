@@ -1,12 +1,12 @@
 #include "stdafx.h"
-#include "ScpDataDeserializer.h"
+#include "ScpParser.h"
 #include "BlockRandomizer.h"
 
 using namespace msra::dbn;
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    std::vector<utterancedesc> ScpDataDeserializer::Parse(const std::vector<std::wstring>& featureScpFiles)
+    std::vector<utterancedesc> ScpParser::Parse(const std::vector<std::wstring>& featureScpFiles)
     {
         std::vector<utterancedesc> utterances;
 

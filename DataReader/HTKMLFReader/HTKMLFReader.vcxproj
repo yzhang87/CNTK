@@ -116,15 +116,17 @@
     <ClInclude Include="CudaMemoryProvider.h" />
     <ClInclude Include="FrameModePacker.h" />
     <ClInclude Include="HeapMemoryProvider.h" />
+    <ClInclude Include="HTKDataDeserializer.h" />
     <ClInclude Include="htkfeatio.h" />
     <ClInclude Include="HTKMLFReader.h" />
     <ClInclude Include="HTKMLFReaderShim.h" />
     <ClInclude Include="HTKMLFWriter.h" />
     <ClInclude Include="minibatchiterator.h" />
     <ClInclude Include="minibatchsourcehelpers.h" />
+    <ClInclude Include="MLFDataDeserializer.h" />
     <ClInclude Include="MonolithicTransformer.h" />
     <ClInclude Include="msra_mgram.h" />
-    <ClInclude Include="ScpDataDeserializer.h" />
+    <ClInclude Include="ScpParser.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="targetver.h" />
@@ -159,12 +161,14 @@
     </ClCompile>
     <ClCompile Include="BlockRandomizer.cpp" />
     <ClCompile Include="FrameModePacker.cpp" />
+    <ClCompile Include="HTKDataDeserializer.cpp" />
     <ClCompile Include="HTKMLFReader.cpp" />
     <ClCompile Include="HTKMLFReaderShim.cpp" />
     <ClCompile Include="HTKMLFWriter.cpp" />
     <ClCompile Include="latticearchive.cpp" />
+    <ClCompile Include="MLFDataDeserializer.cpp" />
     <ClCompile Include="MonolithicTransformer.cpp" />
-    <ClCompile Include="ScpDataDeserializer.cpp" />
+    <ClCompile Include="ScpParser.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
