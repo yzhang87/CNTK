@@ -142,11 +142,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     };
 
-    // ---------------------------------------------------------------------------
-    // minibatchutterancesource -- feature source to provide randomized utterances
-    // This also implements a frame-wise mode, which is layered on top of the utterance-wise mode
-    // and thus benefits from its goodies such as corpus-wide high-level randomization and chunk paging.
-    // ---------------------------------------------------------------------------
     class BundlerSplitted : public Sequencer
     {
         std::vector<size_t> m_featureIndices;
@@ -167,16 +162,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool issupervised() const { return !m_classids.empty(); }
 
         size_t m_totalframes;            // total frames (same as classids.size() if we have labels)
-        double m_timegetbatch;            // [v-hansu] for time measurement
         size_t m_chunksinram;             // (for diagnostics messages)
-
-        // helper to page out a chunk with log message
-        //void releaserandomizedchunk(size_t k);
-
-        // helper to page in a chunk for a given utterance
-        // (window range passed in for checking only)
-        // Returns true if we actually did read something.
-        //bool requirerandomizedchunk(const size_t chunkindex, const size_t windowbegin, const size_t windowend);
 
         // TODO: this may go away if we store classids directly in the utterance data
         template<class VECTOR> class shiftedvector  // accessing a vector with a non-0 starting index
@@ -215,16 +201,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void ReleaseChunk(size_t chunkIndex) override;
 
     private:
-
         Timeline m_timeline;
         std::vector<string> m_featkind;
         std::map<size_t, const utterancedesc*> m_sequenceIdToSequence;
         size_t m_workerRank;
         size_t m_numberOfWorkers;
         size_t m_elementSize;
-        //std::vector<size_t> m_udim;
-        std::vector<FrameDescription> m_featureFrameDescriptions;
-        std::vector<FrameDescription> m_labelFrameDescriptions;
         std::vector<InputDescriptionPtr> m_inputs;
 
         // TODO can more stuff be dropped?

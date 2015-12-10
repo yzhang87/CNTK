@@ -17,7 +17,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int verbosity)
         : m_framemode(framemode)
         , m_chunksinram(0)
-        , m_timegetbatch(0)
         , m_verbosity(verbosity)
         , m_elementSize(elementSize)
     {
@@ -57,7 +56,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             FrameDescription frameDescription;
             frameDescription.elementSize = m_elementSize;
             frameDescription.dimensions.push_back(dim);
-            m_featureFrameDescriptions.push_back(frameDescription);
 
             SampleLayoutPtr layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ dim }));
             input->sampleLayout = layout;
@@ -86,7 +84,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             FrameDescription labelFrameDescription;
             labelFrameDescription.elementSize = m_elementSize;
             labelFrameDescription.dimensions.push_back(dim);
-            m_labelFrameDescriptions.push_back(labelFrameDescription);
 
             SampleLayoutPtr layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t> { dim }));
             input->sampleLayout = layout;
@@ -687,8 +684,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             assert(tspos == feat[i].cols());
         }
-
-        m_timegetbatch = timergetbatch;
 
         for (auto it = m_featureIndices.begin(); it != m_featureIndices.end(); ++it)
         {
