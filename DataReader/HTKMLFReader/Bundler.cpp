@@ -739,7 +739,6 @@ namespace msra { namespace dbn {
             Sequence r;
             size_t id = *it;
 
-            // eldak: leak here.
             const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat[id], 0, feat[0].cols());
             const size_t dimensions = featOri.rows();
             const void* tmp = &featOri(0, 0);
@@ -747,7 +746,6 @@ namespace msra { namespace dbn {
             r.numberOfFrames = 1;
             r.frameDescription = &m_featureFrameDescriptions[id];
 
-            // eldak: leak leak leak. who is responsible for clearing this? who does caching?
             void* buffer = nullptr;
             if (m_elementSize == sizeof(float))
             {
@@ -778,7 +776,6 @@ namespace msra { namespace dbn {
 
             const std::vector<size_t>& x = uids[id];
 
-            // eldak: leak here.
             if (m_elementSize == sizeof(float))
             {
                 float* tmp = new float[dim];
