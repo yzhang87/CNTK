@@ -15,16 +15,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class BlockRandomizer : public Transformer
     {
         // Structure for per-chunk information
-        // TODO note: numSequences / numSamples could also be computed through neighbors
         struct ChunkInformation
         {
-            size_t numSequences;
-            size_t numSamples;
             size_t sequencePositionStart;
             size_t samplePositionStart;
-
-            size_t sequencePositionEnd() const { return sequencePositionStart + numSequences; }
-            size_t samplePositionEnd() const { return samplePositionStart + numSamples; }
         };
 
         // Structure that will be maintained for each randomized chunk
@@ -60,7 +54,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_currentSweep;
         size_t m_currentSequencePositionInSweep; // position within the current sweep
         std::vector<RandomizedChunk> m_randomizedChunks;
-        std::vector<size_t> m_sequencePositionToChunkIndex;
+        std::vector<size_t> m_sequencePositionToChunkIndex; // TODO find on m_randomizedChunks instead?
         Timeline m_randomTimeline;
 
         bool IsValid(const Timeline& timeline) const;

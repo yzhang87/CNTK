@@ -68,23 +68,33 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Place randomized chunks on global time line
         m_randomizedChunks.clear();
-        m_randomizedChunks.reserve(m_numChunks);
-        for (size_t chunkId = 0, samplePosition = sweepts, sequencePosition = 0; chunkId < m_numChunks; chunkId++)
+        m_randomizedChunks.reserve(m_numChunks + 1);
+        size_t chunkId, samplePosition, sequencePosition; // TODO xxx
+        for (chunkId = 0, samplePosition = sweepts, sequencePosition = 0; chunkId < m_numChunks; chunkId++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[chunkId];
-            const size_t numSequences = m_chunkInformation[originalChunkIndex].numSequences;
-            const size_t numSamples = m_chunkInformation[originalChunkIndex].numSamples;
+            const size_t numSequences =
+                m_chunkInformation[originalChunkIndex + 1].sequencePositionStart -
+                m_chunkInformation[originalChunkIndex].sequencePositionStart;
+            const size_t numSamples =
+                m_chunkInformation[originalChunkIndex + 1].samplePositionStart -
+                m_chunkInformation[originalChunkIndex].samplePositionStart;
             m_randomizedChunks.push_back(RandomizedChunk {
-                numSequences, numSamples, sequencePosition, samplePosition,
+                sequencePosition, samplePosition,
                 originalChunkIndex
             });
             samplePosition += numSamples;
             sequencePosition += numSequences;
         }
 
+        // Add sentinel
+        m_randomizedChunks.push_back(RandomizedChunk {
+            sequencePosition, samplePosition, SIZE_MAX
+        });
+
         // For each chunk, compute the randomization range (w.r.t. the randomized chunk sequence)
         size_t halfWindowRange = m_randomizationRangeInSamples / 2;
-        foreach_index(chunkId, m_randomizedChunks)
+        for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
         {
             auto & chunk = m_randomizedChunks[chunkId];
             // start with the range of left neighbor
@@ -95,23 +105,25 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
             else
             {
-                chunk.windowbegin = m_randomizedChunks[chunkId - 1].windowbegin;  // might be too early
-                chunk.windowend = m_randomizedChunks[chunkId - 1].windowend;      // might have more space
+                chunk.windowbegin = m_randomizedChunks[chunkId - 1].windowbegin; // might be too early
+                chunk.windowend = m_randomizedChunks[chunkId - 1].windowend; // might have more space
             }
             while (chunk.info.samplePositionStart - m_randomizedChunks[chunk.windowbegin].info.samplePositionStart > halfWindowRange)
-                chunk.windowbegin++;            // too early
+                chunk.windowbegin++; // too early
             while (chunk.windowend < m_numChunks &&
-                m_randomizedChunks[chunk.windowend].info.samplePositionEnd() - chunk.info.samplePositionStart < halfWindowRange)
-                chunk.windowend++;              // got more space
+                m_randomizedChunks[chunk.windowend + 1].info.samplePositionStart - chunk.info.samplePositionStart < halfWindowRange)
+                chunk.windowend++; // got more space
         }
 
         // Compute the randomization range for sequence positions.
         m_sequencePositionToChunkIndex.clear();
         m_sequencePositionToChunkIndex.reserve(m_numSequences);
-        foreach_index (k, m_randomizedChunks)
+        for (size_t k = 0; k < m_numChunks; k++)
         {
-            const auto & chunk = m_randomizedChunks[k];
-            for (size_t i = 0; i < chunk.info.numSequences; i++)
+            const size_t numSequences =
+                m_randomizedChunks[k + 1].info.sequencePositionStart -
+                m_randomizedChunks[k].info.sequencePositionStart;
+            for (size_t i = 0; i < numSequences; i++)
             {
                 m_sequencePositionToChunkIndex.push_back(k);
             }
@@ -135,11 +147,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
         m_randomTimeline.reserve(m_numSequences);
-        foreach_index (chunkId, m_randomizedChunks)
+        for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
         {
-            const auto & chunk = m_randomizedChunks[chunkId];
+            auto originalChunkIndex = m_randomizedChunks[chunkId].originalChunkIndex;
 
-            for (size_t i = 0, sequencePosition = m_chunkInformation[chunk.originalChunkIndex].sequencePositionStart; i < chunk.info.numSequences; i++, sequencePosition++)
+            for (size_t sequencePosition = m_chunkInformation[originalChunkIndex].sequencePositionStart;
+                sequencePosition < m_chunkInformation[originalChunkIndex + 1].sequencePositionStart;
+                sequencePosition++)
             {
                 SequenceDescription randomizedSeqDesc = timeline[sequencePosition];
                 randomizedSeqDesc.chunkId = chunkId;
@@ -166,7 +180,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             // Get valid randomization range, expressed in sequence positions.
             size_t posbegin = m_randomizedChunks[windowbegin].info.sequencePositionStart;
-            size_t posend = m_randomizedChunks[windowend - 1].info.sequencePositionEnd();
+            size_t posend = m_randomizedChunks[windowend].info.sequencePositionStart;
 
             for (;;)
             {
@@ -231,9 +245,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Generate additional information about physical chunks
         assert(m_chunkInformation.size() == 0);
+        m_chunkInformation.reserve(m_numChunks + 1);
         m_chunkInformation.insert(m_chunkInformation.begin(),
-            m_numChunks,
-            ChunkInformation { 0, 0, SIZE_MAX, SIZE_MAX } );
+            m_numChunks + 1,
+            ChunkInformation { SIZE_MAX, SIZE_MAX } );
 
         size_t maxNumberOfSamples = 0;
 
@@ -241,16 +256,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (const auto & seqDesc : timeline)
         {
             auto & chunkInformation = m_chunkInformation[seqDesc.chunkId];
-            chunkInformation.numSequences++;
-            chunkInformation.numSamples += seqDesc.numberOfSamples;
             chunkInformation.sequencePositionStart =
                 min(chunkInformation.sequencePositionStart, seqDesc.id);
-            chunkInformation.sequencePositionStart =
-                min(chunkInformation.sequencePositionStart, seqDesc.id);
-            chunkInformation.samplePositionStart = m_numSamples;
+            chunkInformation.samplePositionStart =
+                min(chunkInformation.samplePositionStart, m_numSamples);
             maxNumberOfSamples = max(maxNumberOfSamples, seqDesc.numberOfSamples);
-            m_numSamples += chunkInformation.numSamples;
+            m_numSamples += seqDesc.numberOfSamples;
         }
+
+        // Add sentinel
+        m_chunkInformation[m_numChunks] = { m_numSequences, m_numSamples };
 
         // Frame mode to the randomizer just means there are only single-sample sequences
         m_frameMode = (maxNumberOfSamples == 1);
@@ -258,7 +273,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
     {
-        // TODO some asserts on EpochConfiguration
+        // TODO add some asserts on EpochConfiguration
         m_config = config;
         m_currentSamplePositionInEpoch = 0;
         m_epochSize = config.totalSize;
