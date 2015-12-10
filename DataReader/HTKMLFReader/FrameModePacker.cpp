@@ -388,6 +388,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return;
         }
 
+        const auto& inputs = m_transformer->GetInputs();
         size_t numOfFea = m_featuresBufferMultiIO.size();
         size_t numOfLabel = m_labelsBufferMultiIO.size();
         size_t totalFeatNum = 0;
@@ -397,7 +398,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t id = m_featureNameToIdMap[it->first];
             size_t inputId = m_nameToId[it->first];
 
-            size_t dim = sequences[0][inputId].frameDescription->Size();
+            size_t dim = inputs[inputId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             m_featuresStartIndexMultiUtt[id + featureSequenceIndex] = totalFeatNum;
@@ -419,7 +420,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t id = m_labelNameToIdMap[it->first];
             size_t inputId = m_nameToId[it->first];
 
-            size_t dim = sequences[0][inputId].frameDescription->Size();
+            size_t dim = inputs[inputId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             m_labelsStartIndexMultiUtt[id + labelSequenceIndex] = totalLabelsNum;
@@ -443,7 +444,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t id = m_featureNameToIdMap[it->first];
             size_t inputId = m_nameToId[it->first];
 
-            size_t fdim = sequences[0][inputId].frameDescription->Size();
+            size_t fdim = inputs[inputId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             if (first)
@@ -475,7 +476,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t id = m_labelNameToIdMap[it->first];
             size_t inputId = m_nameToId[it->first];
 
-            size_t fdim = sequences[0][inputId].frameDescription->Size();
+            size_t fdim = inputs[inputId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             if (first)

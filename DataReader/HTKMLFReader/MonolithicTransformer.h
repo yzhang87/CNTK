@@ -52,7 +52,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::map<std::wstring, size_t> m_labelNameToDimMap;
         int m_verbosity;
         bool m_partialMinibatch;
-        std::shared_ptr<msra::dbn::Bundler> m_frameSource;
+        SequencerPtr m_bundler;
 
         std::map<std::wstring, size_t> m_nameToId;
 

@@ -32,6 +32,7 @@ typedef unsigned int UNINT32;
 #include "TimerUtility.h"
 #include "Utils.h"
 #include "Bundler.h"
+#include "BundlerSplitted.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -387,11 +388,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_lattices.reset(new msra::dbn::latticesource(latticetocs, m_hset.getsymmap()));
 
             // now get the frame source. This has better randomization and doesn't create temp files
-            //m_frameSource.reset(new msra::dbn::Bundler(readerConfig, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, true, m_featureFrameDescriptions, m_labelFrameDescriptions, m_inputs, m_nameToId, m_featureNameToIdMap, m_labelNameToIdMap, m_elementSize));
-            m_frameSource.reset(new msra::dbn::Bundler(readerConfig, true, m_elementSize));
-            m_frameSource->setverbosity(m_verbosity);
-
-            m_transformer = std::make_shared<BlockRandomizer>(m_verbosity, randomize, m_frameSource);
+            m_bundler = std::make_shared<BundlerSplitted>(readerConfig, true, m_elementSize, m_verbosity);
+            m_transformer = std::make_shared<BlockRandomizer>(m_verbosity, randomize, m_bundler);
         }
         else
         {
@@ -404,10 +402,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.workerRank < config.numberOfWorkers);
         assert((config.workerRank == 0) && (config.numberOfWorkers == 1));
 
-        m_frameSource->SetEpochConfiguration(config);
+        m_bundler->SetEpochConfiguration(config);
 
         size_t totalFrames = 0;
-        for (const auto& s : m_frameSource->GetTimeline())
+        for (const auto& s : m_bundler->GetTimeline())
         {
             totalFrames += s.numberOfSamples;
         }

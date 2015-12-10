@@ -157,6 +157,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<size_t> m_leftcontext;             // number of frames to the left of the target frame in the context window
         std::vector<size_t> m_rightcontext;            // number of frames to the right of the target frame in the context window
         std::vector<size_t> m_featdim;
+        std::vector<unsigned int> m_sampperiod;        // (for reference and to check against model)
         const bool m_framemode;           // true -> actually return frame-level randomized frames (not possible in lattice mode)
         int m_verbosity;
 
@@ -203,7 +204,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 
     public:
-        BundlerSplitted::BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, size_t elementSize);
+        BundlerSplitted::BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, size_t elementSize, int verbosity);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
@@ -216,6 +217,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     private:
 
         Timeline m_timeline;
+        std::vector<string> m_featkind;
         std::map<size_t, const utterancedesc*> m_sequenceIdToSequence;
         size_t m_workerRank;
         size_t m_numberOfWorkers;

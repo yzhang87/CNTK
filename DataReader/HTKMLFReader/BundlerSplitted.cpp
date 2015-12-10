@@ -13,11 +13,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     BundlerSplitted::BundlerSplitted(
         const ConfigParameters& readerConfig,
         bool framemode,
-        size_t elementSize)
+        size_t elementSize,
+        int verbosity)
         : m_framemode(framemode)
         , m_chunksinram(0)
         , m_timegetbatch(0)
-        , m_verbosity(2)
+        , m_verbosity(verbosity)
         , m_elementSize(elementSize)
     {
         std::vector<std::wstring> featureNames;
@@ -152,6 +153,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_rightcontext = contextRight;
         m_inputs = inputs;
         m_elementSize = elementSize;
+        m_featkind = std::vector<string>(infiles.size(), "");
+        m_sampperiod = std::vector<unsigned int>(infiles.size(), 0);
 
         // process infiles to know dimensions of things (but not loading features)
         size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
@@ -504,9 +507,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     msra::dbn::latticesource lattices(
                         std::pair<std::vector<std::wstring>, std::vector<std::wstring>>(),
                         empty);
-                    unsigned int sampperiod;
-                    string featkind;
-                    chunkdata.requiredata(featkind, m_featdim[m], sampperiod, lattices, m_verbosity);
+                    chunkdata.requiredata(m_featkind[m], m_featdim[m], m_sampperiod[m], lattices, m_verbosity);
                 });
             }
             m_chunksinram++;
@@ -699,7 +700,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const void* tmp = &featOri(0, 0);
 
             r.numberOfFrames = 1;
-            r.frameDescription = &m_featureFrameDescriptions[id];
 
             // eldak: this should not be allocated each time.
             void* buffer = nullptr;
@@ -736,7 +736,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 tmp[x[0]] = 1;
                 r.data = tmp;
                 r.numberOfFrames = 1;
-                r.frameDescription = &m_labelFrameDescriptions[id];
             }
             else
             {
@@ -744,7 +743,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 tmp[x[0]] = 1;
                 r.data = tmp;
                 r.numberOfFrames = 1;
-                r.frameDescription = &m_labelFrameDescriptions[id];
             }
             result.m_data.insert(std::make_pair(m_inputs[m_labelIndices[l]]->id, r));
         }

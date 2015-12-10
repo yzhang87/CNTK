@@ -744,7 +744,6 @@ namespace msra { namespace dbn {
             const void* tmp = &featOri(0, 0);
 
             r.numberOfFrames = 1;
-            r.frameDescription = &m_featureFrameDescriptions[id];
 
             void* buffer = nullptr;
             if (m_elementSize == sizeof(float))
@@ -783,7 +782,6 @@ namespace msra { namespace dbn {
                 tmp[x[0]] = 1;
                 r.data = tmp;
                 r.numberOfFrames = 1;
-                r.frameDescription = &m_labelFrameDescriptions[id];
             }
             else
             {
@@ -791,7 +789,6 @@ namespace msra { namespace dbn {
                 tmp[x[0]] = 1;
                 r.data = tmp;
                 r.numberOfFrames = 1;
-                r.frameDescription = &m_labelFrameDescriptions[id];
             }
             result.m_data.insert(std::make_pair(m_inputs[m_labelIndices[l]]->id, r));
         }

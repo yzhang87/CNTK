@@ -38,7 +38,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     struct Sequence
     {
         SequenceDescription* description;
-        FrameDescription* frameDescription;
+        //FrameDescription* frameDescription;
         void* data;
         size_t numberOfFrames; // TODO -> change to numberOfSamples? also elsewhere?
     };
