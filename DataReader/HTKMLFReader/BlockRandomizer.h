@@ -78,8 +78,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual std::vector<InputDescriptionPtr> GetInputs() const override
         {
-            std::vector<InputDescriptionPtr> dummy;
-            return dummy;
+            return m_sequencer->GetInputs();
         }
 
         virtual SequenceData GetNextSequence() override;

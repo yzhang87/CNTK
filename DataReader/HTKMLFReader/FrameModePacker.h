@@ -9,7 +9,7 @@
 #include "biggrowablevectors.h"
 #include "utterancesourcemulti.h"
 #include "minibatchiterator.h"
-#include "MonolithicTransformer.h"
+#include <InnerInterfaces.h>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
     class FrameModePacker : public Reader
@@ -31,6 +31,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             virtual ~EpochImplementation();
         };
 
+
+    private:
         void InitFromConfig(const ConfigParameters& config);
         void StartDistributedMinibatchLoop(size_t requestedMBSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples /*= requestDataSize*/);
         Minibatch GetMinibatch();

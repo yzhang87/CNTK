@@ -2,6 +2,10 @@
 #include "FrameModePacker.h"
 #include "TimerUtility.h"
 #include "Utils.h"
+#include <DataReader.h>
+#include "BundlerSplitted.h"
+#include "ConfigHelper.h"
+#include "BlockRandomizer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -37,7 +41,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_memoryProvider(memoryProvider)
         , m_elementSize(elementSize)
     {
-        m_transformer = std::make_shared<MonolithicTransformer>(config, m_elementSize);
         InitFromConfig(config);
     }
 
@@ -48,8 +51,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     EpochPtr FrameModePacker::StartNextEpoch(const EpochConfiguration& config)
     {
-        m_transformer->SetEpochConfiguration(config);
         assert(config.workerRank < config.numberOfWorkers);
+
+        // TODO: what to do with partial minibatches? Is it important to propagate this information to lower layers?
+        m_transformer->SetEpochConfiguration(config);
 
         StartDistributedMinibatchLoop(config.minibatchSize, config.index, config.workerRank, config.numberOfWorkers, config.totalSize);
         return std::make_unique<EpochImplementation>(this);
@@ -57,6 +62,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void FrameModePacker::InitFromConfig(const ConfigParameters & readerConfig)
     {
+        size_t window = ConfigHelper::GetRandomizationWindow(readerConfig);
+        auto bundler = std::make_shared<BundlerSplitted>(readerConfig, true, m_elementSize, m_verbosity);
+        m_transformer = std::make_shared<BlockRandomizer>(m_verbosity, window, bundler);
+
         intargvector numberOfuttsPerMinibatchForAllEpochs =
             readerConfig(L"nbruttsineachrecurrentiter", ConfigParameters::Array(intargvector(vector<int>{ 1 })));
         Utils::CheckMinibatchSizes(numberOfuttsPerMinibatchForAllEpochs);

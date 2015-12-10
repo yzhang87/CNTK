@@ -742,4 +742,31 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_workerRank = config.workerRank;
         m_numberOfWorkers = config.numberOfWorkers;
     }
+
+    std::vector<BundlerSplitted::shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> BundlerSplitted::GetClassIds(
+        const sequenceref& uttref)
+    {
+        std::vector<shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> allclassids;
+        allclassids.empty();
+
+        if (!issupervised())
+        {
+            foreach_index(i, m_classids)
+                allclassids.push_back(std::move(shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>((*m_classids[i]), 0, 0)));
+            return allclassids;     // nothing to return
+        }
+        const size_t originalChunkIndex = uttref.chunkindex;
+        const auto & chunkdata = m_allchunks[0][originalChunkIndex];
+        const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
+        const size_t n = chunkdata.numframes(uttref.utteranceindex);
+        foreach_index(i, m_classids)
+        {
+            if ((*m_classids[i])[classidsbegin + n] != (msra::dbn::CLASSIDTYPE) - 1)
+            {
+                LogicError("getclassids: expected boundary marker not found, internal data structure screwed up");
+            }
+            allclassids.push_back(std::move(shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>((*m_classids[i]), classidsbegin, n)));
+        }
+        return allclassids;   // nothing to return
+    }
 }}}

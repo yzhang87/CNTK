@@ -8,6 +8,7 @@
 #include "BlockRandomizer.h"
 #include <algorithm>
 #include <utility> // std::swap
+#include "DataReader.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -273,10 +274,27 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
     {
+        m_sequencer->SetEpochConfiguration(config);
+
+        size_t totalFrames = 0;
+        for (const auto& t : m_sequencer->GetTimeline())
+        {
+            totalFrames += t.numberOfSamples;
+        }
+
+        // eldak: check partial minibatches.
+        if (config.totalSize == requestDataSize)
+        {
+            m_epochSize = totalFrames;
+        } 
+        else
+        {
+            m_epochSize = config.totalSize;
+        }
+
         // TODO add some asserts on EpochConfiguration
         m_config = config;
         m_currentSamplePositionInEpoch = 0;
-        m_epochSize = config.totalSize;
         size_t timeframe = m_epochSize * config.index;
 
         assert(m_frameMode);
