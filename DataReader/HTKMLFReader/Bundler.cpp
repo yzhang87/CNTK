@@ -555,17 +555,17 @@ namespace msra { namespace dbn {
         }
     }
 
-    const Timeline& Bundler::getTimeline() const
+    const Timeline& Bundler::GetTimeline() const
     {
         return m_timeline;
     }
 
-    std::vector<InputDescriptionPtr> Bundler::getInputs() const
+    std::vector<InputDescriptionPtr> Bundler::GetInputs() const
     {
         return m_inputs;
     }
 
-    SequenceData Bundler::getSequenceById(size_t id)
+    SequenceData Bundler::GetSequenceById(size_t id)
     {
         SequenceData result;
 

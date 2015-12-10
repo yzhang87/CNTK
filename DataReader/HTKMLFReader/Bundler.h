@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "inner_interfaces.h"
+#include "InnerInterfaces.h"
 
 #include "Basics.h"                  // for attempt()
 #include "htkfeatio.h"                  // for htkmlfreader
@@ -264,11 +264,11 @@ namespace msra {
 
             const std::vector<size_t> & unitcounts() const { return m_counts[0]; }
 
-            virtual const Microsoft::MSR::CNTK::Timeline& getTimeline() const override;
+            virtual const Microsoft::MSR::CNTK::Timeline& GetTimeline() const override;
 
-            virtual std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> getInputs() const override;
+            virtual std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> GetInputs() const override;
 
-            virtual Microsoft::MSR::CNTK::SequenceData getSequenceById(size_t id) override;
+            virtual Microsoft::MSR::CNTK::SequenceData GetSequenceById(size_t id) override;
             virtual bool RequireChunk(size_t chunkindex) override;
             virtual void ReleaseChunk(size_t chunkIndex) override;
 

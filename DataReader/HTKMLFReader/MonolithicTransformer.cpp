@@ -407,7 +407,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_frameSource->SetEpochConfiguration(config);
 
         size_t totalFrames = 0;
-        for (const auto& s : m_frameSource->getTimeline())
+        for (const auto& s : m_frameSource->GetTimeline())
         {
             totalFrames += s.numberOfSamples;
         }
@@ -445,13 +445,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_transformer->SetEpochConfiguration(transformerConfig);
     }
 
-    std::vector<InputDescriptionPtr> MonolithicTransformer::getInputs() const
+    std::vector<InputDescriptionPtr> MonolithicTransformer::GetInputs() const
     {
         return m_inputs;
     }
 
-    SequenceData MonolithicTransformer::getNextSequence()
+    SequenceData MonolithicTransformer::GetNextSequence()
     {
-        return m_transformer->getNextSequence();
+        return m_transformer->GetNextSequence();
     }
 }}}

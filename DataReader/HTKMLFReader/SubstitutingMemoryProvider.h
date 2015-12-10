@@ -1,6 +1,6 @@
 #pragma once
 
-#include "reader_interface.h"
+#include "ReaderInterfaces.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -17,14 +17,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_provider = p;
         }
 
-        virtual void* alloc(size_t elementSize, size_t numberOfElements) override
+        virtual void* Alloc(size_t elementSize, size_t numberOfElements) override
         {
-            return m_provider->alloc(elementSize, numberOfElements);
+            return m_provider->Alloc(elementSize, numberOfElements);
         }
 
-        virtual void free(void* p) override
+        virtual void Free(void* p) override
         {
-            return m_provider->free(p);
+            return m_provider->Free(p);
         }
     };
 

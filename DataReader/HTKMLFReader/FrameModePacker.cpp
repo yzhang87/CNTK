@@ -27,7 +27,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     FrameModePacker::EpochImplementation::~EpochImplementation()
     {}
 
-    Minibatch FrameModePacker::EpochImplementation::readMinibatch()
+    Minibatch FrameModePacker::EpochImplementation::ReadMinibatch()
     {
         return m_parent->GetMinibatch();
     }
@@ -41,12 +41,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         InitFromConfig(config);
     }
 
-    std::vector<InputDescriptionPtr> FrameModePacker::getInputs()
+    std::vector<InputDescriptionPtr> FrameModePacker::GetInputs()
     {
-        return m_transformer->getInputs();
+        return m_transformer->GetInputs();
     }
 
-    EpochPtr FrameModePacker::startNextEpoch(const EpochConfiguration& config)
+    EpochPtr FrameModePacker::StartNextEpoch(const EpochConfiguration& config)
     {
         m_transformer->SetEpochConfiguration(config);
         assert(config.workerRank < config.numberOfWorkers);
@@ -72,7 +72,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError("legacy mode has been deprecated\n");
 
         // eldak: we should introduce a separate class describing inputs with proper interface.
-        std::vector<InputDescriptionPtr> inputs = m_transformer->getInputs();
+        std::vector<InputDescriptionPtr> inputs = m_transformer->GetInputs();
         for (size_t i = 0; i < inputs.size(); ++i)
         {
             m_nameToId.insert(std::make_pair(inputs[i]->name, inputs[i]->id));
@@ -369,7 +369,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<std::map<size_t, Sequence>> sequences;
         for (size_t currentIndex = 0; currentIndex < this->m_requestedMBSize; ++currentIndex)
         {
-            auto sequence = m_transformer->getNextSequence();
+            auto sequence = m_transformer->GetNextSequence();
             if (sequence.m_endOfEpoch)
             {
                 m_noData = true;
@@ -382,7 +382,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        // eldak: this will fail when no data is returned for the worker...
         if (sequences.size() == 0)
         {
             m_numFramesToProcess[parallelSequenceNumber] = 0;
@@ -515,7 +514,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     std::shared_ptr<void> FrameModePacker::AllocateExternalBuffer(size_t numElements, size_t elementSize)
     {
         return std::shared_ptr<void>(
-            m_memoryProvider->alloc(elementSize, numElements),
-            [this](void* p) { this->m_memoryProvider->free(p); });
+            m_memoryProvider->Alloc(elementSize, numElements),
+            [this](void* p) { this->m_memoryProvider->Free(p); });
     }
 }}}

@@ -60,17 +60,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
         }
 
-        const void* getData() const
+        const void* GetData() const
         {
             return data_;
         }
 
-        size_t getDataSize() const
+        size_t GetDataSize() const
         {
             return data_size_;
         }
 
-        LayoutPtr getLayout() const
+        LayoutPtr GetLayout() const
         {
             return layout_;
         }
@@ -81,8 +81,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class MemoryProvider
     {
     public:
-        virtual void* alloc(size_t element, size_t numberOfElements) = 0;
-        virtual void free(void* ptr) = 0;
+        virtual void* Alloc(size_t element, size_t numberOfElements) = 0;
+        virtual void Free(void* ptr) = 0;
         virtual ~MemoryProvider() = 0 {}
     };
     typedef std::shared_ptr<MemoryProvider> MemoryProviderPtr;
@@ -102,7 +102,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class Epoch
     {
     public:
-        virtual Minibatch readMinibatch() = 0;
+        virtual Minibatch ReadMinibatch() = 0;
         virtual ~Epoch() = 0 {};
     };
     typedef std::unique_ptr<Epoch> EpochPtr;
@@ -111,8 +111,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class Reader
     {
     public:
-        virtual std::vector<InputDescriptionPtr> getInputs() = 0;
-        virtual EpochPtr startNextEpoch(const EpochConfiguration& config) = 0;
+        virtual std::vector<InputDescriptionPtr> GetInputs() = 0;
+        virtual EpochPtr StartNextEpoch(const EpochConfiguration& config) = 0;
         virtual ~Reader() = 0 {};
     };
     typedef std::unique_ptr<Reader> ReaderPtr;

@@ -3,13 +3,13 @@
 #include <vector>
 #include <memory>
 
-#include "reader_interface.h"
+#include "ReaderInterfaces.h"
 #include "commandArgUtil.h"
 
 #include "biggrowablevectors.h"
 #include "utterancesourcemulti.h"
 #include "minibatchiterator.h"
-#include <inner_interfaces.h>
+#include "InnerInterfaces.h"
 #include "Bundler.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -20,8 +20,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         MonolithicTransformer(const ConfigParameters & readerConfig, size_t elementSize);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config);
-        virtual std::vector<InputDescriptionPtr> getInputs() const override;
-        virtual SequenceData getNextSequence() override;
+        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
+        virtual SequenceData GetNextSequence() override;
 
         virtual ~MonolithicTransformer()
         {}

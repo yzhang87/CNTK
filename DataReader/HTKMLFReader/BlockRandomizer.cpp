@@ -218,7 +218,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
                     m_currentSweep, m_frameMode ? "frame" : "utterance");
             m_currentSweep++;
-            Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
+            Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->GetTimeline());
             m_currentSequencePositionInSweep = 0;
         };
     }
@@ -237,7 +237,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_epochSize(SIZE_MAX)
     {
         assert(sequencer != nullptr);
-        const Timeline & timeline = m_sequencer->getTimeline();
+        const Timeline & timeline = m_sequencer->GetTimeline();
         assert(IsValid(timeline));
 
         m_numSequences = timeline.back().id + 1;
@@ -283,11 +283,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // TODO make sure this will use the lazy path as well...
         m_currentSweep = timeframe / m_numSamples;
-        Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->getTimeline());
+        Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->GetTimeline());
         m_currentSequencePositionInSweep = timeframe % m_numSamples;
     };
 
-    SequenceData BlockRandomizer::getNextSequence()
+    SequenceData BlockRandomizer::GetNextSequence()
     {
         assert(m_currentSamplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
         if (m_currentSamplePositionInEpoch >= m_epochSize)
@@ -324,7 +324,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_currentSamplePositionInEpoch += seqDesc.numberOfSamples;
         m_currentSequencePositionInSweep++;
 
-        return m_sequencer->getSequenceById(seqDesc.id);
+        return m_sequencer->GetSequenceById(seqDesc.id);
     };
 
 } } }

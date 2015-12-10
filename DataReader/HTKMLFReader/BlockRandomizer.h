@@ -8,7 +8,7 @@
 
 #include "minibatchsourcehelpers.h" // for msra::dbn::rand
 #include "unordered_set"
-#include "inner_interfaces.h"
+#include "InnerInterfaces.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -76,13 +76,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual std::vector<InputDescriptionPtr> getInputs() const override
+        virtual std::vector<InputDescriptionPtr> GetInputs() const override
         {
             std::vector<InputDescriptionPtr> dummy;
             return dummy;
         }
 
-        virtual SequenceData getNextSequence() override;
+        virtual SequenceData GetNextSequence() override;
     };
 
 } } }

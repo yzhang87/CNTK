@@ -417,8 +417,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Reader interfaces", "Reader interfaces", "{824DF649-E168-4C96-AADC-ACDD349FF45B}"
 	ProjectSection(SolutionItems) = preProject
 		DataReader\Interfaces\implementations.h = DataReader\Interfaces\implementations.h
-		DataReader\Interfaces\inner_interfaces.h = DataReader\Interfaces\inner_interfaces.h
-		DataReader\Interfaces\reader_interface.h = DataReader\Interfaces\reader_interface.h
+		DataReader\Interfaces\InnerInterfaces.h = DataReader\Interfaces\InnerInterfaces.h
+		DataReader\Interfaces\ReaderInterfaces.h = DataReader\Interfaces\ReaderInterfaces.h
 	EndProjectSection
 EndProject
 Global

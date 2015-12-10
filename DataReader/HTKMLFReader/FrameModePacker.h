@@ -3,7 +3,7 @@
 #include <vector>
 #include <memory>
 
-#include "reader_interface.h"
+#include "ReaderInterfaces.h"
 #include "commandArgUtil.h"
 
 #include "biggrowablevectors.h"
@@ -17,8 +17,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         FrameModePacker(const ConfigParameters & config, MemoryProviderPtr memoryProvider, size_t elementSize);
 
-        virtual std::vector<InputDescriptionPtr> getInputs() override;
-        virtual EpochPtr startNextEpoch(const EpochConfiguration& config) override;
+        virtual std::vector<InputDescriptionPtr> GetInputs() override;
+        virtual EpochPtr StartNextEpoch(const EpochConfiguration& config) override;
 
     private:
         class EpochImplementation : public Epoch
@@ -27,7 +27,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         public:
             EpochImplementation(FrameModePacker* parent);
-            virtual Minibatch readMinibatch() override;
+            virtual Minibatch ReadMinibatch() override;
             virtual ~EpochImplementation();
         };
 

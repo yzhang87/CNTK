@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "reader_interface.h"
+#include "ReaderInterfaces.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -47,7 +47,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class BlockReader
     {
     public:
-        virtual void get(char* buffer, size_t offset, size_t size) = 0;
+        virtual void Get(char* buffer, size_t offset, size_t size) = 0;
         virtual ~BlockReader() = 0 {}
     };
 
@@ -84,12 +84,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class Sequencer
     {
     public:
-        virtual const Timeline& getTimeline() const = 0;
+        virtual const Timeline& GetTimeline() const = 0;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
-        virtual std::vector<InputDescriptionPtr> getInputs() const = 0;
-        virtual SequenceData getSequenceById(size_t id) = 0;
+        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
+        virtual SequenceData GetSequenceById(size_t id) = 0;
 
-        // TODO
         virtual bool RequireChunk(size_t chunkIndex) = 0;
         virtual void ReleaseChunk(size_t chunkIndex) = 0;
 
@@ -111,22 +110,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
-        virtual std::vector<InputDescriptionPtr> getInputs() const = 0;
+        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
         virtual ~Transformer() = 0 {}
-        virtual SequenceData getNextSequence() = 0;
+        virtual SequenceData GetNextSequence() = 0;
     };
 
     typedef std::shared_ptr<Transformer> TransformerPtr;
-
-    // A Randomizer implements Sequence randomization for a Sequencer and
-    // additional parameters given at construction time.
-    // Note: chunk-level randomization can be implemented based on Sequence lengths
-    // exposed through the Sequencer's Timeline method.
-    class Randomizer : public Transformer
-    {
-    };
-
-    class ImageCropper : public Transformer
-    {
-    };
 }}}

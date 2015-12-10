@@ -3,7 +3,7 @@
 #include <memory>
 #include <CUDAPageLockedMemAllocator.h>
 
-#include "reader_interface.h"
+#include "ReaderInterfaces.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -17,13 +17,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_allocator = std::make_unique<CUDAPageLockedMemAllocator>(deviceId);
         }
 
-        virtual void* alloc(size_t elementSize, size_t numberOfElements) override
+        virtual void* Alloc(size_t elementSize, size_t numberOfElements) override
         {
             size_t totalSize = elementSize * numberOfElements;
             return m_allocator->Malloc(totalSize);
         }
 
-        virtual void free(void* p) override
+        virtual void Free(void* p) override
         {
             if (!p)
             {

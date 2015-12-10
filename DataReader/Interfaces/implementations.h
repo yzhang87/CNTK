@@ -1,7 +1,7 @@
 #pragma once
 
-#include "reader_interface.h"
-#include "inner_interfaces.h"
+#include "ReaderInterfaces.h"
+#include "InnerInterfaces.h"
 
 #include <string>
 

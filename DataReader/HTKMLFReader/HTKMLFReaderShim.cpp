@@ -66,7 +66,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         config.totalSize = requestedEpochSamples;
         config.index = epoch;
 
-        m_epoch = m_packer->startNextEpoch(config);
+        m_epoch = m_packer->StartNextEpoch(config);
     }
 
     template<class ElemType>
@@ -82,13 +82,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        Minibatch m = m_epoch->readMinibatch();
+        Minibatch m = m_epoch->ReadMinibatch();
         if (m.atEndOfEpoch)
         {
             return false;
         }
 
-        auto inputs = m_packer->getInputs();
+        auto inputs = m_packer->GetInputs();
         std::map<size_t, wstring> idToName;
         for (auto i: inputs)
         {
@@ -103,14 +103,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 continue;
             }
 
-            auto layout = input.second->getLayout();
+            auto layout = input.second->GetLayout();
             size_t columnNumber = layout->columns->GetNumCols();
             size_t rowNumber = layout->rows->GetNumElements();
 
             // Current hack.
             m_layout = layout->columns;
 
-            auto data = reinterpret_cast<const ElemType*>(input.second->getData());
+            auto data = reinterpret_cast<const ElemType*>(input.second->GetData());
             matrices[name]->SetValue(rowNumber, columnNumber, matrices[name]->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);
         }
 
