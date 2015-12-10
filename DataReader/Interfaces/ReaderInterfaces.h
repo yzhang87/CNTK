@@ -8,7 +8,7 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    // Epoch configuration.
+    // Epoch configuration. Is communicated to the packer, randomizer, bundler.
     struct EpochConfiguration
     {
         size_t workerRank;
@@ -17,7 +17,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t minibatchSize;
         size_t totalSize;
 
-        size_t numberOfSequences;
         size_t index;
     };
 
