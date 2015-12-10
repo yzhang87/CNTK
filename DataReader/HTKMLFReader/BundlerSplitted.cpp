@@ -10,7 +10,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     // constructor
     // Pass empty labels to denote unsupervised training (so getbatch() will not return uids).
-    // eldak: utterance mode, support for lattices and hmm is missing.
     BundlerSplitted::BundlerSplitted(
         const ConfigParameters& readerConfig,
         bool framemode,
@@ -20,7 +19,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_timegetbatch(0)
         , m_verbosity(2)
         , m_elementSize(elementSize)
-        , m_lattices(std::pair<std::vector<std::wstring>, std::vector<std::wstring>>(), m_notused)
     {
         std::vector<std::wstring> featureNames;
         std::vector<std::wstring> labelNames;
@@ -178,19 +176,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
         m_featdim = std::vector<size_t>(infiles.size(), 0);
-        m_sampperiod = std::vector<unsigned int>(infiles.size(), 0);
-        m_featkind = std::vector<string>(infiles.size(), "");
 
         numclasses = std::vector<size_t>(labels.size(), 0);
-        m_counts = std::vector<std::vector<size_t>>(labels.size(), std::vector<size_t>());
 
         foreach_index(i, labels)
         {
             m_classids.push_back(unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>(new msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>()));
-            m_phoneboundaries.push_back(unique_ptr<msra::dbn::biggrowablevector<msra::dbn::HMMIDTYPE>>(new msra::dbn::biggrowablevector<msra::dbn::HMMIDTYPE>()));
-            //std::pair<std::vector<wstring>,std::vector<wstring>> latticetocs;
-            //std::unordered_map<std::string,size_t> modelsymmap;
-            //lattices.push_back(shared_ptr<latticesource>(new latticesource(latticetocs, modelsymmap)));
         }
 
 
@@ -367,18 +358,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                                         for (size_t t = e.firstframe; t < e.firstframe + e.numframes; t++)
                                         {
                                             m_classids[j]->push_back(e.classid);
-                                            if (e.phonestart != 0 && t == e.firstframe)
-                                                m_phoneboundaries[j]->push_back((msra::dbn::HMMIDTYPE)e.phonestart);
-                                            else
-                                                m_phoneboundaries[j]->push_back((msra::dbn::HMMIDTYPE)0);
                                         }
                                         numclasses[j] = max(numclasses[j], (size_t)(1u + e.classid));
-                                        m_counts[j].resize(numclasses[j], 0);
-                                        m_counts[j][e.classid] += e.numframes;
                                     }
 
                                     m_classids[j]->push_back((msra::dbn::CLASSIDTYPE) - 1);  // append a boundary marker marker for checking
-                                    m_phoneboundaries[j]->push_back((msra::dbn::HMMIDTYPE) - 1); // append a boundary marker marker for checking
 
                                     if (!labels[j].empty() && m_classids[j]->size() != m_totalframes + utteranceset.size())
                                         LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());
@@ -451,13 +435,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 currentchunk.push_back(std::move(utteranceset[i]));    // move it out from our temp array into the chunk
                 // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
             }
-            m_numutterances = utteranceset.size();
-            fprintf(stderr, "minibatchutterancesource: %d utterances grouped into %d chunks, av. chunk size: %.1f utterances, %.1f frames\n",
-                (int)m_numutterances, (int)thisallchunks.size(), m_numutterances / (double)thisallchunks.size(), m_totalframes / (double)thisallchunks.size());
-            // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
 
-            // Initialize the block randomizer
-            //rand = std::make_unique<BlockRandomizer>(m_verbosity, framemode, m_totalframes, m_numutterances, randomizationrange, nullptr);
+            fprintf(stderr, "minibatchutterancesource: %llu utterances grouped into %llu chunks, av. chunk size: %.1f utterances, %.1f frames\n",
+                utteranceset.size(), thisallchunks.size(), utteranceset.size() / (double)thisallchunks.size(), m_totalframes / (double)thisallchunks.size());
+            // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
         }
 
         size_t sequenceId = 0;
@@ -519,7 +500,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 auto & chunkdata = m_allchunks[m][chunkindex];
                 msra::util::attempt(5, [&]()   // (reading from network)
                 {
-                    chunkdata.requiredata(m_featkind[m], m_featdim[m], m_sampperiod[m], m_lattices, m_verbosity);
+                    std::unordered_map<std::string, size_t> empty;
+                    msra::dbn::latticesource lattices(
+                        std::pair<std::vector<std::wstring>, std::vector<std::wstring>>(),
+                        empty);
+                    unsigned int sampperiod;
+                    string featkind;
+                    chunkdata.requiredata(featkind, m_featdim[m], sampperiod, lattices, m_verbosity);
                 });
             }
             m_chunksinram++;
@@ -693,7 +680,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 if (i == 0)
                 {
                     auto uttclassids = GetClassIds(uttref);
-                    //auto uttphoneboudaries = getphonebound(uttref);
                     foreach_index(j, uttclassids)
                     {
                         for (size_t t = 0; t < sequence.numberOfSamples; t++)          // t = time index into source utterance

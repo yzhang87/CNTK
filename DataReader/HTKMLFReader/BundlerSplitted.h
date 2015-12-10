@@ -151,37 +151,22 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // ---------------------------------------------------------------------------
     class BundlerSplitted : public Sequencer
     {
-        std::unordered_map<std::string, size_t> m_notused;
         std::vector<size_t> m_featureIndices;
         std::vector<size_t> m_labelIndices;
 
-
         void operator=(const BundlerSplitted & other); // non-assignable
-        //std::vector<size_t> m_vdim;                    // feature dimension after augmenting neighhors
+
         std::vector<size_t> m_leftcontext;             // number of frames to the left of the target frame in the context window
         std::vector<size_t> m_rightcontext;            // number of frames to the right of the target frame in the context window
-        std::vector<unsigned int> m_sampperiod;        // (for reference and to check against model)
-        std::vector<string> m_featkind;
         std::vector<size_t> m_featdim;
         const bool m_framemode;           // true -> actually return frame-level randomized frames (not possible in lattice mode)
-        std::vector<std::vector<size_t>> m_counts;     // [s] occurrence count for all states (used for priors)
         int m_verbosity;
-        // lattice reader
-        // const std::vector<unique_ptr<latticesource>> lattices;
-        msra::dbn::latticesource m_lattices;
-
-
-        //std::vector<latticesource> lattices;
-        // word-level transcripts (for MMI mode when adding best path to lattices)
-        //const map<wstring, msra::lattices::lattice::htkmlfwordsequence> & m_allwordtranscripts; // (used for getting word-level transcripts)
-        //std::vector<map<wstring,msra::lattices::lattice::htkmlfwordsequence>> allwordtranscripts;
 
         std::vector<std::vector<utterancechunkdata>> m_allchunks;          // set of utterances organized in chunks, referred to by an iterator (not an index)
         std::vector<unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> m_classids;            // [classidsbegin+t] concatenation of all state sequences
-        std::vector<unique_ptr<msra::dbn::biggrowablevector<msra::dbn::HMMIDTYPE>>> m_phoneboundaries;
+
         bool issupervised() const { return !m_classids.empty(); }
 
-        size_t m_numutterances;           // total number of utterances
         size_t m_totalframes;            // total frames (same as classids.size() if we have labels)
         double m_timegetbatch;            // [v-hansu] for time measurement
         size_t m_chunksinram;             // (for diagnostics messages)
@@ -208,30 +193,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t operator[] (size_t i) const { check(i); return v[first + i]; }
         };
 
-        template<class UTTREF> std::vector<shiftedvector<msra::dbn::biggrowablevector<msra::dbn::HMMIDTYPE>>> getphonebound(const UTTREF & uttref)  // return sub-vector of classids[] for a given utterance
-        {
-            std::vector<shiftedvector<biggrowablevector<HMMIDTYPE>>> allphoneboundaries;
-            allphoneboundaries.empty();
-
-            if (!issupervised())
-            {
-                foreach_index(i, classids)
-                    allphoneboundaries.push_back(std::move(shiftedvector<biggrowablevector<HMMIDTYPE>>((*phoneboundaries[i]), 0, 0)));
-                return allphoneboundaries;     // nothing to return
-            }
-            const auto & chunk = randomizedchunks[0][uttref.chunkindex];
-            const auto & chunkdata = chunk.getchunkdata();
-            const size_t classidsbegin = chunkdata.getclassidsbegin(uttref.utteranceindex); // index of first state label in global concatenated classids[] array
-            const size_t n = chunkdata.numframes(uttref.utteranceindex);
-            foreach_index(i, phoneboundaries)
-            {
-                if ((*phoneboundaries[i])[classidsbegin + n] != (HMMIDTYPE)-1)
-                    LogicError("getclassids: expected boundary marker not found, internal data structure screwed up");
-                allphoneboundaries.push_back(std::move(shiftedvector<biggrowablevector<HMMIDTYPE>>((*phoneboundaries[i]), classidsbegin, n)));
-            }
-            return allphoneboundaries;   // nothing to return
-        }
-
         class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors
         {
             void operator= (const matrixasvectorofvectors &);  // non-assignable
@@ -246,25 +207,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         BundlerSplitted::BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, size_t elementSize);
 
-        virtual void SetEpochConfiguration(const EpochConfiguration& config);
-
-        void setverbosity(int newverbosity){ m_verbosity = newverbosity; }
-
-        double gettimegetbatch() { return m_timegetbatch; }
-
-        size_t totalframes() const { return m_totalframes; }
-
-        // return first valid globalts to ask getbatch() for
-        // In utterance mode, the epoch start may fall in the middle of an utterance.
-        // We return the end time of that utterance (which, in pathological cases, may in turn be outside the epoch; handle that).
-        /*implement*/// size_t firstvalidglobalts(const size_t globalts); // TODO can be const
-
-        const std::vector<size_t> & unitcounts() const { return m_counts[0]; }
+        virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
         virtual const Timeline& GetTimeline() const override;
-
         virtual std::vector<InputDescriptionPtr> GetInputs() const override;
-
         virtual SequenceData GetSequenceById(size_t id) override;
         virtual bool RequireChunk(size_t chunkindex) override;
         virtual void ReleaseChunk(size_t chunkIndex) override;
@@ -280,9 +226,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<FrameDescription> m_featureFrameDescriptions;
         std::vector<FrameDescription> m_labelFrameDescriptions;
         std::vector<InputDescriptionPtr> m_inputs;
-        //std::map<std::wstring, size_t> m_nameToId;
-        //std::map<std::wstring, size_t> m_featureNameToIdMap;
-        //std::map<std::wstring, size_t> m_labelNameToIdMap;
 
         // TODO can more stuff be dropped?
         struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
