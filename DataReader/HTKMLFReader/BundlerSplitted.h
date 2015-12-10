@@ -10,12 +10,10 @@
 
 #include "Basics.h"                  // for attempt()
 #include "htkfeatio.h"                  // for htkmlfreader
-#include "latticearchive.h"             // for reading HTK phoneme lattices (MMI training)
 #include "minibatchsourcehelpers.h"
 #include "minibatchiterator.h"
 #include "biggrowablevectors.h"
 #include "ssematrix.h"
-#include "BlockRandomizer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

@@ -593,13 +593,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // eldak:s should return phone boundaries and sentendmark lattices transcripts etc.
         feat.resize(m_featureIndices.size());
         uids.resize(m_classids.size());
-        //phoneboundaries.resize(m_classids.size());
-        //sentendmark.resize(m_vdim.size());
-        //assert(feat.size() == vdim.size());
-        //assert(feat.size() == randomizedchunks.size());
+
         foreach_index(i, feat)
         {
-            //feat[i].resize(m_vdim[i], tspos);
             feat[i].resize(m_inputs[m_featureIndices[i]]->sampleLayout->GetDim(0), tspos);
 
             if (i == 0)
@@ -609,20 +605,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     if (issupervised())             // empty means unsupervised training -> return empty uids
                     {
                         uids[j].resize(tspos);
-                        //phoneboundaries[j].resize(tspos);
                     }
                     else
                     {
                         uids[i].clear();
-                        //phoneboundaries[i].clear();
                     }
-                    //latticepairs.clear();               // will push_back() below
-                    //transcripts.clear();
                 }
-                //foreach_index(j, sentendmark)
-                //{
-                //    sentendmark[j].clear();
-                //}
             }
         }
         //// return these utterances
@@ -647,7 +635,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 size_t dimension = m_inputs[m_featureIndices[i]]->sampleLayout->GetDim(0);
 
                 // eldak - does it mean we have read the who?
-                // assert((m_numberOfWorkers > 1) || (uttref.globalts == globalts + tspos));
                 auto uttframes = chunkdata.getutteranceframes(uttref.utteranceindex);
                 matrixasvectorofvectors uttframevectors(uttframes);    // (wrapper that allows m[j].size() and m[j][i] as required by augmentneighbors())
                 n = uttframevectors.size();
@@ -664,7 +651,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     // page in the needed range of frames
                     if (m_leftcontext[i] == 0 && m_rightcontext[i] == 0)
                     {
-                        //leftextent = rightextent = augmentationextent(uttframevectors[t].size(), m_vdim[i]);
                         leftextent = rightextent = msra::dbn::augmentationextent(uttframevectors[t].size(), dimension);
                     }
                     else
@@ -687,23 +673,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                             if (issupervised())
                             {
                                 uids[j][t + tspos] = uttclassids[j][uttref.frameindex + t];
-                                //phoneboundaries[j][t + tspos] = uttphoneboudaries[j][t];
                             }
                         }
-
-                        // eldak - no lattices currently.
-                        //if (!this->lattices.empty())
-                        //{
-                        //    auto latticepair = chunkdata.getutterancelattice(uttref.utteranceindex);
-                        //    latticepairs.push_back(latticepair);
-                        //    // look up reference
-                        //    const auto & key = latticepair->getkey();
-                        //    if (!allwordtranscripts.empty())
-                        //    {
-                        //        const auto & transcript = allwordtranscripts.find(key)->second;
-                        //        transcripts.push_back(transcript.words);
-                        //    }
-                        //}
                     }
                 }
             }
@@ -719,7 +690,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_timegetbatch = timergetbatch;
 
         for (auto it = m_featureIndices.begin(); it != m_featureIndices.end(); ++it)
-            //for (auto it = m_featureNameToIdMap.begin(); it != m_featureNameToIdMap.end(); ++it)
         {
             Sequence r;
             size_t id = *it;
@@ -731,6 +701,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             r.numberOfFrames = 1;
             r.frameDescription = &m_featureFrameDescriptions[id];
 
+            // eldak: this should not be allocated each time.
             void* buffer = nullptr;
             if (m_elementSize == sizeof(float))
             {
@@ -749,15 +720,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         for (size_t l = 0; l < m_labelIndices.size(); ++l)
-            //for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it)
         {
             Sequence r;
             size_t id = l;
 
             auto dimension = m_inputs[m_labelIndices[l]]->sampleLayout->GetDims()[0];
             size_t dim = dimension;
-
-            //size_t dim = m_udim[id];
 
             const std::vector<size_t>& x = uids[id];
 
@@ -784,10 +752,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    void BundlerSplitted::SetEpochConfiguration(const Microsoft::MSR::CNTK::EpochConfiguration& config)
+    void BundlerSplitted::SetEpochConfiguration(const EpochConfiguration& config)
     {
         m_workerRank = config.workerRank;
         m_numberOfWorkers = config.numberOfWorkers;
     }
-
 }}}
