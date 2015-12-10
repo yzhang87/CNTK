@@ -6,9 +6,10 @@
 
 #pragma once
 
-#include "minibatchsourcehelpers.h" // for msra::dbn::rand
-#include "unordered_set"
+#include <vector>
+
 #include "InnerInterfaces.h"
+#include "minibatchsourcehelpers.h" // for msra::dbn::rand
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

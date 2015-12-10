@@ -4,12 +4,8 @@
 #include <memory>
 
 #include "ReaderInterfaces.h"
-#include "commandArgUtil.h"
-
-#include "biggrowablevectors.h"
-#include "utterancesourcemulti.h"
-#include "minibatchiterator.h"
 #include <InnerInterfaces.h>
+#include "commandArgUtil.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
     class FrameModePacker : public Reader
@@ -30,7 +26,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             virtual Minibatch ReadMinibatch() override;
             virtual ~EpochImplementation();
         };
-
 
     private:
         void InitFromConfig(const ConfigParameters& config);
