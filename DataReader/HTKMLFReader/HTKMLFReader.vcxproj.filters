@@ -27,6 +27,7 @@
     <ClCompile Include="MLFDataDeserializer.cpp" />
     <ClCompile Include="HTKDataDeserializer.cpp" />
     <ClCompile Include="ScpParser.cpp" />
+    <ClCompile Include="BundlerSplitted.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
@@ -73,6 +74,7 @@
     <ClInclude Include="HTKDataDeserializer.h" />
     <ClInclude Include="MLFDataDeserializer.h" />
     <ClInclude Include="ScpParser.h" />
+    <ClInclude Include="BundlerSplitted.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />

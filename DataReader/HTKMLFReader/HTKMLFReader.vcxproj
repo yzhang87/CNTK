@@ -108,6 +108,7 @@
     <ClInclude Include="basetypes.h" />
     <ClInclude Include="biggrowablevectors.h" />
     <ClInclude Include="Bundler.h" />
+    <ClInclude Include="BundlerSplitted.h" />
     <ClInclude Include="chunkevalsource.h" />
     <ClInclude Include="..\..\Common\Include\fileutil.h" />
     <ClInclude Include="..\..\Common\Include\DebugUtil.h" />
@@ -139,6 +140,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Bundler.cpp" />
+    <ClCompile Include="BundlerSplitted.cpp" />
     <ClCompile Include="ConfigHelper.cpp" />
     <ClCompile Include="DataReader.cpp" />
     <ClCompile Include="DataWriter.cpp" />
