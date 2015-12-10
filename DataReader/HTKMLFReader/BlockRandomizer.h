@@ -48,11 +48,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Per-epoch configuration
         EpochConfiguration m_config;
         size_t m_epochSize;
-        size_t m_currentSamplePositionInEpoch;
+        size_t m_samplePositionInEpoch;
 
         // Per-randomization-sweep information
-        size_t m_currentSweep;
-        size_t m_currentSequencePositionInSweep; // position within the current sweep
+        size_t m_sweep;
+        size_t m_sweepStartInSamples; // TODO do we need it?
+        size_t m_sequencePositionInSweep;
         std::vector<RandomizedChunk> m_randomizedChunks;
         std::vector<size_t> m_sequencePositionToChunkIndex; // TODO find on m_randomizedChunks instead?
         Timeline m_randomTimeline;
@@ -61,13 +62,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         template<typename VECTOR> static void randomShuffle(VECTOR & v, size_t randomseed);
 
-        void RandomizeChunks(const size_t sweep, const size_t sweepts); // TODO drop sweepts? // TODO rename?
+        void RandomizeChunks();
 
         bool IsValidForPosition(size_t targetPosition, const SequenceDescription & seqDesc) const;
 
-        void Randomize(const size_t sweep, const size_t sweepts, const Timeline& timeline); // TODO drop sweepts? 
+        void Randomize();
 
-        void LazyRandomize();
+        void RandomizeForGlobalSamplePosition(const size_t samplePosition);
+
+        void RandomizeIfNewSweepIsEntered();
 
     public:
         BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer);
