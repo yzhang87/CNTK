@@ -5,25 +5,6 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    // Defines the encoding of a frame.
-    struct FrameDescription
-    {
-        std::vector<size_t> dimensions;
-        size_t elementSize;
-
-        size_t Size() const
-        {
-            size_t result = 1;
-            for (auto d: dimensions)
-            {
-                result *= d;
-            }
-
-            return result;
-        }
-    };
-
-
     // Defines identifier and length of a Sequence.
     struct SequenceDescription
     {
@@ -38,9 +19,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     struct Sequence
     {
         SequenceDescription* description;
-        //FrameDescription* frameDescription;
         void* data;
-        size_t numberOfFrames; // TODO -> change to numberOfSamples? also elsewhere?
+        size_t numberOfSamples; // TODO -> change to numberOfSamples? also elsewhere?
     };
 
     // Low-level input interface (for file, network, etc.).

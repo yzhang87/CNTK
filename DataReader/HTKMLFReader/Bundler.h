@@ -280,8 +280,6 @@ namespace msra {
             size_t m_numberOfWorkers;
             size_t m_elementSize;
             //std::vector<size_t> m_udim;
-            std::vector<Microsoft::MSR::CNTK::FrameDescription> m_featureFrameDescriptions;
-            std::vector<Microsoft::MSR::CNTK::FrameDescription> m_labelFrameDescriptions;
             std::vector<Microsoft::MSR::CNTK::InputDescriptionPtr> m_inputs;
             //std::map<std::wstring, size_t> m_nameToId;
             //std::map<std::wstring, size_t> m_featureNameToIdMap;

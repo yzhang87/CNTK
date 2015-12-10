@@ -33,6 +33,7 @@ typedef unsigned int UNINT32;
 #include "Utils.h"
 #include "Bundler.h"
 #include "BundlerSplitted.h"
+#include <DataTensor.h>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -109,12 +110,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 InvalidArgument("feature type must be 'real'");
             }
 
-            FrameDescription featureFrameDescription;
-            featureFrameDescription.elementSize = m_elementSize;
-            featureFrameDescription.dimensions.push_back(m_featDims[i]);
-            m_featureFrameDescriptions.push_back(featureFrameDescription);
-
-
             m_featureNameToIdMap[featureNames[i]] = iFeat;
             scriptpaths.push_back(thisFeature(L"scpFile"));
             RootPathInScripts.push_back(thisFeature(L"prefixPathInSCP", L""));
@@ -175,11 +170,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 }
             }
             mlfpathsmulti.push_back(mlfpaths);
-
-            FrameDescription labelFrameDescription;
-            labelFrameDescription.elementSize = m_elementSize;
-            labelFrameDescription.dimensions.push_back(m_labelDims[i]);
-            m_labelFrameDescriptions.push_back(labelFrameDescription);
 
             m_nameToId.insert(std::make_pair(labelNames[i], input_index));
 

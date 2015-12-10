@@ -56,11 +56,6 @@ namespace msra { namespace dbn {
             size_t dim = thisFeature(L"dim");
             dim = dim * (1 + context.first + context.second);
 
-            FrameDescription frameDescription;
-            frameDescription.elementSize = m_elementSize;
-            frameDescription.dimensions.push_back(dim);
-            m_featureFrameDescriptions.push_back(frameDescription);
-
             SampleLayoutPtr layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ dim }));
             input->sampleLayout = layout;
 
@@ -84,11 +79,6 @@ namespace msra { namespace dbn {
             ConfigHelper::CheckLabelType(thisLabel);
 
             size_t dim = ConfigHelper::GetLabelDimension(thisLabel);
-
-            FrameDescription labelFrameDescription;
-            labelFrameDescription.elementSize = m_elementSize;
-            labelFrameDescription.dimensions.push_back(dim);
-            m_labelFrameDescriptions.push_back(labelFrameDescription);
 
             SampleLayoutPtr layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t> { dim }));
             input->sampleLayout = layout;
@@ -743,7 +733,7 @@ namespace msra { namespace dbn {
             const size_t dimensions = featOri.rows();
             const void* tmp = &featOri(0, 0);
 
-            r.numberOfFrames = 1;
+            r.numberOfSamples = 1;
 
             void* buffer = nullptr;
             if (m_elementSize == sizeof(float))
@@ -781,14 +771,14 @@ namespace msra { namespace dbn {
                 memset(tmp, 0, m_elementSize * dim);
                 tmp[x[0]] = 1;
                 r.data = tmp;
-                r.numberOfFrames = 1;
+                r.numberOfSamples = 1;
             }
             else
             {
                 double* tmp = new double[dim];
                 tmp[x[0]] = 1;
                 r.data = tmp;
-                r.numberOfFrames = 1;
+                r.numberOfSamples = 1;
             }
             result.m_data.insert(std::make_pair(m_inputs[m_labelIndices[l]]->id, r));
         }
