@@ -65,10 +65,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
-        // Map of sequence ids into string ids.
-        virtual std::vector<std::wstring> SequenceIdToName() = 0;
-
-        virtual TimelineP GetTimeline() const = 0;
+        virtual TimelineP GetSequenceDescriptions() const = 0;
 
         virtual InputDescriptionPtr GetInput() const = 0;
         virtual Sequence GetSequenceById(size_t id) = 0;
@@ -89,6 +86,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         virtual const Timeline& GetTimeline() const = 0;
+
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
         virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
         virtual SequenceData GetSequenceById(size_t id) = 0;

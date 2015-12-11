@@ -202,6 +202,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void ReleaseChunk(size_t chunkIndex) override;
 
     private:
+        void NewInit(
+            const ConfigParameters& readerConfig,
+            /*bool framemode,*/
+            size_t elementSize);
+
         Timeline m_timeline;
         std::vector<string> m_featkind;
         std::map<size_t, const utterancedesc*> m_sequenceIdToSequence;

@@ -42,7 +42,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             HTKSequenceDescription description(std::move(utterance));
             description.id = i;
             description.numberOfSamples = uttframes;
+
             m_sequences.push_back(description);
+            m_sequencesP.push_back(&m_sequences[i]);
         }
     }
 
@@ -51,18 +53,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    TimelineP Microsoft::MSR::CNTK::HTKDataDeserializer::GetTimeline() const
+    TimelineP Microsoft::MSR::CNTK::HTKDataDeserializer::GetSequenceDescriptions() const
     {
-        //todo: should be transform
-        std::vector<const SequenceDescription*> result(m_sequences.size());
-        result.resize(m_sequences.size());
-
-        for (int i = 0; i < m_sequences.size(); ++i)
-        {
-            result[i] = &m_sequences[i];
-        }
-
-        return result;
+        return m_sequencesP;
     }
 
     Microsoft::MSR::CNTK::InputDescriptionPtr Microsoft::MSR::CNTK::HTKDataDeserializer::GetInput() const
@@ -86,11 +79,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     }
 
     void Microsoft::MSR::CNTK::HTKDataDeserializer::ReleaseChunk(size_t /*chunkIndex*/)
-    {
-        throw std::logic_error("The method or operation is not implemented.");
-    }
-
-    std::vector<std::wstring> HTKDataDeserializer::SequenceIdToName()
     {
         throw std::logic_error("The method or operation is not implemented.");
     }

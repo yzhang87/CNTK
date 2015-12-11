@@ -20,13 +20,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<std::wstring> m_featureFiles;
 
         std::vector<HTKSequenceDescription> m_sequences;
+        TimelineP m_sequencesP;
 
     public:
         HTKDataDeserializer(const ConfigParameters& feature);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual TimelineP GetTimeline() const override;
+        virtual TimelineP GetSequenceDescriptions() const override;
 
         virtual InputDescriptionPtr GetInput() const override;
 
@@ -37,8 +38,5 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual bool RequireChunk(size_t chunkIndex) override;
 
         virtual void ReleaseChunk(size_t chunkIndex) override;
-
-        virtual std::vector<std::wstring> SequenceIdToName() override;
-
     };
 }}}

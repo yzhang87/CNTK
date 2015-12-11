@@ -466,6 +466,390 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
+    void BundlerSplitted::NewInit(
+        const ConfigParameters& readerConfig,
+        /*bool framemode,*/
+        size_t elementSize)
+    {
+        //m_framemode = framemode;
+        m_chunksinram = 0;
+        m_verbosity = readerConfig(L"verbosity", 2);
+        m_elementSize = elementSize;
+
+        std::vector<std::wstring> featureNames;
+        std::vector<std::wstring> labelNames;
+
+        std::vector<std::wstring> notused;
+        Utils::GetDataNamesFromConfig(readerConfig, featureNames, labelNames, notused, notused);
+        if (featureNames.size() < 1 || labelNames.size() < 1)
+        {
+            // eldak: Don't we support unsupervised training?
+            InvalidArgument("network needs at least 1 input and 1 output specified!");
+        }
+
+        std::vector<InputDescriptionPtr> inputs;
+        for (const auto& featureName : featureNames)
+        {
+            auto deserializer = std::make_shared<HTKDataDeserializer>(readerConfig(featureName));
+            m_featureDeserailizers.push_back(deserializer);
+
+            // eldak: should we simply delegate this to the data deserializer?
+            // who sets the id then?
+            InputDescriptionPtr input = std::make_shared<InputDescription>();
+            input->id = inputs.size();
+            input->name = featureName;
+            input->sampleLayout = deserializer->GetInput()->sampleLayout;
+            inputs.push_back(input);
+
+            m_featureIndices.push_back(input->id);
+        }
+
+        for (const auto& labelName : labelNames)
+        {
+            auto deserializer = std::make_shared<MLFDataDeserializer>(readerConfig(labelName));
+            m_labelDeserailizers.push_back(deserializer);
+
+            // eldak: should we simply delegate this to the data deserializer?
+            // who sets the id then?
+            InputDescriptionPtr input = std::make_shared<InputDescription>();
+            input->id = inputs.size();
+            input->name = labelName;
+            input->sampleLayout = deserializer->GetInput()->sampleLayout;
+            inputs.push_back(input);
+
+            m_labelIndices.push_back(input->id);
+        }
+
+        //eldak TODO: does not belong here
+        std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
+        if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
+        {
+            RuntimeError("readMethod must be 'blockRandomize'");
+        }
+
+        //const std::vector<std::vector<wstring>>& infiles = featurePaths;
+        //const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels = labelsmulti;
+        m_inputs = inputs;
+        m_elementSize = elementSize;
+        //m_featkind = std::vector<string>(infiles.size(), "");
+        //m_sampperiod = std::vector<unsigned int>(infiles.size(), 0);
+
+        // process infiles to know dimensions of things (but not loading features)
+        size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
+        //size_t nolat = 0;                       // number of entries missing in lattice archive (diagnostics)
+        std::vector<size_t> numclasses;                  // number of output classes as found in the label file (diagnostics)
+        m_totalframes = 0;
+        wstring key;
+        size_t numutts = 0;
+
+        std::vector<size_t> classidsbegin;
+
+        //assert(infiles.size() == 1); // we are only looking at a single file here...
+
+        //m_allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
+        //m_featdim = std::vector<size_t>(infiles.size(), 0);
+
+        numclasses = std::vector<size_t>(m_labelDeserailizers.size(), 0);
+
+        /*
+        foreach_index(i, labels)
+        {
+            m_classids.push_back(unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>(new msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>()));
+        }
+        */
+
+        const auto& expected = m_featureDeserailizers[0]->GetSequenceDescriptions();
+        numutts = expected.size();
+        std::vector<bool> isValid(numutts, true);
+
+        foreach_index(m, m_featureDeserailizers)
+        {
+            const auto& utterances = m_featureDeserailizers[m]->GetSequenceDescriptions();
+            if (utterances.size() != numutts)
+            {
+                RuntimeError("minibatchutterancesourcemulti: all feature files must have same number of utterances");
+            }
+
+            foreach_index(i, utterances)
+            {
+                const SequenceDescription* sequence = utterances[i];
+                if (sequence->numberOfSamples != expected[i]->numberOfSamples || !sequence->isValid)
+                {
+                    //fprintf(stderr, "minibatchutterancesource: skipping %d-th file due to inconsistency in duration in different feature streams (%d vs %d frames)\n", i, (int)uttduration[i], (int)uttframes);
+                    isValid[i] = false;
+                }
+            }
+        }
+
+        // shouldn't this be checked (again) later? more utterances can be invalidated...
+        size_t invalidUtts = 0;
+        foreach_index(i, isValid)
+        {
+            if (!isValid[i])
+            {
+                invalidUtts++;
+            }
+        }
+        assert(invalidUtts == 0); // For us it's zero
+
+        if (invalidUtts > isValid.size() / 2)
+        {
+            RuntimeError("minibatchutterancesource: too many files with inconsistent durations, assuming broken configuration\n");
+        }
+        else if (invalidUtts > 0)
+        {
+            fprintf(stderr, "Found inconsistent durations across feature streams in %llu out of %llu files\n", invalidUtts, isValid.size());
+        }
+
+
+        bool isSupervised = !m_labelDeserailizers.empty();
+        std::vector<std::map<std::wstring, const SequenceDescription*>> labels(m_labelDeserailizers.size());
+        std::map<std::wstring, const SequenceDescription*>* expectedLabels = nullptr;
+        if (isSupervised)
+        {
+            for (auto d : m_featureDeserailizers)
+            {
+                labels.push_back(std::map<std::wstring, const SequenceDescription*>());
+                std::map<std::wstring, const SequenceDescription*>& m = labels[labels.size() - 1];
+                for (auto p : d->GetSequenceDescriptions())
+                {
+                    m[p->key] = p;
+                }
+            }
+            expectedLabels = &labels[0];
+        }
+
+        // now process the features and labels
+        //size_t utterancesetsize = 0;
+        foreach_index(m, m_featureDeserailizers)
+        {
+            const auto& utterances = m_featureDeserailizers[m]->GetSequenceDescriptions();
+
+            //std::vector<utterancedesc> utteranceset;// read all utterances to here first; at the end, distribute to chunks
+            //utteranceset.reserve(infiles[m].size());
+            if (m == 0)
+            {
+                classidsbegin.clear();
+            }
+
+            foreach_index(i, utterances)
+            {
+                /*if (i % (m_featureDeserailizers[m].size() / 100 + 1) == 0)
+                {
+                    fprintf(stderr, "."); fflush(stderr);
+                }*/
+
+                // build utterance descriptor
+                if (m == 0 && isSupervised)
+                {
+                    classidsbegin.push_back(m_classids[0]->size());
+                }
+
+                if (!isValid[i])
+                {
+                    continue;
+                }
+
+                //utterancedesc utterance(msra::asr::htkfeatreader::parsedpath(infiles[m][i]), labels.empty() ? 0 : classidsbegin[i]);  //mseltzer - is this foolproof for multiio? is classids always non-empty?
+                //const size_t uttframes = utterance.numframes(); // will throw if frame bounds not given --required to be given in this mode
+
+                // check whether we have the ref transcript
+                bool lacksmlf = true;
+                if (isSupervised)    // empty means unsupervised mode (don't load any)
+                {
+                    key = utterances[i]->key;
+
+                    auto labelsiter = expectedLabels->find(key);
+                    lacksmlf = (labelsiter == expectedLabels->end());
+
+                    if (lacksmlf)
+                    {
+                        if (nomlf++ < 5)
+                        {
+                            fprintf(stderr, " [no labels for  %ls]", key.c_str());
+                        }
+
+                        isValid[i] = false;
+                        continue;   // skip this utterance at all
+                    }
+                }
+
+                // push the label sequence into classids[], since we already looked it up
+                // TODO: we can store labels more efficiently now since we don't do frame-wise random access anymore.
+
+                // OK, utterance has all we need --remember it
+
+/*                if (m == 0)
+                {
+                    if (isSupervised)
+                    {
+                        // first verify that all the label files have the proper duration
+                        foreach_index(j, labels)
+                        {
+                            const auto & labseq = labels[j].find(key)->second;
+                            // check if durations match; skip if not
+                            size_t labframes = labseq-> .empty() ? 0 : (labseq[labseq.size() - 1].firstframe + labseq[labseq.size() - 1].numframes);
+                            if (labframes != uttframes)
+                            {
+                                fprintf(stderr, " [duration mismatch (%d in label vs. %d in feat file), skipping %ls]", (int)labframes, (int)uttframes, key.c_str());
+                                nomlf++;
+                                isValid[i] = false;
+                                //continue;   // skip this utterance at all
+                                break;
+                            }
+                        }
+                        if (isValid[i])
+                        {
+                            utteranceset.push_back(std::move(utterance));
+                            m_totalframes += uttframes;
+                            // then parse each mlf if the durations are consistent
+                            foreach_index(j, labels)
+                            {
+                                const auto & labseq = labels[j].find(key)->second;
+                                // expand classid sequence into flat array
+                                foreach_index(i, labseq)
+                                {
+                                    const auto & e = labseq[i];
+                                    if ((i > 0 && labseq[i - 1].firstframe + labseq[i - 1].numframes != e.firstframe) || (i == 0 && e.firstframe != 0))
+                                    {
+                                        RuntimeError("minibatchutterancesource: labels not in consecutive order MLF in label set: %ls", key.c_str());
+                                        // TODO Why will these yield a run-time error as opposed to making the utterance invalid?
+                                        // TODO check this at the source. Saves storing numframes field.
+                                    }
+
+                                    auto dimension = m_inputs[m_labelIndices[j]]->sampleLayout->GetDims()[0];
+
+                                    if (e.classid >= dimension) //udim[j])
+                                    {
+                                        RuntimeError("minibatchutterancesource: class id %d exceeds model output dimension %d in file %ls", (int)e.classid, (int)dimension, key.c_str());
+                                    }
+                                    if (e.classid != (msra::dbn::CLASSIDTYPE)e.classid)
+                                        RuntimeError("CLASSIDTYPE has too few bits");
+                                    for (size_t t = e.firstframe; t < e.firstframe + e.numframes; t++)
+                                    {
+                                        m_classids[j]->push_back(e.classid);
+                                    }
+                                    numclasses[j] = max(numclasses[j], (size_t)(1u + e.classid));
+                                }
+
+                                m_classids[j]->push_back((msra::dbn::CLASSIDTYPE) - 1);  // append a boundary marker marker for checking
+
+                                if (!labels[j].empty() && m_classids[j]->size() != m_totalframes + utteranceset.size())
+                                    LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());
+                                assert(labels[j].empty() || m_classids[j]->size() == m_totalframes + utteranceset.size());
+                            }
+                        }
+                    }
+                    else
+                    {
+                        assert(m_classids.empty() && labels.empty());
+                        utteranceset.push_back(std::move(utterance));
+                        m_totalframes += uttframes;
+                    }
+                }
+                else
+                {
+                    utteranceset.push_back(std::move(utterance));
+                }
+
+            }
+            if (m == 0)
+                utterancesetsize = utteranceset.size();
+            else
+                assert(utteranceset.size() == utterancesetsize);
+
+            fprintf(stderr, "feature set %d: %d frames in %d out of %d utterances\n", m, (int)m_totalframes, (int)utteranceset.size(), (int)infiles[m].size());
+
+            if (!labels.empty()){
+                foreach_index(j, labels){
+                    msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> & cid = *m_classids[j];
+                    foreach_index(i, utteranceset){
+                        //if ((*classids[j])[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (CLASSIDTYPE) -1)
+                        //printf("index = %d\n",utteranceset[i].classidsbegin + utteranceset[i].numframes());
+                        //printf("cid[index] = %d\n",cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()]);
+                        //printf("CLASSIDTYPE(-1) = %d\n",(CLASSIDTYPE) -1);
+                        if (cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (msra::dbn::CLASSIDTYPE) - 1)
+                            LogicError("minibatchutterancesource: classids[] out of sync");
+                    }
+                }
+            }
+            if (nomlf + nolat > 0)
+            {
+                fprintf(stderr, "minibatchutterancesource: out of %d files, %d files not found in label set and %d have no lattice\n", (int)infiles[0].size(), (int)nomlf, (int)nolat);
+                if (nomlf + nolat > infiles[m].size() / 2)
+                    RuntimeError("minibatchutterancesource: too many files not found in label set--assuming broken configuration\n");
+            }
+            assert(nomlf + nolat == 0); // For us it's zero
+            if (m == 0) { foreach_index(j, numclasses) { fprintf(stderr, "label set %d: %d classes\n", j, (int)numclasses[j]); } }
+            // distribute them over chunks
+            // We simply count off frames until we reach the chunk size.
+            // Note that we first randomize the chunks, i.e. when used, chunks are non-consecutive and thus cause the disk head to seek for each chunk.
+            const size_t framespersec = 100;                    // we just assume this; our efficiency calculation is based on this
+            const size_t chunkframes = 15 * 60 * framespersec;  // number of frames to target for each chunk
+            // Loading an initial 24-hour range will involve 96 disk seeks, acceptable.
+            // When paging chunk by chunk, chunk size ~14 MB.
+            std::vector<utterancechunkdata> & thisallchunks = m_allchunks[m];
+
+            thisallchunks.resize(0);
+            thisallchunks.reserve(m_totalframes / chunkframes); // This is ignoring I/O for invalid utterances... // TODO round up?
+
+            foreach_index(i, utteranceset)
+            {
+                // if exceeding current entry--create a new one
+                // I.e. our chunks are a little larger than wanted (on av. half the av. utterance length).
+                if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= 65535)
+                    // TODO > instead of >= ? if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= frameref::maxutterancesperchunk)
+                    thisallchunks.push_back(utterancechunkdata());
+                // append utterance to last chunk
+                utterancechunkdata & currentchunk = thisallchunks.back();
+                currentchunk.push_back(std::move(utteranceset[i]));    // move it out from our temp array into the chunk
+                // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
+            }
+
+            fprintf(stderr, "minibatchutterancesource: %llu utterances grouped into %llu chunks, av. chunk size: %.1f utterances, %.1f frames\n",
+                utteranceset.size(), thisallchunks.size(), utteranceset.size() / (double)thisallchunks.size(), m_totalframes / (double)thisallchunks.size());
+            // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
+        }
+
+        size_t sequenceId = 0;
+        const std::vector<utterancechunkdata>& chunks = m_allchunks[0];
+        foreach_index(i, chunks)
+        {
+            foreach_index(j, chunks[i].utteranceset)
+            {
+                if (framemode)
+                {
+                    for (size_t k = 0; k < chunks[i].utteranceset[j].numframes(); ++k)
+                    {
+                        SequenceDescription description;
+                        description.id = sequenceId++;
+                        description.chunkId = i;
+                        description.numberOfSamples = 1;
+                        m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
+                        m_timeline.push_back(description);
+
+                        auto sq = sequenceref(i, j, k);
+                        sq.numframes = 1;
+                        m_sequences.push_back(sq);
+                    }
+                }
+                else
+                {
+                    SequenceDescription description;
+                    description.id = sequenceId++;
+                    description.chunkId = i;
+                    description.numberOfSamples = chunks[i].utteranceset[j].numframes();
+                    m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
+                    m_timeline.push_back(description);
+
+                    auto sq = sequenceref(i, j, 0);
+                    sq.numframes = description.numberOfSamples;
+                    m_sequences.push_back(sq);
+                }*/
+            }
+        }
+    }
+
     bool BundlerSplitted::RequireChunk(size_t chunkindex)
     {
         size_t numinram = 0;
