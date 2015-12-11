@@ -234,8 +234,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // TODO: can these two be merged in one array?
         std::vector<ScpParserPtr> m_scpParsers;
-        std::vector<DataDeserializerPtr> m_featureDeserailizers;
-        std::vector<DataDeserializerPtr> m_labelDeserailizers;
+        std::vector<DataDeserializerPtr> m_featureDeserailizers; // TODO fix typo
+        std::vector<DataDeserializerPtr> m_labelDeserailizers; // TODO fix typo
 
         // return sub-vector of classids[] for a given utterance
         std::vector<shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> GetClassIds(const sequenceref& uttref);
