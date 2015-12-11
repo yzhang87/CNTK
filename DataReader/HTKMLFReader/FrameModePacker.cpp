@@ -376,7 +376,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         std::vector<std::map<size_t, Sequence>> sequences;
-        for (size_t currentIndex = 0; currentIndex < this->m_requestedMBSize; ++currentIndex)
+        for (size_t currentIndex = 0; currentIndex < m_requestedMBSize; ++currentIndex)
         {
             auto sequence = m_transformer->GetNextSequence();
             if (sequence.m_endOfEpoch)
@@ -525,6 +525,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         return std::shared_ptr<void>(
             m_memoryProvider->Alloc(elementSize, numElements),
-            [this](void* p) { this->m_memoryProvider->Free(p); });
+            [this](void* p) { m_memoryProvider->Free(p); });
     }
 }}}

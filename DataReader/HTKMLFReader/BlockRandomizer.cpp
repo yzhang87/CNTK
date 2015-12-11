@@ -70,7 +70,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Place randomized chunks on global time line
         m_randomizedChunks.clear();
         m_randomizedChunks.reserve(m_numChunks + 1);
-        size_t chunkId, samplePosition, sequencePosition; // TODO xxx
+        size_t chunkId, samplePosition, sequencePosition;
         for (chunkId = 0, samplePosition = m_sweepStartInSamples, sequencePosition = 0; chunkId < m_numChunks; chunkId++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[chunkId];
@@ -357,7 +357,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             if (windowbegin <= chunkId && chunkId < windowend)
             {
-                // TODO missing: for distributed case only need some of the chunks
                 m_sequencer->RequireChunk(originalChunkIndex);
             }
             else
