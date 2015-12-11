@@ -5,10 +5,14 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    class HTKDataDeserializer : DataDeserializer
+    class HTKDataDeserializer : public DataDeserializer
     {
+        size_t m_dimension;
+        SampleLayoutPtr m_layout;
+        std::vector<std::wstring> m_featureFiles;
+
     public:
-        HTKDataDeserializer(ScpParserPtr nameToId);
+        HTKDataDeserializer(const ConfigParameters& feature);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 

@@ -73,6 +73,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual ~DataDeserializer() = 0 {};
     };
 
+    typedef std::shared_ptr<DataDeserializer> DataDeserializerPtr;
+
 
     // A Sequencer composes Timeline information and a number of Sequence readers, providing
     // random-access to the Timeline as well as the composed Sequence readers.

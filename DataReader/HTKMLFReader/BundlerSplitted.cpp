@@ -5,6 +5,8 @@
 #include "ConfigHelper.h"
 #include "msra_mgram.h"
 #include <DataTensor.h>
+#include "HTKDataDeserializer.h"
+#include "MLFDataDeserializer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -59,6 +61,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // eldak TODO: check that all script files for multi io have the same length.
             featurePaths.push_back(std::move(ConfigHelper::GetFeaturePaths(thisFeature)));
             m_featureIndices.push_back(input->id);
+
+            auto deserializer = std::make_shared<HTKDataDeserializer>(thisFeature);
+            m_featureDeserailizers.push_back(deserializer);
         }
 
         std::vector<std::wstring> stateListPaths;
@@ -84,6 +89,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             mlfPaths.push_back(std::move(ConfigHelper::GetMlfPaths(thisLabel)));
             m_labelIndices.push_back(input->id);
+
+            auto deserializer = std::make_shared<MLFDataDeserializer>(thisLabel);
+            m_labelDeserailizers.push_back(deserializer);
         }
 
         assert(featurePaths.size() == m_featureIndices.size() && mlfPaths.size() == m_labelIndices.size());
@@ -93,26 +101,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         //look up in the config for the master command to determine whether we're writing output (inputs only) or training/evaluating (inputs and outputs)
         wstring command(readerConfig(L"action", L""));
 
-        //size_t randomize = ConfigHelper::GetRandomizationWindow(readerConfig);
+        //eldak TODO: does not belong here
         std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
+        if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
+        {
+            RuntimeError("readMethod must be 'blockRandomize'");
+        }
 
         m_verbosity = readerConfig(L"verbosity", 2);
 
-        msra::lm::CSymbolSet unigramSymbols;
-        std::unique_ptr<msra::lm::CMGramLM> unigram;
-
         // currently assumes all Mlfs will have same root name (key)
         set<wstring> restrictmlftokeys;     // restrict MLF reader to these files--will make stuff much faster without having to use shortened input files
-        if (featurePaths[0].size() <= 100)
-        {
-            foreach_index(i, featurePaths[0])
-            {
-                msra::asr::htkfeatreader::parsedpath ppath(featurePaths[0][i]);
-                // delete extension (or not if none)
-                const wstring key = regex_replace(static_cast<wstring>(ppath), wregex(L"\\.[^\\.\\\\/:]*$"), wstring());
-                restrictmlftokeys.insert(key);
-            }
-        }
 
         // get labels
         double htktimetoframe = 100000.0; // default is 10ms 
@@ -129,11 +128,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // Make sure 'msra::asr::htkmlfreader' type has a move constructor
             static_assert(std::is_move_constructible<msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence>>::value,
                 "Type 'msra::asr::htkmlfreader' should be move constructible!");
-        }
-
-        if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
-        {
-            RuntimeError("readMethod must be 'blockRandomize'");
         }
 
         const std::vector<std::vector<wstring>>& infiles = featurePaths;

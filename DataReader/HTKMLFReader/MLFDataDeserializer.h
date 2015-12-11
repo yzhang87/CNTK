@@ -5,10 +5,18 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    class MLFDataDeserializer : DataDeserializer
+    class MLFDataDeserializer : public DataDeserializer
     {
+        size_t m_dimension;
+        SampleLayoutPtr m_layout;
+        std::wstring m_stateListPath;
+        std::vector<std::wstring> m_mlfPaths;
+
+        // [classidsbegin+t] concatenation of all state sequences
+        msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> m_classIds;
+
     public:
-        MLFDataDeserializer(ScpParserPtr nameToId);
+        MLFDataDeserializer(const ConfigParameters& label);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 

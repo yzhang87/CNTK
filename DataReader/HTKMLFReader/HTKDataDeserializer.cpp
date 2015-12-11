@@ -1,10 +1,20 @@
 #include "stdafx.h"
 #include "HTKDataDeserializer.h"
+#include "ConfigHelper.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    HTKDataDeserializer::HTKDataDeserializer(ScpParserPtr nameToId)
+    HTKDataDeserializer::HTKDataDeserializer(const ConfigParameters& feature)
+        : m_featureFiles(std::move(ConfigHelper::GetFeaturePaths(feature)))
     {
+        ConfigHelper::CheckFeatureType(feature);
+
+        auto context = ConfigHelper::GetContextWindow(feature);
+
+        m_dimension = feature(L"dim");
+        m_dimension = m_dimension * (1 + context.first + context.second);
+
+        m_layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
     }
 
     void Microsoft::MSR::CNTK::HTKDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
