@@ -288,6 +288,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         m_sequencer->SetEpochConfiguration(config);
 
+        m_workerRank = config.workerRank;
+        m_numberOfWorkers = config.numberOfWorkers;
+
         // eldak: check partial minibatches.
         if (config.totalSize == requestDataSize)
         {
@@ -299,24 +302,47 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         // TODO add some asserts on EpochConfiguration
-        m_config = config;
         m_samplePositionInEpoch = 0;
         size_t timeframe = m_epochSize * config.index;
         assert(m_frameMode); // TODO not (tested) yet
+        assert(timeframe != SIZE_MAX); // used as special value for init
         RandomizeForGlobalSamplePosition(timeframe);
     };
+
+    bool BlockRandomizer::AdvanceToNextPositionForThisWorker()
+    {
+        while (m_samplePositionInEpoch < m_epochSize)
+        {
+            RandomizeIfNewSweepIsEntered();
+
+            const auto & seqDesc = m_randomTimeline[m_sequencePositionInSweep];
+
+            if ((seqDesc.chunkId % m_numberOfWorkers) == m_workerRank)
+            {
+                // Got one
+                break;
+            }
+
+            m_samplePositionInEpoch += seqDesc.numberOfSamples;
+            m_sequencePositionInSweep++;
+        }
+
+        return m_epochSize <= m_samplePositionInEpoch;
+    }
 
     SequenceData BlockRandomizer::GetNextSequence()
     {
         assert(m_samplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
-        if (m_samplePositionInEpoch >= m_epochSize)
+
+        bool endOfEpoch = AdvanceToNextPositionForThisWorker();
+
+        if (endOfEpoch)
         {
             SequenceData result;
             result.m_endOfEpoch = true;
             return result;
         }
 
-        RandomizeIfNewSweepIsEntered();
         assert(m_sequencePositionInSweep < m_numSequences);
         const auto & seqDesc = m_randomTimeline[m_sequencePositionInSweep];
 

@@ -47,7 +47,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<ChunkInformation> m_chunkInformation;
 
         // Per-epoch configuration
-        EpochConfiguration m_config;
+        size_t m_workerRank;
+        size_t m_numberOfWorkers;
         size_t m_epochSize;
         size_t m_samplePositionInEpoch;
 
@@ -72,6 +73,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void RandomizeForGlobalSamplePosition(const size_t samplePosition);
 
         void RandomizeIfNewSweepIsEntered();
+
+        bool AdvanceToNextPositionForThisWorker();
 
     public:
         BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer);

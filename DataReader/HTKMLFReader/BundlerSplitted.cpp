@@ -559,12 +559,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t tspos = 0;
         for (size_t pos = spos; pos < epos; pos++)
         {
-            auto chunkId = m_timeline[id].chunkId;
-            if ((chunkId % m_numberOfWorkers) != m_workerRank)            // chunk not to be returned for this MPI node
-            {
-                continue;
-            }
-
             tspos += m_timeline[id].numberOfSamples;
         }
 
@@ -606,11 +600,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             const auto& sequence = m_timeline[id];
             const auto & uttref = m_sequences[id];
-
-            if ((uttref.chunkindex % m_numberOfWorkers) != m_workerRank)            // chunk not to be returned for this MPI node
-            {
-                continue;
-            }
 
             size_t n = 0;
             for (size_t i = 0; i < numStreams; ++i)
@@ -731,10 +720,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    void BundlerSplitted::SetEpochConfiguration(const EpochConfiguration& config)
+    void BundlerSplitted::SetEpochConfiguration(const EpochConfiguration& /*config*/)
     {
-        m_workerRank = config.workerRank;
-        m_numberOfWorkers = config.numberOfWorkers;
+        // TODO do we keep SetEpochConfiguration(), now empty?
     }
 
     std::vector<BundlerSplitted::shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> BundlerSplitted::GetClassIds(
