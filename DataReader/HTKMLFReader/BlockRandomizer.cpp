@@ -357,7 +357,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             if (windowbegin <= chunkId && chunkId < windowend)
             {
-                // TODO missing: for distributed case only need some of the chunks
                 m_sequencer->RequireChunk(originalChunkIndex);
             }
             else
