@@ -6,11 +6,13 @@
 
 #pragma once
 
+#include <vector>
+
 #include "InnerInterfaces.h"
 
 #include "Basics.h"                  // for attempt()
-#include "htkfeatio.h"                  // for htkmlfreader
-#include "latticearchive.h"             // for reading HTK phoneme lattices (MMI training)
+#include "htkfeatio.h"               // for htkmlfreader
+#include "latticearchive.h"          // for reading HTK phoneme lattices (MMI training)
 #include "minibatchsourcehelpers.h"
 #include "minibatchiterator.h"
 #include "biggrowablevectors.h"

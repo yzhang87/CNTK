@@ -56,7 +56,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void BlockRandomizer::RandomizeChunks(const size_t sweep, const size_t sweepts)
+    void BlockRandomizer::RandomizeChunks()
     {
         // Create vector of chunk indices and shuffle them using current sweep as seed
         std::vector<size_t> randomizedChunkIndices;
@@ -65,13 +65,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             randomizedChunkIndices.push_back(i);
         }
-        randomShuffle(randomizedChunkIndices, sweep);
+        randomShuffle(randomizedChunkIndices, m_sweep);
 
         // Place randomized chunks on global time line
         m_randomizedChunks.clear();
         m_randomizedChunks.reserve(m_numChunks + 1);
         size_t chunkId, samplePosition, sequencePosition; // TODO xxx
-        for (chunkId = 0, samplePosition = sweepts, sequencePosition = 0; chunkId < m_numChunks; chunkId++)
+        for (chunkId = 0, samplePosition = m_sweepStartInSamples, sequencePosition = 0; chunkId < m_numChunks; chunkId++)
         {
             const size_t originalChunkIndex = randomizedChunkIndices[chunkId];
             const size_t numSequences =
@@ -138,12 +138,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return chunk.windowbegin <= seqDesc.chunkId && seqDesc.chunkId < chunk.windowend;
     }
 
-    void BlockRandomizer::Randomize(
-        const size_t sweep,
-        const size_t sweepts,
-        const Timeline& timeline)
+    void BlockRandomizer::Randomize()
     {
-        RandomizeChunks(sweep, sweepts);
+        const auto & timeline = m_sequencer->GetTimeline();
+        RandomizeChunks();
 
         // Set up m_randomTimeline, shuffled by chunks.
         m_randomTimeline.clear();
@@ -171,7 +169,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Now randomly shuffle m_randomTimeline, while considering the
         // constraints of what chunk range needs to be in memory.
-        srand(static_cast<unsigned int>(sweep + 1));
+        srand(static_cast<unsigned int>(m_sweep + 1));
         foreach_index (i, m_randomTimeline)
         {
             // Get valid randomization range, expressed in chunks
@@ -211,18 +209,32 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void BlockRandomizer::LazyRandomize()
+    void BlockRandomizer::RandomizeIfNewSweepIsEntered()
     {
-        if (m_currentSequencePositionInSweep >= m_numSequences)
+        if (m_sequencePositionInSweep >= m_numSequences)
         {
             if (m_verbosity > 0)
                 fprintf(stderr, "lazyrandomization: re-randomizing for sweep %llu in %s mode\n",
-                    m_currentSweep, m_frameMode ? "frame" : "utterance");
-            m_currentSweep++;
-            Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->GetTimeline());
-            m_currentSequencePositionInSweep = 0;
+                    m_sweep, m_frameMode ? "frame" : "utterance");
+            m_sweep++;
+            m_sweepStartInSamples += m_numSamples;
+            Randomize();
+            m_sequencePositionInSweep = 0;
         };
     }
+
+    void BlockRandomizer::RandomizeForGlobalSamplePosition(const size_t samplePosition)
+    {
+        size_t sweep = samplePosition / m_numSamples;
+
+        if (m_sweep != sweep)
+        {
+            m_sweep = sweep;
+            m_sweepStartInSamples = sweep * m_numSamples;
+            Randomize();
+        }
+        m_sequencePositionInSweep = samplePosition % m_numSamples;
+    };
 
     //
     // Public methods
@@ -232,9 +244,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         : m_verbosity(verbosity)
         , m_randomizationRangeInSamples(randomizationRangeInSamples)
         , m_sequencer(sequencer)
-        , m_currentSweep(SIZE_MAX)
-        , m_currentSequencePositionInSweep(SIZE_MAX)
-        , m_currentSamplePositionInEpoch(SIZE_MAX)
+        , m_sweep(SIZE_MAX)
+        , m_sequencePositionInSweep(SIZE_MAX)
+        , m_samplePositionInEpoch(SIZE_MAX)
         , m_epochSize(SIZE_MAX)
     {
         assert(sequencer != nullptr);
@@ -276,17 +288,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         m_sequencer->SetEpochConfiguration(config);
 
-        size_t totalFrames = 0;
-        for (const auto& t : m_sequencer->GetTimeline())
-        {
-            totalFrames += t.numberOfSamples;
-        }
-
         // eldak: check partial minibatches.
         if (config.totalSize == requestDataSize)
         {
-            m_epochSize = totalFrames;
-        } 
+            m_epochSize = m_numSamples;
+        }
         else
         {
             m_epochSize = config.totalSize;
@@ -294,33 +300,28 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // TODO add some asserts on EpochConfiguration
         m_config = config;
-        m_currentSamplePositionInEpoch = 0;
+        m_samplePositionInEpoch = 0;
         size_t timeframe = m_epochSize * config.index;
-
-        assert(m_frameMode);
-
-        // TODO make sure this will use the lazy path as well...
-        m_currentSweep = timeframe / m_numSamples;
-        Randomize(m_currentSweep, 0 /* TODO should not need it anymore? */, m_sequencer->GetTimeline());
-        m_currentSequencePositionInSweep = timeframe % m_numSamples;
+        assert(m_frameMode); // TODO not (tested) yet
+        RandomizeForGlobalSamplePosition(timeframe);
     };
 
     SequenceData BlockRandomizer::GetNextSequence()
     {
-        assert(m_currentSamplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
-        if (m_currentSamplePositionInEpoch >= m_epochSize)
+        assert(m_samplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
+        if (m_samplePositionInEpoch >= m_epochSize)
         {
             SequenceData result;
             result.m_endOfEpoch = true;
             return result;
         }
 
-        LazyRandomize();
-        assert(m_currentSequencePositionInSweep < m_numSequences);
-        const auto & seqDesc = m_randomTimeline[m_currentSequencePositionInSweep];
+        RandomizeIfNewSweepIsEntered();
+        assert(m_sequencePositionInSweep < m_numSequences);
+        const auto & seqDesc = m_randomTimeline[m_sequencePositionInSweep];
 
         // Require and release chunks from the sequencer
-        const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[m_currentSequencePositionInSweep]];
+        const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[m_sequencePositionInSweep]];
         const size_t windowbegin = chunk.windowbegin;
         const size_t windowend = chunk.windowend;
 
@@ -339,8 +340,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        m_currentSamplePositionInEpoch += seqDesc.numberOfSamples;
-        m_currentSequencePositionInSweep++;
+        m_samplePositionInEpoch += seqDesc.numberOfSamples;
+        m_sequencePositionInSweep++;
 
         return m_sequencer->GetSequenceById(seqDesc.id);
     };

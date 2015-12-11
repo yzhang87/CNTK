@@ -130,7 +130,6 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="Timeline.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="utterancesourcemulti.h" />
   </ItemGroup>

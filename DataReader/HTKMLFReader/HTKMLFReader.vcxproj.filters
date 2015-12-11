@@ -67,7 +67,6 @@
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Bundler.h" />
-    <ClInclude Include="Timeline.h" />
     <ClInclude Include="ConfigHelper.h" />
     <ClInclude Include="HTKDataDeserializer.h" />
     <ClInclude Include="MLFDataDeserializer.h" />
