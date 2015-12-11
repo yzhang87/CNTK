@@ -2,21 +2,31 @@
 
 #include "InnerInterfaces.h"
 #include "ScpParser.h"
+#include "BundlerSplitted.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     class HTKDataDeserializer : public DataDeserializer
     {
+        struct HTKSequenceDescription : public SequenceDescription
+        {
+            HTKSequenceDescription(utterancedesc&& u) : utterance(u) {}
+
+            utterancedesc utterance;
+        };
+
         size_t m_dimension;
         SampleLayoutPtr m_layout;
         std::vector<std::wstring> m_featureFiles;
+
+        std::vector<HTKSequenceDescription> m_sequences;
 
     public:
         HTKDataDeserializer(const ConfigParameters& feature);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual const Timeline& GetTimeline() const override;
+        virtual TimelineP GetTimeline() const override;
 
         virtual InputDescriptionPtr GetInput() const override;
 
@@ -27,6 +37,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual bool RequireChunk(size_t chunkIndex) override;
 
         virtual void ReleaseChunk(size_t chunkIndex) override;
+
+        virtual std::vector<std::wstring> SequenceIdToName() override;
 
     };
 }}}

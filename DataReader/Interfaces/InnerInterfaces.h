@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 #include "ReaderInterfaces.h"
 
@@ -12,6 +13,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t numberOfSamples;
         size_t chunkId;
         bool isValid;
+        std::wstring key;
     };
 
     // Defines a sequences, which consists of sequences description and a number
@@ -35,6 +37,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Timeline specifies a vector of Sequence IDs and lengths.
     // This information is exposed by a Sequencer, e.g., to be used by the Randomizer.
     typedef std::vector<SequenceDescription> Timeline;
+
+    typedef std::vector<const SequenceDescription*> TimelineP;
 
     // Timeline offsets specify file offset of sequences. These are used internally
     // of a Sequence Reader or a Sequencer.
@@ -61,7 +65,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
-        virtual const Timeline& GetTimeline() const = 0;
+        // Map of sequence ids into string ids.
+        virtual std::vector<std::wstring> SequenceIdToName() = 0;
+
+        virtual TimelineP GetTimeline() const = 0;
 
         virtual InputDescriptionPtr GetInput() const = 0;
         virtual Sequence GetSequenceById(size_t id) = 0;

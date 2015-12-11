@@ -20,7 +20,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual const Timeline& GetTimeline() const override;
+        virtual TimelineP GetTimeline() const override;
 
         virtual InputDescriptionPtr GetInput() const override;
 
@@ -32,5 +32,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void ReleaseChunk(size_t chunkIndex) override;
 
+        virtual std::vector<std::wstring> SequenceIdToName() override;
     };
 }}}

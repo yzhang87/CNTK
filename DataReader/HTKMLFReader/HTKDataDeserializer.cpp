@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "HTKDataDeserializer.h"
 #include "ConfigHelper.h"
+#include "BundlerSplitted.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -15,6 +16,34 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_dimension = m_dimension * (1 + context.first + context.second);
 
         m_layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
+
+        std::vector<std::wstring> featurePaths(ConfigHelper::GetFeaturePaths(feature));
+
+        std::vector<bool> isValid(featurePaths.size(), true);
+        std::vector<size_t> duration(featurePaths.size(), 0);
+
+        foreach_index(i, featurePaths)
+        {
+            utterancedesc utterance(msra::asr::htkfeatreader::parsedpath(featurePaths[i]), 0);
+            const size_t uttframes = utterance.numframes(); // will throw if frame bounds not given --required to be given in this mode
+
+            // we need at least 2 frames for boundary markers to work
+            if (uttframes < 2 || uttframes > 65535 /* TODO frameref::maxframesperutterance */)
+            {
+                fprintf(stderr, "minibatchutterancesource: skipping %llu-th file (%llu frames) because it exceeds max. frames (%llu) for frameref bit field: %ls\n", i, uttframes, 65535 /* frameref::maxframesperutterance */, utterance.key().c_str());
+                duration[i] = 0;
+                isValid[i] = false;
+            }
+            else
+            {
+                duration[i] = uttframes;
+            }
+
+            HTKSequenceDescription description(std::move(utterance));
+            description.id = i;
+            description.numberOfSamples = uttframes;
+            m_sequences.push_back(description);
+        }
     }
 
     void Microsoft::MSR::CNTK::HTKDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
@@ -22,9 +51,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    const Timeline& Microsoft::MSR::CNTK::HTKDataDeserializer::GetTimeline() const
+    TimelineP Microsoft::MSR::CNTK::HTKDataDeserializer::GetTimeline() const
     {
-        throw std::logic_error("The method or operation is not implemented.");
+        //todo: should be transform
+        std::vector<const SequenceDescription*> result(m_sequences.size());
+        result.resize(m_sequences.size());
+
+        for (int i = 0; i < m_sequences.size(); ++i)
+        {
+            result[i] = &m_sequences[i];
+        }
+
+        return result;
     }
 
     Microsoft::MSR::CNTK::InputDescriptionPtr Microsoft::MSR::CNTK::HTKDataDeserializer::GetInput() const
@@ -52,4 +90,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
+    std::vector<std::wstring> HTKDataDeserializer::SequenceIdToName()
+    {
+        throw std::logic_error("The method or operation is not implemented.");
+    }
 }}}

@@ -41,7 +41,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    const Timeline& Microsoft::MSR::CNTK::MLFDataDeserializer::GetTimeline() const
+    TimelineP Microsoft::MSR::CNTK::MLFDataDeserializer::GetTimeline() const
     {
         throw std::logic_error("The method or operation is not implemented.");
     }
@@ -71,4 +71,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
+    std::vector<std::wstring> MLFDataDeserializer::SequenceIdToName()
+    {
+        throw std::logic_error("The method or operation is not implemented.");
+    }
 }}}
