@@ -205,8 +205,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Timeline m_timeline;
         std::vector<string> m_featkind;
         std::map<size_t, const utterancedesc*> m_sequenceIdToSequence;
-        size_t m_workerRank;
-        size_t m_numberOfWorkers;
         size_t m_elementSize;
         std::vector<InputDescriptionPtr> m_inputs;
 
