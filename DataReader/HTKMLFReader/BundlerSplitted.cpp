@@ -715,33 +715,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                             {
                                 const auto & labseq = labels[j].find(key)->second;
 
-                                // expand classid sequence into flat array
-                                foreach_index(i, labseq)
-                                {
-                                    const auto & e = labseq[i];
-                                    if ((i > 0 && labseq[i - 1].firstframe + labseq[i - 1].numframes != e.firstframe) || (i == 0 && e.firstframe != 0))
-                                    {
-                                        RuntimeError("minibatchutterancesource: labels not in consecutive order MLF in label set: %ls", key.c_str());
-                                        // TODO Why will these yield a run-time error as opposed to making the utterance invalid?
-                                        // TODO check this at the source. Saves storing numframes field.
-                                    }
-
-                                    auto dimension = m_inputs[m_labelIndices[j]]->sampleLayout->GetDims()[0];
-
-                                    if (e.classid >= dimension) //udim[j])
-                                    {
-                                        RuntimeError("minibatchutterancesource: class id %d exceeds model output dimension %d in file %ls", (int)e.classid, (int)dimension, key.c_str());
-                                    }
-                                    if (e.classid != (msra::dbn::CLASSIDTYPE)e.classid)
-                                        RuntimeError("CLASSIDTYPE has too few bits");
-                                    for (size_t t = e.firstframe; t < e.firstframe + e.numframes; t++)
-                                    {
-                                        m_classids[j]->push_back(e.classid);
-                                    }
-                                    numclasses[j] = max(numclasses[j], (size_t)(1u + e.classid));
-                                }
-
-                                m_classids[j]->push_back((msra::dbn::CLASSIDTYPE) - 1);  // append a boundary marker marker for checking
+                                // except for the following, code that was here already moved to MLFDataDeserializer:
 
                                 if (!labels[j].empty() && m_classids[j]->size() != m_totalframes + utteranceset.size())
                                     LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());

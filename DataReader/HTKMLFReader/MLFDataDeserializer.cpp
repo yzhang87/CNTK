@@ -43,6 +43,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
              const auto & labseq = l.second;
              foreach_index(i, labseq)
              {
+                 // TODO Why will these yield a run-time error as opposed to making the utterance invalid?
+
                  const auto & e = labseq[i];
                  if ((i == 0 && e.firstframe != 0) || (i > 0 && labseq[i - 1].firstframe + labseq[i - 1].numframes != e.firstframe))
                  {
@@ -62,18 +64,20 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                  for (size_t t = e.firstframe; t < e.firstframe + e.numframes; t++)
                  {
-                     //m_classids[j]->push_back(e.classid);
+                     m_classIds.push_back(e.classid);
                  }
 
-                 numClasses = max(numClasses, (size_t)(1u + e.classid));
+                 numClasses = max(numClasses, static_cast<size_t>(1u + e.classid));
              }
 
-#if 0
-             m_classids[j]->push_back((msra::dbn::CLASSIDTYPE) - 1);  // append a boundary marker marker for checking
+             // append a boundary marker marker for checking
+             m_classIds.push_back(static_cast<msra::dbn::CLASSIDTYPE>(-1));
 
-             if (!labels[j].empty() && m_classids[j]->size() != m_totalframes + utteranceset.size())
+#if 0
+             // TODO maybe this shouldn't be here
+             if (!labels[j].empty() && m_classids->size() != m_totalframes + utteranceset.size())
                  LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());
-             assert(labels[j].empty() || m_classids[j]->size() == m_totalframes + utteranceset.size());
+             assert(labels[j].empty() || m_classids->size() == m_totalframes + utteranceset.size());
 #endif
          }
     }
