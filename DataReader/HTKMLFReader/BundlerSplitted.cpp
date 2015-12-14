@@ -63,7 +63,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_featureIndices.push_back(input->id);
 
             auto deserializer = std::make_shared<HTKDataDeserializer>(thisFeature);
-            m_featureDeserailizers.push_back(deserializer);
+            m_featureDeserializers.push_back(deserializer);
         }
 
         std::vector<std::wstring> stateListPaths;
@@ -91,7 +91,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_labelIndices.push_back(input->id);
 
             auto deserializer = std::make_shared<MLFDataDeserializer>(thisLabel);
-            m_labelDeserailizers.push_back(deserializer);
+            m_labelDeserializers.push_back(deserializer);
         }
 
         assert(featurePaths.size() == m_featureIndices.size() && mlfPaths.size() == m_labelIndices.size());
@@ -116,6 +116,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // get labels
         double htktimetoframe = 100000.0; // default is 10ms 
         std::vector<std::map<std::wstring, std::vector<msra::asr::htkmlfentry>>> labelsmulti;
+
         foreach_index(i, mlfPaths)
         {
             msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence>
@@ -169,7 +170,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             m_classids.push_back(unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>(new msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>()));
         }
-
 
         // first check consistency across feature streams
         // We'll go through the SCP files for each stream to make sure the duration is consistent
@@ -491,7 +491,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (const auto& featureName : featureNames)
         {
             auto deserializer = std::make_shared<HTKDataDeserializer>(readerConfig(featureName));
-            m_featureDeserailizers.push_back(deserializer);
+            m_featureDeserializers.push_back(deserializer);
 
             // eldak: should we simply delegate this to the data deserializer?
             // who sets the id then?
@@ -507,7 +507,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (const auto& labelName : labelNames)
         {
             auto deserializer = std::make_shared<MLFDataDeserializer>(readerConfig(labelName));
-            m_labelDeserailizers.push_back(deserializer);
+            m_labelDeserializers.push_back(deserializer);
 
             // eldak: should we simply delegate this to the data deserializer?
             // who sets the id then?
@@ -549,7 +549,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         //m_allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
         //m_featdim = std::vector<size_t>(infiles.size(), 0);
 
-        numclasses = std::vector<size_t>(m_labelDeserailizers.size(), 0);
+        numclasses = std::vector<size_t>(m_labelDeserializers.size(), 0);
 
         /*
         foreach_index(i, labels)
@@ -558,13 +558,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
         */
 
-        const auto& expected = m_featureDeserailizers[0]->GetSequenceDescriptions();
+        const auto& expected = m_featureDeserializers[0]->GetSequenceDescriptions();
         numutts = expected.size();
         std::vector<bool> isValid(numutts, true);
 
-        foreach_index(m, m_featureDeserailizers)
+        foreach_index(m, m_featureDeserializers)
         {
-            const auto& utterances = m_featureDeserailizers[m]->GetSequenceDescriptions();
+            const auto& utterances = m_featureDeserializers[m]->GetSequenceDescriptions();
             if (utterances.size() != numutts)
             {
                 RuntimeError("minibatchutterancesourcemulti: all feature files must have same number of utterances");
@@ -602,12 +602,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
 
-        bool isSupervised = !m_labelDeserailizers.empty();
-        std::vector<std::map<std::wstring, const SequenceDescription*>> labels(m_labelDeserailizers.size());
+        bool isSupervised = !m_labelDeserializers.empty();
+        std::vector<std::map<std::wstring, const SequenceDescription*>> labels(m_labelDeserializers.size());
         std::map<std::wstring, const SequenceDescription*>* expectedLabels = nullptr;
         if (isSupervised)
         {
-            for (auto d : m_featureDeserailizers)
+            for (auto d : m_featureDeserializers)
             {
                 labels.push_back(std::map<std::wstring, const SequenceDescription*>());
                 std::map<std::wstring, const SequenceDescription*>& m = labels[labels.size() - 1];
@@ -621,9 +621,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         /*
         // now process the features and labels
         //size_t utterancesetsize = 0;
-        foreach_index(m, m_featureDeserailizers)
+        foreach_index(m, m_featureDeserializers)
         {
-            const auto& utterances = m_featureDeserailizers[m]->GetSequenceDescriptions();
+            const auto& utterances = m_featureDeserializers[m]->GetSequenceDescriptions();
 
             //std::vector<utterancedesc> utteranceset;// read all utterances to here first; at the end, distribute to chunks
             //utteranceset.reserve(infiles[m].size());
@@ -634,7 +634,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             foreach_index(i, utterances)
             {
-                //if (i % (m_featureDeserailizers[m].size() / 100 + 1) == 0)
+                //if (i % (m_featureDeserializers[m].size() / 100 + 1) == 0)
                 //{
                 //    fprintf(stderr, "."); fflush(stderr);
                 //}
