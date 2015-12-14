@@ -37,17 +37,33 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
          size_t numClasses = 0; // TODO same as m_dimension?
 
-         // TODO only checking that frames within a sequence are contiguous
+         size_t numSequences = labels.size();
+         m_sequences.reserve(numSequences);
+         m_sequencesP.reserve(numSequences);
+
+         MLFSequenceDescription description;
+         description.id = 0;
+         description.isValid = true; // right now we throw for invalid sequences
+         // TODO .chunk, .key
+
+         // Note: this is only checking that frames within a sequence are contiguous
          for (auto l : labels)
          {
-             // TODO wrong order
+
              const auto & labseq = l.second;
+
+             assert(0 < labseq.size()); // TODO
+
+             description.key = l.first;
+             description.numberOfSamples = labseq[0].firstframe;
+
              foreach_index(i, labseq)
              {
                  // TODO Why will these yield a run-time error as opposed to making the utterance invalid?
 
                  const auto & e = labseq[i];
-                 if ((i == 0 && e.firstframe != 0) || (i > 0 && labseq[i - 1].firstframe + labseq[i - 1].numframes != e.firstframe))
+                 if ((i == 0 && e.firstframe != 0) ||
+                     (i > 0 && labseq[i - 1].firstframe + labseq[i - 1].numframes != e.firstframe))
                  {
                      RuntimeError("minibatchutterancesource: labels not in consecutive order MLF in label set: %ls", l.first.c_str());
                  }
@@ -73,6 +89,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
              // append a boundary marker marker for checking
              m_classIds.push_back(static_cast<msra::dbn::CLASSIDTYPE>(-1));
+
+             m_sequences.push_back(description);
+             m_sequencesP.push_back(&m_sequences[description.id]);
+
+             description.id++;
+             description.sequenceStart = m_classIds.size(); // TODO
+
 
 #if 0
              // TODO maybe this shouldn't be here

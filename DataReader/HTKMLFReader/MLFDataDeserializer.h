@@ -15,6 +15,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // [classidsbegin+t] concatenation of all state sequences
         msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> m_classIds;
 
+        struct MLFSequenceDescription : public SequenceDescription
+        {
+            // Where the sequence is stored in m_classIds
+            size_t sequenceStart;
+        };
+
+        std::vector<MLFSequenceDescription> m_sequences;
+        TimelineP m_sequencesP;
+
     public:
         MLFDataDeserializer(const ConfigParameters& label);
 
