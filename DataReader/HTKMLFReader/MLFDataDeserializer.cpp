@@ -40,6 +40,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
          // TODO only checking that frames within a sequence are contiguous
          for (auto l : labels)
          {
+             // TODO wrong order
              const auto & labseq = l.second;
              foreach_index(i, labseq)
              {
