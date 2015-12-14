@@ -535,7 +535,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         //m_sampperiod = std::vector<unsigned int>(infiles.size(), 0);
 
         // process infiles to know dimensions of things (but not loading features)
-        size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
+        // size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
         //size_t nolat = 0;                       // number of entries missing in lattice archive (diagnostics)
         std::vector<size_t> numclasses;                  // number of output classes as found in the label file (diagnostics)
         m_totalframes = 0;
@@ -618,7 +618,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
             expectedLabels = &labels[0];
         }
-
+        /*
         // now process the features and labels
         //size_t utterancesetsize = 0;
         foreach_index(m, m_featureDeserailizers)
@@ -634,10 +634,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             foreach_index(i, utterances)
             {
-                /*if (i % (m_featureDeserailizers[m].size() / 100 + 1) == 0)
-                {
-                    fprintf(stderr, "."); fflush(stderr);
-                }*/
+                //if (i % (m_featureDeserailizers[m].size() / 100 + 1) == 0)
+                //{
+                //    fprintf(stderr, "."); fflush(stderr);
+                //}
 
                 // build utterance descriptor
                 if (m == 0 && isSupervised)
@@ -679,7 +679,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 // OK, utterance has all we need --remember it
 
-/*                if (m == 0)
+                if (m == 0)
                 {
                     if (isSupervised)
                     {
@@ -688,24 +688,31 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                         {
                             const auto & labseq = labels[j].find(key)->second;
                             // check if durations match; skip if not
-                            size_t labframes = labseq-> .empty() ? 0 : (labseq[labseq.size() - 1].firstframe + labseq[labseq.size() - 1].numframes);
-                            if (labframes != uttframes)
+                            //size_t labframes = labseq-> .empty() ? 0 : (labseq[labseq.size() - 1].firstframe + labseq[labseq.size() - 1].numframes);
+                            if (labseq->numberOfSamples != utterances[i]->numberOfSamples)
                             {
-                                fprintf(stderr, " [duration mismatch (%d in label vs. %d in feat file), skipping %ls]", (int)labframes, (int)uttframes, key.c_str());
+                                fprintf(
+                                    stderr, 
+                                    " [duration mismatch (%llu in label vs. %llu in feat file), skipping %ls]",
+                                    labseq->numberOfSamples,
+                                    utterances[i]->numberOfSamples,
+                                    key.c_str());
+
                                 nomlf++;
                                 isValid[i] = false;
                                 //continue;   // skip this utterance at all
                                 break;
                             }
                         }
+
                         if (isValid[i])
                         {
-                            utteranceset.push_back(std::move(utterance));
-                            m_totalframes += uttframes;
+                            m_totalframes += utterances[i]->numberOfSamples;
                             // then parse each mlf if the durations are consistent
                             foreach_index(j, labels)
                             {
                                 const auto & labseq = labels[j].find(key)->second;
+
                                 // expand classid sequence into flat array
                                 foreach_index(i, labseq)
                                 {
@@ -845,9 +852,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     auto sq = sequenceref(i, j, 0);
                     sq.numframes = description.numberOfSamples;
                     m_sequences.push_back(sq);
-                }*/
+                }
             }
-        }
+        }*/
     }
 
     bool BundlerSplitted::RequireChunk(size_t chunkindex)
