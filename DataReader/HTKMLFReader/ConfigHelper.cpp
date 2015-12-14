@@ -94,7 +94,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             if (!config.ExistsCurrent(L"mlfFileList"))
             {
-                InvalidArgument("Either mlfFile or mlfFileList must exist in HTKMLFReder");
+                InvalidArgument("Either mlfFile or mlfFileList must exist in HTKMLFReader");
             }
 
             wstring list = config(L"mlfFileList");

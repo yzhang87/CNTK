@@ -20,7 +20,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // restrict MLF reader to these files--will make stuff much faster without having to use shortened input files
 
         // get labels
-        double htktimetoframe = 100000.0; // default is 10ms
+        const double htktimetoframe = 100000.0; // default is 10ms
 
         const msra::lm::CSymbolSet* wordTable = nullptr;
         std::map<string, size_t>* symbolTable = nullptr;
@@ -34,7 +34,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 msra::asr::htkmlfreader<msra::asr::htkmlfentry,
                 msra::lattices::lattice::htkmlfwordsequence>>::value,
              "Type 'msra::asr::htkmlfreader' should be move constructible!");
-         /*
+
+         size_t numClasses = 0; // TODO same as m_dimension?
+
+         // TODO only checking that frames within a sequence are contiguous
          for (auto l : labels)
          {
              const auto & labseq = l.second;
@@ -46,31 +49,33 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                      RuntimeError("minibatchutterancesource: labels not in consecutive order MLF in label set: %ls", l.first.c_str());
                  }
 
-                 auto dimension = m_dimension;
-                 if (e.classid >= dimension)
+                 if (e.classid >= m_dimension)
                  {
-                     RuntimeError("minibatchutterancesource: class id %llu exceeds model output dimension %llu in file %ls", e.classid, dimension, l.first.c_str());
+                     RuntimeError("minibatchutterancesource: class id %llu exceeds model output dimension %llu in file %ls",
+                         e.classid, m_dimension, l.first.c_str());
                  }
 
-                 if (e.classid != (msra::dbn::CLASSIDTYPE)e.classid)
+                 if (e.classid != static_cast<msra::dbn::CLASSIDTYPE>(e.classid))
                  {
                      RuntimeError("CLASSIDTYPE has too few bits");
                  }
 
                  for (size_t t = e.firstframe; t < e.firstframe + e.numframes; t++)
                  {
-                     m_classids[j]->push_back(e.classid);
+                     //m_classids[j]->push_back(e.classid);
                  }
 
-                 numclasses[j] = max(numclasses[j], (size_t)(1u + e.classid));
+                 numClasses = max(numClasses, (size_t)(1u + e.classid));
              }
 
+#if 0
              m_classids[j]->push_back((msra::dbn::CLASSIDTYPE) - 1);  // append a boundary marker marker for checking
 
              if (!labels[j].empty() && m_classids[j]->size() != m_totalframes + utteranceset.size())
                  LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());
              assert(labels[j].empty() || m_classids[j]->size() == m_totalframes + utteranceset.size());
-         }*/
+#endif
+         }
     }
 
     void Microsoft::MSR::CNTK::MLFDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /*config*/)

@@ -35,8 +35,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<InputDescriptionPtr> inputs;
         std::vector<size_t> contextLeft;
         std::vector<size_t> contextRight;
-        std::vector<std::vector<std::wstring>> featurePaths;
-        foreach_index(i, featureNames)
+        std::vector<std::vector<std::wstring>> featurePaths; /// TODO get rid
+        foreach_index(i, featureNames) // TODO only need range-based
         {
             InputDescriptionPtr input = std::make_shared<InputDescription>();
             input->id = inputs.size();
@@ -94,7 +94,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_labelDeserializers.push_back(deserializer);
         }
 
-        assert(featurePaths.size() == m_featureIndices.size() && mlfPaths.size() == m_labelIndices.size());
+        assert(featurePaths.size() == m_featureIndices.size());
+        assert(mlfPaths.size() == m_labelIndices.size());
 
         m_verbosity = readerConfig(L"verbosity", 2);
 
@@ -114,7 +115,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         set<wstring> restrictmlftokeys;     // restrict MLF reader to these files--will make stuff much faster without having to use shortened input files
 
         // get labels
-        double htktimetoframe = 100000.0; // default is 10ms 
+        double htktimetoframe = 100000.0; // default is 10ms
         std::vector<std::map<std::wstring, std::vector<msra::asr::htkmlfentry>>> labelsmulti;
 
         foreach_index(i, mlfPaths)
@@ -164,7 +165,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
         m_featdim = std::vector<size_t>(infiles.size(), 0);
 
-        numclasses = std::vector<size_t>(labels.size(), 0);
+        numclasses = std::vector<size_t>(labels.size(), 0); // numLabelStreams
 
         foreach_index(i, labels)
         {
@@ -498,7 +499,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             InputDescriptionPtr input = std::make_shared<InputDescription>();
             input->id = inputs.size();
             input->name = featureName;
-            input->sampleLayout = deserializer->GetInput()->sampleLayout;
+            // input->sampleLayout = deserializer->GetInput()->sampleLayout; // TODO not implemented
+
             inputs.push_back(input);
 
             m_featureIndices.push_back(input->id);
@@ -514,7 +516,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             InputDescriptionPtr input = std::make_shared<InputDescription>();
             input->id = inputs.size();
             input->name = labelName;
-            input->sampleLayout = deserializer->GetInput()->sampleLayout;
+            // input->sampleLayout = deserializer->GetInput()->sampleLayout; // TODO not implemented
             inputs.push_back(input);
 
             m_labelIndices.push_back(input->id);
@@ -692,7 +694,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                             if (labseq->numberOfSamples != utterances[i]->numberOfSamples)
                             {
                                 fprintf(
-                                    stderr, 
+                                    stderr,
                                     " [duration mismatch (%llu in label vs. %llu in feat file), skipping %ls]",
                                     labseq->numberOfSamples,
                                     utterances[i]->numberOfSamples,
@@ -960,8 +962,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // resize feat and uids
         // eldak:s should return phone boundaries and sentendmark lattices transcripts etc.
-        feat.resize(m_featureIndices.size());
-        uids.resize(m_classids.size());
+        feat.resize(m_featureIndices.size()); // TODO numFeatureStreams
+        uids.resize(m_classids.size()); // TODO numLabelStreams
+
+        // TODO go to virtual stream input InputDescriptionPtr GetInput() const override;
 
         foreach_index(i, feat)
         {

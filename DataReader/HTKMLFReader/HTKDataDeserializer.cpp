@@ -17,31 +17,33 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
 
-        std::vector<std::wstring> featurePaths(ConfigHelper::GetFeaturePaths(feature));
+        size_t numSequences = m_featureFiles.size();
 
-        std::vector<bool> isValid(featurePaths.size(), true);
-        std::vector<size_t> duration(featurePaths.size(), 0);
+        m_sequences.reserve(numSequences);
+        m_sequencesP.reserve(numSequences);
 
-        foreach_index(i, featurePaths)
+        foreach_index(i, m_featureFiles)
         {
-            utterancedesc utterance(msra::asr::htkfeatreader::parsedpath(featurePaths[i]), 0);
+            utterancedesc utterance(msra::asr::htkfeatreader::parsedpath(m_featureFiles[i]), 0);
             const size_t uttframes = utterance.numframes(); // will throw if frame bounds not given --required to be given in this mode
-
-            // we need at least 2 frames for boundary markers to work
-            if (uttframes < 2 || uttframes > 65535 /* TODO frameref::maxframesperutterance */)
-            {
-                fprintf(stderr, "minibatchutterancesource: skipping %llu-th file (%llu frames) because it exceeds max. frames (%llu) for frameref bit field: %ls\n", i, uttframes, 65535 /* frameref::maxframesperutterance */, utterance.key().c_str());
-                duration[i] = 0;
-                isValid[i] = false;
-            }
-            else
-            {
-                duration[i] = uttframes;
-            }
 
             HTKSequenceDescription description(std::move(utterance));
             description.id = i;
-            description.numberOfSamples = uttframes;
+            // description.chunkId, description.key // TODO
+
+            // we need at least 2 frames for boundary markers to work
+            if (uttframes < 2)
+            {
+                fprintf(stderr, "minibatchutterancesource: skipping %d-th file (%llu frames) because it has less than 2 frames: %ls\n",
+                    i, uttframes, utterance.key().c_str());
+                description.numberOfSamples = 0;
+                description.isValid = false;
+            }
+            else
+            {
+                description.numberOfSamples = uttframes;
+                description.isValid = true;
+            }
 
             m_sequences.push_back(description);
             m_sequencesP.push_back(&m_sequences[i]);

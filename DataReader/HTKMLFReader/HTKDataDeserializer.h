@@ -30,6 +30,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual TimelineP GetSequenceDescriptions() const override;
 
         virtual InputDescriptionPtr GetInput() const override;
+        // TODO const?
 
         virtual Sequence GetSequenceById(size_t id) override;
 
