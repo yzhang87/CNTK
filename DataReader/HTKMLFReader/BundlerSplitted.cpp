@@ -504,7 +504,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             InputDescriptionPtr input = std::make_shared<InputDescription>();
             input->id = inputs.size();
             input->name = featureName;
-            // input->sampleLayout = deserializer->GetInput()->sampleLayout; // TODO not implemented
+            input->sampleLayout = deserializer->GetInput()->sampleLayout;
 
             inputs.push_back(input);
 
@@ -521,7 +521,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             InputDescriptionPtr input = std::make_shared<InputDescription>();
             input->id = inputs.size();
             input->name = labelName;
-            // input->sampleLayout = deserializer->GetInput()->sampleLayout; // TODO not implemented
+            input->sampleLayout = deserializer->GetInput()->sampleLayout;
             inputs.push_back(input);
 
             m_labelIndices.push_back(input->id);
@@ -830,7 +830,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    bool BundlerSplitted::RequireChunk(size_t chunkindex)
+    bool BundlerSplitted::OldRequireChunk(size_t chunkindex)
     {
         size_t numinram = 0;
 
@@ -866,7 +866,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    bool BundlerSplitted::NewRequireChunk(size_t chunkindex)
+    bool BundlerSplitted::RequireChunk(size_t chunkindex)
     {
         bool result = false;
         for (const auto& d: m_featureDeserializers)
@@ -877,7 +877,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    void BundlerSplitted::NewReleaseChunk(size_t chunkIndex)
+    void BundlerSplitted::ReleaseChunk(size_t chunkIndex)
     {
         for (const auto& d : m_featureDeserializers)
         {
@@ -885,7 +885,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void BundlerSplitted::ReleaseChunk(size_t chunkIndex)
+    void BundlerSplitted::OldReleaseChunk(size_t chunkIndex)
     {
         size_t numreleased = 0;
         const size_t numStreams = m_allchunks.size();

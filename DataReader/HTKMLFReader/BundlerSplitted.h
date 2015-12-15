@@ -201,8 +201,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual bool RequireChunk(size_t chunkindex) override;
         virtual void ReleaseChunk(size_t chunkIndex) override;
 
-        bool NewRequireChunk(size_t chunkindex);
-        void NewReleaseChunk(size_t chunkIndex);
+        bool OldRequireChunk(size_t chunkindex);
+        void OldReleaseChunk(size_t chunkIndex);
         SequenceData OldGetSequenceById(size_t id);
 
 

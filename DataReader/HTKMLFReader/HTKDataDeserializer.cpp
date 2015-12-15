@@ -112,7 +112,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     InputDescriptionPtr HTKDataDeserializer::GetInput() const
     {
-        throw std::logic_error("The method or operation is not implemented.");
+        InputDescriptionPtr input = std::make_shared<InputDescription>();
+        input->id = 0;
+        input->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
+        return input;
     }
 
     Sequence HTKDataDeserializer::GetSequenceById(size_t /*id*/)
