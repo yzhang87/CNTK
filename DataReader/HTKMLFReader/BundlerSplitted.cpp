@@ -537,7 +537,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         //m_sampperiod = std::vector<unsigned int>(infiles.size(), 0);
 
         // process infiles to know dimensions of things (but not loading features)
-        // size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
+        size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
         //size_t nolat = 0;                       // number of entries missing in lattice archive (diagnostics)
         std::vector<size_t> numclasses;                  // number of output classes as found in the label file (diagnostics)
         m_totalframes = 0;
@@ -556,7 +556,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         /*
         foreach_index(i, labels)
         {
-            m_classids.push_back(unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>(new msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>()));
+        m_classids.push_back(unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>(new msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>()));
         }
         */
 
@@ -620,7 +620,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
             expectedLabels = &labels[0];
         }
-        /*
+
         // now process the features and labels
         //size_t utterancesetsize = 0;
         foreach_index(m, m_featureDeserializers)
@@ -711,59 +711,48 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                         {
                             m_totalframes += utterances[i]->numberOfSamples;
                             // then parse each mlf if the durations are consistent
-                            foreach_index(j, labels)
-                            {
-                                const auto & labseq = labels[j].find(key)->second;
-
-                                // except for the following, code that was here already moved to MLFDataDeserializer:
-
-                                if (!labels[j].empty() && m_classids[j]->size() != m_totalframes + utteranceset.size())
-                                    LogicError("minibatchutterancesource: label duration inconsistent with feature file in MLF label set: %ls", key.c_str());
-                                assert(labels[j].empty() || m_classids[j]->size() == m_totalframes + utteranceset.size());
-                            }
                         }
                     }
                     else
                     {
                         assert(m_classids.empty() && labels.empty());
-                        utteranceset.push_back(std::move(utterance));
-                        m_totalframes += uttframes;
-                    }
-                }
-                else
-                {
-                    utteranceset.push_back(std::move(utterance));
-                }
-
-            }
-            if (m == 0)
-                utterancesetsize = utteranceset.size();
-            else
-                assert(utteranceset.size() == utterancesetsize);
-
-            fprintf(stderr, "feature set %d: %d frames in %d out of %d utterances\n", m, (int)m_totalframes, (int)utteranceset.size(), (int)infiles[m].size());
-
-            if (!labels.empty()){
-                foreach_index(j, labels){
-                    msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> & cid = *m_classids[j];
-                    foreach_index(i, utteranceset){
-                        //if ((*classids[j])[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (CLASSIDTYPE) -1)
-                        //printf("index = %d\n",utteranceset[i].classidsbegin + utteranceset[i].numframes());
-                        //printf("cid[index] = %d\n",cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()]);
-                        //printf("CLASSIDTYPE(-1) = %d\n",(CLASSIDTYPE) -1);
-                        if (cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (msra::dbn::CLASSIDTYPE) - 1)
-                            LogicError("minibatchutterancesource: classids[] out of sync");
+                        m_totalframes += utterances[i]->numberOfSamples;
                     }
                 }
             }
-            if (nomlf + nolat > 0)
+
+            // todo: Should put this into the deserializer itself
+            // fprintf(stderr, "feature set %d: %d frames in %d out of %d utterances\n", m, (int)m_totalframes, (int)utteranceset.size(), (int)m_featureDeserializers[m].size());
+
+            if (!labels.empty())
             {
-                fprintf(stderr, "minibatchutterancesource: out of %d files, %d files not found in label set and %d have no lattice\n", (int)infiles[0].size(), (int)nomlf, (int)nolat);
-                if (nomlf + nolat > infiles[m].size() / 2)
-                    RuntimeError("minibatchutterancesource: too many files not found in label set--assuming broken configuration\n");
+                //foreach_index(j, labels)
+                //{
+                //    msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> & cid = *m_classids[j];
+                //    foreach_index(i, utterances){
+                //        //if ((*classids[j])[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (CLASSIDTYPE) -1)
+                //        //printf("index = %d\n",utteranceset[i].classidsbegin + utteranceset[i].numframes());
+                //        //printf("cid[index] = %d\n",cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()]);
+                //        //printf("CLASSIDTYPE(-1) = %d\n",(CLASSIDTYPE) -1);
+                //        if (cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (msra::dbn::CLASSIDTYPE) - 1)
+                //            LogicError("minibatchutterancesource: classids[] out of sync");
+                //    }
+                //}
             }
-            assert(nomlf + nolat == 0); // For us it's zero
-            if (m == 0) { foreach_index(j, numclasses) { fprintf(stderr, "label set %d: %d classes\n", j, (int)numclasses[j]); } }
+
+            //if (nomlf > 0)
+            //{
+            //    fprintf(stderr, "minibatchutterancesource: out of %d files, %d files not found in label set and %d have no lattice\n", (int)infiles[0].size(), (int)nomlf, (int)nolat);
+            //    if (nomlf + nolat > infiles[m].size() / 2)
+            //        RuntimeError("minibatchutterancesource: too many files not found in label set--assuming broken configuration\n");
+            //}
+
+            assert(nomlf == 0); // For us it's zero
+
+            //if (m == 0) { foreach_index(j, numclasses) { fprintf(stderr, "label set %d: %d classes\n", j, (int)numclasses[j]); } }
+
+            /*
+
             // distribute them over chunks
             // We simply count off frames until we reach the chunk size.
             // Note that we first randomize the chunks, i.e. when used, chunks are non-consecutive and thus cause the disk head to seek for each chunk.
@@ -771,66 +760,65 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const size_t chunkframes = 15 * 60 * framespersec;  // number of frames to target for each chunk
             // Loading an initial 24-hour range will involve 96 disk seeks, acceptable.
             // When paging chunk by chunk, chunk size ~14 MB.
-            std::vector<utterancechunkdata> & thisallchunks = m_allchunks[m];
+
 
             thisallchunks.resize(0);
             thisallchunks.reserve(m_totalframes / chunkframes); // This is ignoring I/O for invalid utterances... // TODO round up?
 
-            foreach_index(i, utteranceset)
+            foreach_index(i, utterances)
             {
-                // if exceeding current entry--create a new one
-                // I.e. our chunks are a little larger than wanted (on av. half the av. utterance length).
-                if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= 65535)
-                    // TODO > instead of >= ? if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= frameref::maxutterancesperchunk)
-                    thisallchunks.push_back(utterancechunkdata());
-                // append utterance to last chunk
-                utterancechunkdata & currentchunk = thisallchunks.back();
-                currentchunk.push_back(std::move(utteranceset[i]));    // move it out from our temp array into the chunk
-                // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
+            // if exceeding current entry--create a new one
+            // I.e. our chunks are a little larger than wanted (on av. half the av. utterance length).
+            if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= 65535)
+            // TODO > instead of >= ? if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= frameref::maxutterancesperchunk)
+            thisallchunks.push_back(utterancechunkdata());
+            // append utterance to last chunk
+            utterancechunkdata & currentchunk = thisallchunks.back();
+            currentchunk.push_back(utterances[i]);    // move it out from our temp array into the chunk
+            // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
             }
 
             fprintf(stderr, "minibatchutterancesource: %llu utterances grouped into %llu chunks, av. chunk size: %.1f utterances, %.1f frames\n",
-                utteranceset.size(), thisallchunks.size(), utteranceset.size() / (double)thisallchunks.size(), m_totalframes / (double)thisallchunks.size());
+            utteranceset.size(), thisallchunks.size(), utteranceset.size() / (double)thisallchunks.size(), m_totalframes / (double)thisallchunks.size());
             // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
+            */
         }
 
-        size_t sequenceId = 0;
-        const std::vector<utterancechunkdata>& chunks = m_allchunks[0];
-        foreach_index(i, chunks)
-        {
-            foreach_index(j, chunks[i].utteranceset)
-            {
-                if (framemode)
-                {
-                    for (size_t k = 0; k < chunks[i].utteranceset[j].numframes(); ++k)
-                    {
-                        SequenceDescription description;
-                        description.id = sequenceId++;
-                        description.chunkId = i;
-                        description.numberOfSamples = 1;
-                        m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
-                        m_timeline.push_back(description);
+        // eldak: currently create the timeline from the feature deserializer.
 
-                        auto sq = sequenceref(i, j, k);
-                        sq.numframes = 1;
-                        m_sequences.push_back(sq);
-                    }
-                }
-                else
+        TimelineP timeline = m_featureDeserializers[0]->GetSequenceDescriptions();
+
+        foreach_index(i, timeline)
+        {
+            if (m_framemode)
+            {
+                for (size_t k = 0; k < timeline[i]->numberOfSamples; ++k)
                 {
                     SequenceDescription description;
-                    description.id = sequenceId++;
-                    description.chunkId = i;
-                    description.numberOfSamples = chunks[i].utteranceset[j].numframes();
-                    m_sequenceIdToSequence.insert(std::make_pair(description.id, &chunks[i].utteranceset[j]));
+                    description.id = timeline[i]->id;
+                    description.chunkId = timeline[i]->chunkId;
+                    description.numberOfSamples = 1;
                     m_timeline.push_back(description);
 
-                    auto sq = sequenceref(i, j, 0);
-                    sq.numframes = description.numberOfSamples;
+                    auto sq = sequenceref(description.chunkId, i, k);
+                    sq.numframes = 1;
                     m_sequences.push_back(sq);
                 }
             }
-        }*/
+            else
+            {
+                assert(false);
+                SequenceDescription description;
+                description.id = timeline[i]->id;
+                description.chunkId = timeline[i]->chunkId;
+                description.numberOfSamples = timeline[i]->numberOfSamples;
+                m_timeline.push_back(description);
+
+                auto sq = sequenceref(description.chunkId, i, 0);
+                sq.numframes = description.numberOfSamples;
+                m_sequences.push_back(sq);
+            }
+        }
     }
 
     bool BundlerSplitted::RequireChunk(size_t chunkindex)
