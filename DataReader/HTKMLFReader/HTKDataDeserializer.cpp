@@ -74,6 +74,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_chunks.resize(0);
         m_chunks.reserve(totalSize / chunkframes);
 
+        int chunkId = -1;
         foreach_index(i, m_sequences)
         {
             // if exceeding current entry--create a new one
@@ -82,12 +83,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             {
                 // TODO > instead of >= ? if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= frameref::maxutterancesperchunk)
                 m_chunks.push_back(chunkdata());
+                chunkId++;
             }
 
             // append utterance to last chunk
             chunkdata & currentchunk = m_chunks.back();
-            m_sequences[i].indexInsideChunk = currentchunk.numutterances();
             currentchunk.push_back(&m_sequences[i].utterance);    // move it out from our temp array into the chunk
+            m_sequences[i].indexInsideChunk = currentchunk.numutterances();
+            m_sequences[i].chunkId = chunkId;
             
             // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
         }
