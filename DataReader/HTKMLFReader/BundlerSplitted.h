@@ -203,6 +203,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         bool NewRequireChunk(size_t chunkindex);
         void NewReleaseChunk(size_t chunkIndex);
+        SequenceData NewGetSequenceById(size_t id);
 
 
     private:
@@ -216,6 +217,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::map<size_t, const utterancedesc*> m_sequenceIdToSequence;
         size_t m_elementSize;
         std::vector<InputDescriptionPtr> m_inputs;
+
+        std::vector<std::vector<size_t>> m_sequenceIdTolabelId;
 
         // TODO can more stuff be dropped?
         struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)

@@ -20,7 +20,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // of frames, which have the same encoding and are layed out in memory contiguously.
     struct Sequence
     {
-        SequenceDescription* description;
+        const SequenceDescription* description;
         void* data;
         size_t numberOfSamples; // TODO -> we have it in the sequence description. Should we have length here?
     };

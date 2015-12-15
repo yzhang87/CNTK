@@ -62,7 +62,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             featurePaths.push_back(std::move(ConfigHelper::GetFeaturePaths(thisFeature)));
             m_featureIndices.push_back(input->id);
 
-            auto deserializer = std::make_shared<HTKDataDeserializer>(thisFeature);
+            auto deserializer = std::make_shared<HTKDataDeserializer>(thisFeature, m_elementSize);
             m_featureDeserializers.push_back(deserializer);
         }
 
@@ -90,7 +90,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             mlfPaths.push_back(std::move(ConfigHelper::GetMlfPaths(thisLabel)));
             m_labelIndices.push_back(input->id);
 
-            auto deserializer = std::make_shared<MLFDataDeserializer>(thisLabel);
+            auto deserializer = std::make_shared<MLFDataDeserializer>(thisLabel, m_elementSize);
             m_labelDeserializers.push_back(deserializer);
         }
 
@@ -98,6 +98,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(mlfPaths.size() == m_labelIndices.size());
 
         m_verbosity = readerConfig(L"verbosity", 2);
+
+        m_sequenceIdTolabelId = std::vector<std::vector<size_t>>(m_labelDeserializers.size(), std::vector<size_t>());
 
         //look up in the config for the master command to determine whether we're writing output (inputs only) or training/evaluating (inputs and outputs)
         wstring command(readerConfig(L"action", L""));
@@ -491,7 +493,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<InputDescriptionPtr> inputs;
         for (const auto& featureName : featureNames)
         {
-            auto deserializer = std::make_shared<HTKDataDeserializer>(readerConfig(featureName));
+            auto deserializer = std::make_shared<HTKDataDeserializer>(readerConfig(featureName), m_elementSize);
             m_featureDeserializers.push_back(deserializer);
 
             // eldak: should we simply delegate this to the data deserializer?
@@ -508,7 +510,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         for (const auto& labelName : labelNames)
         {
-            auto deserializer = std::make_shared<MLFDataDeserializer>(readerConfig(labelName));
+            auto deserializer = std::make_shared<MLFDataDeserializer>(readerConfig(labelName), m_elementSize);
             m_labelDeserializers.push_back(deserializer);
 
             // eldak: should we simply delegate this to the data deserializer?
@@ -528,6 +530,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             RuntimeError("readMethod must be 'blockRandomize'");
         }
+
+        m_sequenceIdTolabelId = std::vector<std::vector<size_t>>(m_labelDeserializers.size(), std::vector<size_t>());
 
         //const std::vector<std::vector<wstring>>& infiles = featurePaths;
         //const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels = labelsmulti;
@@ -581,6 +585,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     isValid[i] = false;
                 }
             }
+        }
+
+        for (auto& m : m_sequenceIdTolabelId)
+        {
+            // eldak: possibly not zero but some max size_t?
+            m.resize(numutts, 0);
         }
 
         // shouldn't this be checked (again) later? more utterances can be invalidated...
@@ -689,6 +699,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                         foreach_index(j, labels)
                         {
                             const auto & labseq = labels[j].find(key)->second;
+
+                            //eldak: assume all labels are aligned, could be not true in general.
+                            m_sequenceIdTolabelId[j][utterances[i]->id] = labseq->id;
+
                             // check if durations match; skip if not
                             //size_t labframes = labseq-> .empty() ? 0 : (labseq[labseq.size() - 1].firstframe + labseq[labseq.size() - 1].numframes);
                             if (labseq->numberOfSamples != utterances[i]->numberOfSamples)
@@ -920,6 +934,193 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(m_totalframes > 0);
 
         const size_t numStreams = m_allchunks.size();
+
+        const std::vector<char> noboundaryflags;    // dummy
+
+        const size_t spos = id; // positer->second;
+        const size_t epos = spos + 1;
+
+        // Note that the above loop loops over all chunks incl. those that we already should have.
+        // This has an effect, e.g., if 'numsubsets' has changed (we will fill gaps).
+
+        // determine the true #frames we return, for allocation--it is less than mbframes in the case of MPI/data-parallel sub-set mode
+        size_t tspos = 0;
+        for (size_t pos = spos; pos < epos; pos++)
+        {
+            tspos += m_timeline[id].numberOfSamples;
+        }
+
+        if (tspos == 0)
+        {
+            return result;
+        }
+
+        // resize feat and uids
+        // eldak:s should return phone boundaries and sentendmark lattices transcripts etc.
+        feat.resize(m_featureIndices.size()); // TODO numFeatureStreams
+        uids.resize(m_classids.size()); // TODO numLabelStreams
+
+        // TODO go to virtual stream input InputDescriptionPtr GetInput() const override;
+
+        foreach_index(i, feat)
+        {
+            feat[i].resize(m_inputs[m_featureIndices[i]]->sampleLayout->GetDim(0), tspos);
+
+            if (i == 0)
+            {
+                foreach_index(j, uids)
+                {
+                    if (issupervised())             // empty means unsupervised training -> return empty uids
+                    {
+                        uids[j].resize(tspos);
+                    }
+                    else
+                    {
+                        uids[i].clear();
+                    }
+                }
+            }
+        }
+        //// return these utterances
+        //if (verbosity > 0)
+        //    fprintf(stderr, "getbatch: getting utterances %d..%d (%d subset of %d frames out of %d requested) in sweep %d\n", (int)spos, (int)(epos - 1), (int)tspos, (int)mbframes, (int)framesrequested, (int)sweep);
+        tspos = 0;   // relative start of utterance 'pos' within the returned minibatch
+        size_t numberOfFrames = 0; // eldak: seems this should be changed for sequences though.
+        for (size_t pos = spos; pos < epos; pos++)
+        {
+            const auto& sequence = m_timeline[id];
+            const auto & uttref = m_sequences[id];
+
+            size_t n = 0;
+            for (size_t i = 0; i < numStreams; ++i)
+            {
+                const auto & chunkdata = m_allchunks[i][uttref.chunkindex];
+                size_t dimension = m_inputs[m_featureIndices[i]]->sampleLayout->GetDim(0);
+
+                // eldak - does it mean we have read the who?
+                auto uttframes = chunkdata.getutteranceframes(uttref.utteranceindex);
+                matrixasvectorofvectors uttframevectors(uttframes);    // (wrapper that allows m[j].size() and m[j][i] as required by augmentneighbors())
+                n = uttframevectors.size();
+
+                //sentendmark[i].push_back(n + tspos);
+                assert(n == uttframes.cols() &&
+                    (uttref.numframes == n && !m_framemode || (uttref.numframes == 1 && m_framemode)) &&
+                    (chunkdata.numframes(uttref.utteranceindex) == n && !m_framemode || (uttref.numframes == 1 && m_framemode)));
+
+                // copy the frames and class labels
+                for (size_t t = 0; t < sequence.numberOfSamples; t++)          // t = time index into source utterance
+                {
+                    size_t leftextent, rightextent;
+                    // page in the needed range of frames
+                    if (m_leftcontext[i] == 0 && m_rightcontext[i] == 0)
+                    {
+                        leftextent = rightextent = msra::dbn::augmentationextent(uttframevectors[t].size(), dimension);
+                    }
+                    else
+                    {
+                        leftextent = m_leftcontext[i];
+                        rightextent = m_rightcontext[i];
+                    }
+
+                    msra::dbn::augmentneighbors(uttframevectors, noboundaryflags, uttref.frameindex + t, leftextent, rightextent, feat[i], t + tspos);
+                }
+
+                // copy the frames and class labels
+                if (i == 0)
+                {
+                    auto uttclassids = GetClassIds(uttref);
+                    foreach_index(j, uttclassids)
+                    {
+                        for (size_t t = 0; t < sequence.numberOfSamples; t++)          // t = time index into source utterance
+                        {
+                            if (issupervised())
+                            {
+                                uids[j][t + tspos] = uttclassids[j][uttref.frameindex + t];
+                            }
+                        }
+                    }
+                }
+            }
+            tspos += sequence.numberOfSamples;
+            numberOfFrames++;
+        }
+
+        foreach_index(i, feat)
+        {
+            assert(tspos == feat[i].cols());
+        }
+
+        for (auto it = m_featureIndices.begin(); it != m_featureIndices.end(); ++it)
+        {
+            Sequence r;
+            size_t id = *it;
+
+            const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat[id], 0, feat[0].cols());
+            const size_t dimensions = featOri.rows();
+            const void* tmp = &featOri(0, 0);
+
+            r.numberOfSamples = 1;
+
+            // eldak: this should not be allocated each time.
+            void* buffer = nullptr;
+            if (m_elementSize == sizeof(float))
+            {
+                buffer = new float[featOri.rows()];
+            }
+            else
+            {
+                buffer = new double[featOri.rows()];
+            }
+
+            memset(buffer, 0, m_elementSize * dimensions);
+            memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
+            r.data = buffer;
+
+            result.m_data.insert(std::make_pair(m_inputs[*it]->id, r));
+        }
+
+        for (size_t l = 0; l < m_labelIndices.size(); ++l)
+        {
+            Sequence r;
+            size_t id = l;
+
+            auto dimension = m_inputs[m_labelIndices[l]]->sampleLayout->GetDims()[0];
+            size_t dim = dimension;
+
+            const std::vector<size_t>& x = uids[id];
+
+            if (m_elementSize == sizeof(float))
+            {
+                float* tmp = new float[dim];
+                memset(tmp, 0, m_elementSize * dim);
+                tmp[x[0]] = 1;
+                r.data = tmp;
+                r.numberOfSamples = 1;
+            }
+            else
+            {
+                double* tmp = new double[dim];
+                tmp[x[0]] = 1;
+                r.data = tmp;
+                r.numberOfSamples = 1;
+            }
+            result.m_data.insert(std::make_pair(m_inputs[m_labelIndices[l]]->id, r));
+        }
+
+        return result;
+    }
+
+    SequenceData BundlerSplitted::NewGetSequenceById(size_t id)
+    {
+        SequenceData result;
+
+        std::vector<msra::dbn::matrix> feat;              // buffer for holding curernt minibatch's frames
+        std::vector<std::vector<size_t>> uids;               // buffer for storing current minibatch's frame-level label sequence
+
+        auto_timer timergetbatch;
+        assert(m_totalframes > 0);
+
+        const size_t numStreams = m_featureDeserializers.size();
 
         const std::vector<char> noboundaryflags;    // dummy
 

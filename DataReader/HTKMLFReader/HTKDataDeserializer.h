@@ -111,6 +111,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             HTKSequenceDescription(utterancedesc&& u) : utterance(u) {}
 
             utterancedesc utterance;
+            size_t indexInsideChunk;
         };
 
         size_t m_dimension;
@@ -118,6 +119,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<std::wstring> m_featureFiles;
 
         std::vector<HTKSequenceDescription> m_sequences;
+        size_t m_elementSize;
         TimelineP m_sequencesP;
 
         std::vector<chunkdata> m_chunks;
@@ -127,9 +129,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         unsigned int m_sampperiod;        // (for reference and to check against model)
         int m_verbosity;
         std::string m_featKind;
+        std::pair<size_t, size_t> m_context;
 
     public:
-        HTKDataDeserializer(const ConfigParameters& feature);
+        HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 

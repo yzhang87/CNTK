@@ -6,8 +6,9 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    HTKDataDeserializer::HTKDataDeserializer(const ConfigParameters& feature)
+    HTKDataDeserializer::HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize)
         : m_featureFiles(std::move(ConfigHelper::GetFeaturePaths(feature)))
+        , m_elementSize(elementSize)
     {
         ConfigHelper::CheckFeatureType(feature);
 
@@ -22,6 +23,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_sequences.reserve(numSequences);
         m_sequencesP.reserve(numSequences);
+
+        m_context = ConfigHelper::GetContextWindow(feature);
 
         foreach_index(i, m_featureFiles)
         {
@@ -82,7 +85,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             // append utterance to last chunk
             chunkdata & currentchunk = m_chunks.back();
+            m_sequences[i].indexInsideChunk = currentchunk.numutterances();
             currentchunk.push_back(&m_sequences[i].utterance);    // move it out from our temp array into the chunk
+            
             // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
         }
 
@@ -91,29 +96,117 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
     }
 
-    void Microsoft::MSR::CNTK::HTKDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
+    void HTKDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
     {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    TimelineP Microsoft::MSR::CNTK::HTKDataDeserializer::GetSequenceDescriptions() const
+    TimelineP HTKDataDeserializer::GetSequenceDescriptions() const
     {
         return m_sequencesP;
     }
 
-    Microsoft::MSR::CNTK::InputDescriptionPtr Microsoft::MSR::CNTK::HTKDataDeserializer::GetInput() const
+    InputDescriptionPtr HTKDataDeserializer::GetInput() const
     {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    Microsoft::MSR::CNTK::Sequence Microsoft::MSR::CNTK::HTKDataDeserializer::GetSequenceById(size_t /*id*/)
+    Sequence HTKDataDeserializer::GetSequenceById(size_t /*id*/)
     {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    Microsoft::MSR::CNTK::Sequence Microsoft::MSR::CNTK::HTKDataDeserializer::GetSampleById(size_t /*sequenceId*/, size_t /*sampleId*/)
+    class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors
     {
-        throw std::logic_error("The method or operation is not implemented.");
+        void operator= (const matrixasvectorofvectors &);  // non-assignable
+        msra::dbn::matrixbase & m;
+    public:
+        matrixasvectorofvectors(msra::dbn::matrixbase & m) : m(m) {}
+        size_t size() const { return m.cols(); }
+        const_array_ref<float> operator[] (size_t j) const { return array_ref<float>(&m(0, j), m.rows()); }
+    };
+
+    Sequence HTKDataDeserializer::GetSampleById(size_t sequenceId, size_t sampleId)
+    {
+        msra::dbn::matrix feat;
+
+        const std::vector<char> noboundaryflags;    // dummy
+
+        const size_t spos = sampleId; // positer->second;
+        const size_t epos = spos + 1;
+
+        // Note that the above loop loops over all chunks incl. those that we already should have.
+        // This has an effect, e.g., if 'numsubsets' has changed (we will fill gaps).
+
+        // determine the true #frames we return, for allocation--it is less than mbframes in the case of MPI/data-parallel sub-set mode
+        size_t tspos = 1; // eldak: what about parallel mode?
+
+
+        feat.resize(m_dimension, tspos);
+
+        //// return these utterances
+        //if (verbosity > 0)
+        //    fprintf(stderr, "getbatch: getting utterances %d..%d (%d subset of %d frames out of %d requested) in sweep %d\n", (int)spos, (int)(epos - 1), (int)tspos, (int)mbframes, (int)framesrequested, (int)sweep);
+        tspos = 0;   // relative start of utterance 'pos' within the returned minibatch
+        size_t numberOfFrames = 0;
+        for (size_t pos = spos; pos < epos; pos++)
+        {
+            const auto& sequence = m_sequences[sampleId];
+
+            size_t n = 0;
+            const auto & chunkdata = m_chunks[sequence.chunkId];
+            size_t dimension = m_dimension;
+
+            auto uttframes = chunkdata.getutteranceframes(sequence.indexInsideChunk);
+            matrixasvectorofvectors uttframevectors(uttframes);    // (wrapper that allows m[j].size() and m[j][i] as required by augmentneighbors())
+            n = uttframevectors.size();
+
+
+            size_t leftextent, rightextent;
+            // page in the needed range of frames
+            if (m_context.first == 0 && m_context.second == 0)
+            {
+                leftextent = rightextent = msra::dbn::augmentationextent(uttframevectors[0].size(), dimension);
+            }
+            else
+            {
+                leftextent = m_context.first;
+                rightextent = m_context.second;
+            }
+
+            msra::dbn::augmentneighbors(uttframevectors, noboundaryflags, sampleId, leftextent, rightextent, feat, tspos);
+
+
+            // copy the frames and class labels
+            tspos += sequence.numberOfSamples;
+            numberOfFrames++;
+        }
+
+        Sequence r;
+        r.description = &m_sequences[sequenceId];
+
+        const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat, 0, feat.cols());
+        const size_t dimensions = featOri.rows();
+        const void* tmp = &featOri(0, 0);
+
+        r.numberOfSamples = 1;
+
+        // eldak: this should not be allocated each time.
+        void* buffer = nullptr;
+        if (m_elementSize == sizeof(float))
+        {
+            buffer = new float[featOri.rows()];
+        }
+        else
+        {
+            buffer = new double[featOri.rows()];
+        }
+
+        memset(buffer, 0, m_elementSize * dimensions);
+        memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
+        r.data = buffer;
+
+        return r;
     }
 
     bool HTKDataDeserializer::RequireChunk(size_t chunkIndex)

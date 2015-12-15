@@ -23,9 +23,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::vector<MLFSequenceDescription> m_sequences;
         TimelineP m_sequencesP;
+        size_t m_elementSize;
 
     public:
-        MLFDataDeserializer(const ConfigParameters& label);
+        MLFDataDeserializer(const ConfigParameters& label, size_t elementSize);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
