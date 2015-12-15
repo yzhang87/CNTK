@@ -9,6 +9,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     HTKDataDeserializer::HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize)
         : m_featureFiles(std::move(ConfigHelper::GetFeaturePaths(feature)))
         , m_elementSize(elementSize)
+        , m_featdim(0)
+        , m_sampperiod(0)
+        , m_verbosity(0)
     {
         ConfigHelper::CheckFeatureType(feature);
 

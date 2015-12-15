@@ -792,7 +792,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         TimelineP timeline = m_featureDeserializers[0]->GetSequenceDescriptions();
 
+        if (m_framemode)
+        {
+            m_timeline.reserve(m_totalframes);
+            m_sequenceIdToFeatureId.reserve(m_totalframes);
+            m_sequences.reserve(m_totalframes);
+        }
+        else
+        {
+            m_timeline.reserve(timeline.size());
+            m_sequenceIdToFeatureId.reserve(m_totalframes);
+            m_sequences.reserve(m_totalframes);
+        }
         
+
+
         foreach_index(i, timeline)
         {
             if (m_framemode)
