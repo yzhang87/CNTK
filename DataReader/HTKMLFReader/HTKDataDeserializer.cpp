@@ -91,8 +91,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             // append utterance to last chunk
             chunkdata & currentchunk = m_chunks.back();
-            currentchunk.push_back(&m_sequences[i].utterance);    // move it out from our temp array into the chunk
             m_sequences[i].indexInsideChunk = currentchunk.numutterances();
+            currentchunk.push_back(&m_sequences[i].utterance);    // move it out from our temp array into the chunk
             m_sequences[i].chunkId = chunkId;
             
             // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
@@ -161,7 +161,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t numberOfFrames = 0;
         for (size_t pos = spos; pos < epos; pos++)
         {
-            const auto& sequence = m_sequences[sampleId];
+            const auto& sequence = m_sequences[sequenceId];
 
             size_t n = 0;
             const auto & chunkdata = m_chunks[sequence.chunkId];

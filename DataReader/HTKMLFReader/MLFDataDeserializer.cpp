@@ -56,8 +56,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             assert(0 < labseq.size()); // TODO
 
             description.key = l.first;
-            description.numberOfSamples = labseq[0].firstframe;
+            //description.numberOfSamples = labseq[0].firstframe;
 
+            description.sequenceStart = m_classIds.size(); // TODO
+            description.isValid = true;
+            size_t numofframes = 0;
             foreach_index(i, labseq)
             {
                 // TODO Why will these yield a run-time error as opposed to making the utterance invalid?
@@ -83,19 +86,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 for (size_t t = e.firstframe; t < e.firstframe + e.numframes; t++)
                 {
                     m_classIds.push_back(e.classid);
+                    numofframes++;
                 }
 
                 numClasses = max(numClasses, static_cast<size_t>(1u + e.classid));
             }
+            description.numberOfSamples = numofframes;
 
             // append a boundary marker marker for checking
             m_classIds.push_back(static_cast<msra::dbn::CLASSIDTYPE>(-1));
+            
 
             m_sequences.push_back(description);
             m_sequencesP.push_back(&m_sequences[description.id]);
 
             description.id++;
-            description.sequenceStart = m_classIds.size(); // TODO
         }
     }
 

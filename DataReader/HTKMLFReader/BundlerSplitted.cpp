@@ -622,7 +622,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::map<std::wstring, const SequenceDescription*>* expectedLabels = nullptr;
         if (isSupervised)
         {
-            for (auto d : m_featureDeserializers)
+            for (auto d : m_labelDeserializers)
             {
                 labels.push_back(std::map<std::wstring, const SequenceDescription*>());
                 std::map<std::wstring, const SequenceDescription*>& m = labels[labels.size() - 1];
@@ -814,7 +814,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 for (size_t k = 0; k < timeline[i]->numberOfSamples; ++k)
                 {
                     SequenceDescription description;
-                    description.id = m_sequenceIdToFeatureId.size();
+                    description.id = m_timeline.size();
                     m_sequenceIdToFeatureId.push_back(timeline[i]->id);
 
                     description.chunkId = timeline[i]->chunkId;
@@ -1125,8 +1125,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(m_featureDeserializers.size() == 1);
         assert(m_labelDeserializers.size() == 1);
 
-        Sequence f = m_featureDeserializers[0]->GetSampleById(m_sequenceIdToFeatureId[id], m_sequences[id].frameindex);
-        Sequence l = m_labelDeserializers[0]->GetSampleById(m_sequenceIdTolabelId[0][id], m_sequences[id].frameindex);
+        size_t originalSequenceId = m_sequenceIdToFeatureId[id];
+        size_t orginalIndex = m_sequences[id].frameindex;
+        size_t originalLabelId = m_sequenceIdTolabelId[0][originalSequenceId];
+
+        Sequence f = m_featureDeserializers[0]->GetSampleById(originalSequenceId, orginalIndex);
+        Sequence l = m_labelDeserializers[0]->GetSampleById(originalLabelId, orginalIndex);
 
         SequenceData result;
         result.m_data.insert(std::make_pair(m_inputs[m_featureIndices[0]]->id, f));
