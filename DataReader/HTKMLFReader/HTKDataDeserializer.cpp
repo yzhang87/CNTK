@@ -116,13 +116,34 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    bool Microsoft::MSR::CNTK::HTKDataDeserializer::RequireChunk(size_t /*chunkIndex*/)
+    bool HTKDataDeserializer::RequireChunk(size_t chunkIndex)
     {
-        throw std::logic_error("The method or operation is not implemented.");
+        auto & chunkdata = m_chunks[chunkIndex];
+        if (chunkdata.isinram())
+        {
+            return false;
+        }
+
+        msra::util::attempt(5, [&]()   // (reading from network)
+        {
+            std::unordered_map<std::string, size_t> empty;
+            msra::dbn::latticesource lattices(
+                std::pair<std::vector<std::wstring>, std::vector<std::wstring>>(),
+                empty);
+            chunkdata.requiredata(m_featKind, m_featdim, m_sampperiod, lattices, m_verbosity);
+        });
+
+        m_chunksinram++;
+        return true;
     }
 
-    void Microsoft::MSR::CNTK::HTKDataDeserializer::ReleaseChunk(size_t /*chunkIndex*/)
+    void HTKDataDeserializer::ReleaseChunk(size_t chunkIndex)
     {
-        throw std::logic_error("The method or operation is not implemented.");
+        auto & chunkdata = m_chunks[chunkIndex];
+        if (chunkdata.isinram())
+        {
+            chunkdata.releasedata();
+            m_chunksinram--;
+        }
     }
 }}}

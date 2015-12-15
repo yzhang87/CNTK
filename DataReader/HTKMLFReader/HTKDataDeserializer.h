@@ -121,6 +121,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         TimelineP m_sequencesP;
 
         std::vector<chunkdata> m_chunks;
+        size_t m_chunksinram;             // (for diagnostics messages)
+
+        size_t m_featdim;
+        unsigned int m_sampperiod;        // (for reference and to check against model)
+        int m_verbosity;
+        std::string m_featKind;
 
     public:
         HTKDataDeserializer(const ConfigParameters& feature);

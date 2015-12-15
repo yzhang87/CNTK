@@ -857,6 +857,25 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
+    bool BundlerSplitted::NewRequireChunk(size_t chunkindex)
+    {
+        bool result = false;
+        for (const auto& d: m_featureDeserializers)
+        {
+            result |= d->RequireChunk(chunkindex);
+        }
+
+        return result;
+    }
+
+    void BundlerSplitted::NewReleaseChunk(size_t chunkIndex)
+    {
+        for (const auto& d : m_featureDeserializers)
+        {
+            d->ReleaseChunk(chunkIndex);
+        }
+    }
+
     void BundlerSplitted::ReleaseChunk(size_t chunkIndex)
     {
         size_t numreleased = 0;
