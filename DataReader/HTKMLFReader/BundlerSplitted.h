@@ -218,6 +218,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_elementSize;
         std::vector<InputDescriptionPtr> m_inputs;
 
+        std::vector<size_t> m_sequenceIdToFeatureId;
         std::vector<std::vector<size_t>> m_sequenceIdTolabelId;
 
         // TODO can more stuff be dropped?
