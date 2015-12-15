@@ -33,6 +33,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             HTKSequenceDescription description(std::move(utterance));
             description.id = i;
+            description.key = utterance.key();
             // description.chunkId, description.key // TODO
 
             // we need at least 2 frames for boundary markers to work

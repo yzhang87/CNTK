@@ -12,16 +12,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     // constructor
     // Pass empty labels to denote unsupervised training (so getbatch() will not return uids).
-    BundlerSplitted::BundlerSplitted(
+    void BundlerSplitted::OldInit(
         const ConfigParameters& readerConfig,
         bool framemode,
         size_t elementSize,
         int verbosity)
-        : m_framemode(framemode)
-        , m_chunksinram(0)
-        , m_verbosity(verbosity)
-        , m_elementSize(elementSize)
     {
+        m_framemode = framemode;
+        m_chunksinram = 0;
+        m_verbosity = verbosity;
+        m_elementSize = elementSize;
+
         std::vector<std::wstring> featureNames;
         std::vector<std::wstring> labelNames;
 
@@ -469,14 +470,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void BundlerSplitted::NewInit(
+    BundlerSplitted::BundlerSplitted(
         const ConfigParameters& readerConfig,
-        /*bool framemode,*/
-        size_t elementSize)
+        bool framemode,
+        size_t elementSize,
+        int verbosity)
     {
-        //m_framemode = framemode;
+        m_framemode = framemode;
         m_chunksinram = 0;
         m_verbosity = readerConfig(L"verbosity", 2);
+        m_verbosity = verbosity; // not needed
         m_elementSize = elementSize;
 
         std::vector<std::wstring> featureNames;
@@ -615,7 +618,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 
         bool isSupervised = !m_labelDeserializers.empty();
-        std::vector<std::map<std::wstring, const SequenceDescription*>> labels(m_labelDeserializers.size());
+        std::vector<std::map<std::wstring, const SequenceDescription*>> labels;
         std::map<std::wstring, const SequenceDescription*>* expectedLabels = nullptr;
         if (isSupervised)
         {
@@ -637,25 +640,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             const auto& utterances = m_featureDeserializers[m]->GetSequenceDescriptions();
 
-            //std::vector<utterancedesc> utteranceset;// read all utterances to here first; at the end, distribute to chunks
-            //utteranceset.reserve(infiles[m].size());
-            if (m == 0)
-            {
-                classidsbegin.clear();
-            }
-
             foreach_index(i, utterances)
             {
                 //if (i % (m_featureDeserializers[m].size() / 100 + 1) == 0)
                 //{
                 //    fprintf(stderr, "."); fflush(stderr);
                 //}
-
-                // build utterance descriptor
-                if (m == 0 && isSupervised)
-                {
-                    classidsbegin.push_back(m_classids[0]->size());
-                }
 
                 if (!isValid[i])
                 {
@@ -928,7 +918,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_inputs;
     }
 
-    SequenceData BundlerSplitted::GetSequenceById(size_t id)
+    SequenceData BundlerSplitted::OldGetSequenceById(size_t id)
     {
         SequenceData result;
 
@@ -1115,7 +1105,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    SequenceData BundlerSplitted::NewGetSequenceById(size_t id)
+    SequenceData BundlerSplitted::GetSequenceById(size_t id)
     {
         assert(m_framemode);
         assert(m_featureDeserializers.size() == 1);

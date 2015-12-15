@@ -154,7 +154,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<size_t> m_rightcontext;            // number of frames to the right of the target frame in the context window
         std::vector<size_t> m_featdim;
         std::vector<unsigned int> m_sampperiod;        // (for reference and to check against model)
-        const bool m_framemode;           // true -> actually return frame-level randomized frames (not possible in lattice mode)
+        bool m_framemode;           // true -> actually return frame-level randomized frames (not possible in lattice mode)
         int m_verbosity;
 
         std::vector<std::vector<utterancechunkdata>> m_allchunks;          // set of utterances organized in chunks, referred to by an iterator (not an index)
@@ -191,7 +191,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 
     public:
-        BundlerSplitted::BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, size_t elementSize, int verbosity);
+        BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, size_t elementSize, int verbosity);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
@@ -203,14 +203,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         bool NewRequireChunk(size_t chunkindex);
         void NewReleaseChunk(size_t chunkIndex);
-        SequenceData NewGetSequenceById(size_t id);
+        SequenceData OldGetSequenceById(size_t id);
 
 
     private:
-        void NewInit(
+        void OldInit(
             const ConfigParameters& readerConfig,
-            /*bool framemode,*/
-            size_t elementSize);
+            bool framemode,
+            size_t elementSize,
+            int verbosity);
 
         Timeline m_timeline;
         std::vector<string> m_featkind;
