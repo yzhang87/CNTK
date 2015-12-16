@@ -203,8 +203,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const size_t dimensions = featOri.rows();
             const void* tmp = &featOri(0, 0);
 
-            r.numberOfSamples = 1;
-
             // eldak: this should not be allocated each time.
             void* buffer = nullptr;
             if (m_elementSize == sizeof(float))

@@ -21,7 +21,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         const SequenceDescription* description;
         void* data;
-        size_t numberOfSamples; // TODO -> we have it in the sequence description. Should we have length here?
+        //size_t numberOfSamples; // TODO -> we have it in the sequence description. Should we have length here?
     };
 
     // Low-level input interface (for file, network, etc.).

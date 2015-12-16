@@ -155,15 +155,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             memset(tmp, 0, m_elementSize * m_dimension);
             tmp[label] = 1;
             r.data = tmp;
-            r.numberOfSamples = 1;
         }
         else
         {
             double* tmp = new double[m_dimension];
             tmp[label] = 1;
             r.data = tmp;
-            r.numberOfSamples = 1;
         }
+
+        r.description = m_sequences[id];
 
         return std::vector<Sequence> { r };
     }

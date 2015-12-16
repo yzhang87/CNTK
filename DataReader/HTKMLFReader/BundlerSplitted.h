@@ -200,18 +200,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual std::vector<Sequence> GetSequenceById(size_t id) override;
         virtual bool RequireChunk(size_t chunkindex) override;
         virtual void ReleaseChunk(size_t chunkIndex) override;
-
-        bool OldRequireChunk(size_t chunkindex);
-        void OldReleaseChunk(size_t chunkIndex);
-        SequenceData OldGetSequenceById(size_t id);
-
-
     private:
-        void OldInit(
-            const ConfigParameters& readerConfig,
-            bool framemode,
-            size_t elementSize,
-            int verbosity);
 
         Timeline m_timeline;
         std::vector<string> m_featkind;
