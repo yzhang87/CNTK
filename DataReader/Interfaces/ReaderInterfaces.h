@@ -58,7 +58,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         MBLayoutPtr columns;
         SampleLayoutPtr rows;
         StorageType storageType;
-        ElementType elemnetType;
+        ElementType elementType;
     };
     typedef std::shared_ptr<Layout> LayoutPtr;
 
