@@ -6,9 +6,12 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    MLFDataDeserializer::MLFDataDeserializer(const ConfigParameters& label, size_t elementSize)
+    MLFDataDeserializer::MLFDataDeserializer(const ConfigParameters& label, size_t elementSize, const HTKDataDeserializer* featureDeserializer, bool frameMode, const std::wstring& name)
         : m_mlfPaths(std::move(ConfigHelper::GetMlfPaths(label)))
         , m_elementSize(elementSize)
+        , m_featureDeserializer(featureDeserializer)
+        , m_frameMode(frameMode)
+        , m_name(name)
     {
         ConfigHelper::CheckLabelType(label);
 
@@ -36,46 +39,40 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             msra::lattices::lattice::htkmlfwordsequence >> ::value,
             "Type 'msra::asr::htkmlfreader' should be move constructible!");
 
-        size_t numClasses = 0; // TODO same as m_dimension?
-
-        size_t numSequences = labels.size();
-        m_sequences.reserve(numSequences);
-        m_sequencesP.reserve(numSequences);
-
-        MLFSequenceDescription description;
+        MLFUtterance description;
         description.id = 0;
         description.isValid = true; // right now we throw for invalid sequences
         // TODO .chunk, .key
 
-        // Note: this is only checking that frames within a sequence are contiguous
-        for (auto l : labels)
+        size_t totalFrames = 0;
+        // Have to iterate in the same order as utterances inside the HTK data de-serializer to be aligned.
+        for(const auto& u : featureDeserializer->GetUtterances())
         {
+            wstring key = u.utterance.key();
 
-            const auto & labseq = l.second;
-
-            assert(0 < labseq.size()); // TODO
-
-            description.key = l.first;
-            //description.numberOfSamples = labseq[0].firstframe;
+            // todo check that actually exists.
+            auto l = labels.find(key);
+            const auto & labseq = l->second;
 
             description.sequenceStart = m_classIds.size(); // TODO
             description.isValid = true;
             size_t numofframes = 0;
+            description.id++;
+
             foreach_index(i, labseq)
             {
                 // TODO Why will these yield a run-time error as opposed to making the utterance invalid?
-
                 const auto & e = labseq[i];
                 if ((i == 0 && e.firstframe != 0) ||
                     (i > 0 && labseq[i - 1].firstframe + labseq[i - 1].numframes != e.firstframe))
                 {
-                    RuntimeError("minibatchutterancesource: labels not in consecutive order MLF in label set: %ls", l.first.c_str());
+                    RuntimeError("minibatchutterancesource: labels not in consecutive order MLF in label set: %ls", l->first.c_str());
                 }
 
                 if (e.classid >= m_dimension)
                 {
-                    RuntimeError("minibatchutterancesource: class id %llu exceeds model output dimension %llu in file %ls",
-                        e.classid, m_dimension, l.first.c_str());
+                    RuntimeError("minibatchutterancesource: class id %llu exceeds model output dimension %llu in file",
+                        e.classid, m_dimension);
                 }
 
                 if (e.classid != static_cast<msra::dbn::CLASSIDTYPE>(e.classid))
@@ -88,19 +85,42 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     m_classIds.push_back(e.classid);
                     numofframes++;
                 }
-
-                numClasses = max(numClasses, static_cast<size_t>(1u + e.classid));
             }
+
             description.numberOfSamples = numofframes;
+            totalFrames += numofframes;
+            m_utterances.push_back(description);
+        }
 
-            // append a boundary marker marker for checking
-            m_classIds.push_back(static_cast<msra::dbn::CLASSIDTYPE>(-1));
-            
+        if (m_frameMode)
+        {
+            m_frames.reserve(totalFrames);
+        }
+        else
+        {
+            m_sequences.reserve(m_utterances.size());
+        }
 
-            m_sequences.push_back(description);
-            m_sequencesP.push_back(&m_sequences[description.id]);
-
-            description.id++;
+        foreach_index(i, m_utterances)
+        {
+            if (m_frameMode)
+            {
+                for (size_t k = 0; k < m_utterances[i].numberOfSamples; ++k)
+                {
+                    MLFFrame f;
+                    f.id = m_frames.size();
+                    f.chunkId = 0;
+                    f.numberOfSamples = 1;
+                    f.index = m_utterances[i].sequenceStart + k;
+                    m_frames.push_back(f);
+                    m_sequences.push_back(&m_frames[f.id]);
+                }
+            }
+            else
+            {
+                assert(false);
+                m_sequences.push_back(&m_utterances[i]);
+            }
         }
     }
 
@@ -109,28 +129,25 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    TimelineP Microsoft::MSR::CNTK::MLFDataDeserializer::GetSequenceDescriptions() const
+    const TimelineP& Microsoft::MSR::CNTK::MLFDataDeserializer::GetSequenceDescriptions() const
     {
-        return m_sequencesP;
+        return m_sequences;
     }
 
-    Microsoft::MSR::CNTK::InputDescriptionPtr Microsoft::MSR::CNTK::MLFDataDeserializer::GetInput() const
+    std::vector<InputDescriptionPtr> MLFDataDeserializer::GetInputs() const
     {
         InputDescriptionPtr input = std::make_shared<InputDescription>();
         input->id = 0;
+        input->name = m_name;
         input->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
-        return input;
+        return std::vector<InputDescriptionPtr> { input };
     }
 
-    Microsoft::MSR::CNTK::Sequence Microsoft::MSR::CNTK::MLFDataDeserializer::GetSequenceById(size_t /*id*/)
+    std::vector<Sequence> MLFDataDeserializer::GetSequenceById(size_t id)
     {
-        throw std::logic_error("The method or operation is not implemented.");
-    }
+        assert(m_frameMode);
 
-    Sequence MLFDataDeserializer::GetSampleById(size_t sequenceId, size_t sampleId)
-    {
-        size_t label = m_classIds[m_sequences[sequenceId].sequenceStart + sampleId];
-
+        size_t label = m_classIds[m_frames[id].index];
         Sequence r;
         if (m_elementSize == sizeof(float))
         {
@@ -148,19 +165,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             r.numberOfSamples = 1;
         }
 
-        return r;
+        return std::vector<Sequence> { r };
     }
 
-    bool Microsoft::MSR::CNTK::MLFDataDeserializer::RequireChunk(size_t /*chunkIndex*/)
+    bool MLFDataDeserializer::RequireChunk(size_t /*chunkIndex*/)
     {
-        assert(false);
-        throw std::logic_error("The method or operation is not implemented.");
+        return false;
     }
 
-    void Microsoft::MSR::CNTK::MLFDataDeserializer::ReleaseChunk(size_t /*chunkIndex*/)
+    void MLFDataDeserializer::ReleaseChunk(size_t /*chunkIndex*/)
     {
-        assert(false);
-        throw std::logic_error("The method or operation is not implemented.");
+    }
+
+    const std::vector<MLFUtterance>& MLFDataDeserializer::GetUtterances() const
+    {
+        return m_utterances;
     }
 
 }}}

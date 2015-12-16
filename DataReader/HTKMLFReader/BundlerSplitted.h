@@ -143,7 +143,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     };
 
-    class BundlerSplitted : public Sequencer
+    class BundlerSplitted : public DataDeserializer
     {
         std::vector<size_t> m_featureIndices;
         std::vector<size_t> m_labelIndices;
@@ -191,13 +191,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 
     public:
-        BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, size_t elementSize, int verbosity);
+        BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, int verbosity, DataDeserializerPtr driver, std::vector<DataDeserializerPtr> deserializers);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual const Timeline& GetTimeline() const override;
+        virtual const TimelineP& GetSequenceDescriptions() const override;
         virtual std::vector<InputDescriptionPtr> GetInputs() const override;
-        virtual SequenceData GetSequenceById(size_t id) override;
+        virtual std::vector<Sequence> GetSequenceById(size_t id) override;
         virtual bool RequireChunk(size_t chunkindex) override;
         virtual void ReleaseChunk(size_t chunkIndex) override;
 
@@ -221,6 +221,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::vector<size_t> m_sequenceIdToFeatureId;
         std::vector<std::vector<size_t>> m_sequenceIdTolabelId;
+        std::vector<DataDeserializerPtr> m_deserializers;
+        DataDeserializerPtr m_driver;
 
         // TODO can more stuff be dropped?
         struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
@@ -254,4 +256,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // return sub-vector of classids[] for a given utterance
         std::vector<shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> GetClassIds(const sequenceref& uttref);
     };
+
+    std::vector<DataDeserializerPtr> CreateDeserializers(const ConfigParameters& readerConfig,
+        bool framemode,
+        size_t elementSize);
 }}}

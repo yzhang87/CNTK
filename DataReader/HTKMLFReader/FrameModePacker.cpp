@@ -63,7 +63,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     void FrameModePacker::InitFromConfig(const ConfigParameters & readerConfig)
     {
         size_t window = ConfigHelper::GetRandomizationWindow(readerConfig);
-        auto bundler = std::make_shared<BundlerSplitted>(readerConfig, true, m_elementSize, m_verbosity);
+
+        auto deserializers = CreateDeserializers(readerConfig, true, m_elementSize);
+        assert(deserializers.size() == 2);
+
+        auto bundler = std::make_shared<BundlerSplitted>(readerConfig, true, m_verbosity, deserializers[0], deserializers);
+
+        std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
+        if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
+        {
+            RuntimeError("readMethod must be 'blockRandomize'");
+        }
         m_transformer = std::make_shared<BlockRandomizer>(m_verbosity, window, bundler);
 
         intargvector numberOfuttsPerMinibatchForAllEpochs =

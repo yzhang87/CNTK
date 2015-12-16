@@ -13,7 +13,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t numberOfSamples;
         size_t chunkId;
         bool isValid;
-        std::wstring key;
     };
 
     // Defines a sequences, which consists of sequences description and a number
@@ -63,13 +62,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class DataDeserializer
     {
     public:
+        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
-        virtual TimelineP GetSequenceDescriptions() const = 0;
-
-        virtual InputDescriptionPtr GetInput() const = 0;
-        virtual Sequence GetSequenceById(size_t id) = 0;
-        virtual Sequence GetSampleById(size_t sequenceId, size_t sampleId) = 0;
+        virtual const TimelineP& GetSequenceDescriptions() const = 0;
+        virtual std::vector<Sequence> GetSequenceById(size_t id) = 0;
 
         virtual bool RequireChunk(size_t chunkIndex) = 0;
         virtual void ReleaseChunk(size_t chunkIndex) = 0;

@@ -6,12 +6,14 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    HTKDataDeserializer::HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize)
+    HTKDataDeserializer::HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize, bool frameMode, const std::wstring& featureName)
         : m_featureFiles(std::move(ConfigHelper::GetFeaturePaths(feature)))
         , m_elementSize(elementSize)
         , m_featdim(0)
         , m_sampperiod(0)
         , m_verbosity(0)
+        , m_frameMode(frameMode)
+        , m_featureName(featureName)
     {
         ConfigHelper::CheckFeatureType(feature);
 
@@ -24,19 +26,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         size_t numSequences = m_featureFiles.size();
 
-        m_sequences.reserve(numSequences);
-        m_sequencesP.reserve(numSequences);
+        m_utterances.reserve(numSequences);
 
         m_context = ConfigHelper::GetContextWindow(feature);
 
+        size_t totalFrames = 0;
         foreach_index(i, m_featureFiles)
         {
             utterancedesc utterance(msra::asr::htkfeatreader::parsedpath(m_featureFiles[i]), 0);
             const size_t uttframes = utterance.numframes(); // will throw if frame bounds not given --required to be given in this mode
 
-            HTKSequenceDescription description(std::move(utterance));
+            Utterance description(std::move(utterance));
             description.id = i;
-            description.key = utterance.key();
             // description.chunkId, description.key // TODO
 
             // we need at least 2 frames for boundary markers to work
@@ -53,15 +54,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 description.isValid = true;
             }
 
-            m_sequences.push_back(description);
-            m_sequencesP.push_back(&m_sequences[i]);
+            m_utterances.push_back(description);
+            totalFrames += description.numberOfSamples;
         }
 
         size_t totalSize = std::accumulate(
-            m_sequences.begin(),
-            m_sequences.end(),
+            m_utterances.begin(),
+            m_utterances.end(),
             static_cast<size_t>(0),
-            [](size_t sum, const HTKSequenceDescription& s) {
+            [](size_t sum, const Utterance& s) {
                 return s.numberOfSamples + sum;
         });
 
@@ -78,7 +79,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_chunks.reserve(totalSize / chunkframes);
 
         int chunkId = -1;
-        foreach_index(i, m_sequences)
+        foreach_index(i, m_utterances)
         {
             // if exceeding current entry--create a new one
             // I.e. our chunks are a little larger than wanted (on av. half the av. utterance length).
@@ -91,16 +92,47 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             // append utterance to last chunk
             chunkdata & currentchunk = m_chunks.back();
-            m_sequences[i].indexInsideChunk = currentchunk.numutterances();
-            currentchunk.push_back(&m_sequences[i].utterance);    // move it out from our temp array into the chunk
-            m_sequences[i].chunkId = chunkId;
-            
+            m_utterances[i].indexInsideChunk = currentchunk.numutterances();
+            currentchunk.push_back(&m_utterances[i].utterance);    // move it out from our temp array into the chunk
+            m_utterances[i].chunkId = chunkId;
             // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
         }
 
         fprintf(stderr, "minibatchutterancesource: %llu utterances grouped into %llu chunks, av. chunk size: %.1f utterances, %.1f frames\n",
-            m_sequences.size(), m_chunks.size(), m_sequences.size() / (double)m_chunks.size(), totalSize / (double)m_chunks.size());
+            m_utterances.size(), m_chunks.size(), m_utterances.size() / (double)m_chunks.size(), totalSize / (double)m_chunks.size());
         // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
+
+        if (m_frameMode)
+        {
+            m_frames.reserve(totalFrames);
+        }
+        else
+        {
+            m_sequences.reserve(m_utterances.size());
+        }
+
+        foreach_index(i, m_utterances)
+        {
+            if (m_frameMode)
+            {
+                for (size_t k = 0; k < m_utterances[i].numberOfSamples; ++k)
+                {
+                    Frame f(&m_utterances[i]);
+                    f.id = m_frames.size();
+                    f.chunkId = m_utterances[i].chunkId;
+                    f.numberOfSamples = 1;
+                    f.frameIndexInUtterance = k;
+                    m_frames.push_back(f);
+
+                    m_sequences.push_back(&m_frames[f.id]);
+                }
+            }
+            else
+            {
+                assert(false);
+                m_sequences.push_back(&m_utterances[i]);
+            }
+        }
     }
 
     void HTKDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
@@ -108,22 +140,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         throw std::logic_error("The method or operation is not implemented.");
     }
 
-    TimelineP HTKDataDeserializer::GetSequenceDescriptions() const
+    const TimelineP& HTKDataDeserializer::GetSequenceDescriptions() const
     {
-        return m_sequencesP;
+        return m_sequences;
     }
 
-    InputDescriptionPtr HTKDataDeserializer::GetInput() const
+    std::vector<InputDescriptionPtr> HTKDataDeserializer::GetInputs() const
     {
         InputDescriptionPtr input = std::make_shared<InputDescription>();
         input->id = 0;
+        input->name = m_featureName;
         input->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
-        return input;
-    }
-
-    Sequence HTKDataDeserializer::GetSequenceById(size_t /*id*/)
-    {
-        throw std::logic_error("The method or operation is not implemented.");
+        return std::vector<InputDescriptionPtr> { input };
     }
 
     class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors
@@ -136,47 +164,29 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const_array_ref<float> operator[] (size_t j) const { return array_ref<float>(&m(0, j), m.rows()); }
     };
 
-    Sequence HTKDataDeserializer::GetSampleById(size_t sequenceId, size_t sampleId)
+    std::vector<Sequence> HTKDataDeserializer::GetSequenceById(size_t id)
     {
-        msra::dbn::matrix feat;
-
-        const std::vector<char> noboundaryflags;    // dummy
-
-        const size_t spos = sampleId; // positer->second;
-        const size_t epos = spos + 1;
-
-        // Note that the above loop loops over all chunks incl. those that we already should have.
-        // This has an effect, e.g., if 'numsubsets' has changed (we will fill gaps).
-
-        // determine the true #frames we return, for allocation--it is less than mbframes in the case of MPI/data-parallel sub-set mode
-        size_t tspos = 1; // eldak: what about parallel mode?
-
-
-        feat.resize(m_dimension, tspos);
-
-        //// return these utterances
-        //if (verbosity > 0)
-        //    fprintf(stderr, "getbatch: getting utterances %d..%d (%d subset of %d frames out of %d requested) in sweep %d\n", (int)spos, (int)(epos - 1), (int)tspos, (int)mbframes, (int)framesrequested, (int)sweep);
-        tspos = 0;   // relative start of utterance 'pos' within the returned minibatch
-        size_t numberOfFrames = 0;
-        for (size_t pos = spos; pos < epos; pos++)
+        if (m_frameMode)
         {
-            const auto& sequence = m_sequences[sequenceId];
+            const auto& frame = m_frames[id];
+            const auto& utterance = *frame.u;
 
-            size_t n = 0;
-            const auto & chunkdata = m_chunks[sequence.chunkId];
-            size_t dimension = m_dimension;
+            msra::dbn::matrix feat;
+            feat.resize(m_dimension, 1);
 
-            auto uttframes = chunkdata.getutteranceframes(sequence.indexInsideChunk);
+            const std::vector<char> noboundaryflags;    // dummy
+
+            const auto & chunkdata = m_chunks[utterance.chunkId];
+
+            auto uttframes = chunkdata.getutteranceframes(utterance.indexInsideChunk);
             matrixasvectorofvectors uttframevectors(uttframes);    // (wrapper that allows m[j].size() and m[j][i] as required by augmentneighbors())
-            n = uttframevectors.size();
-
 
             size_t leftextent, rightextent;
             // page in the needed range of frames
             if (m_context.first == 0 && m_context.second == 0)
             {
-                leftextent = rightextent = msra::dbn::augmentationextent(uttframevectors[0].size(), dimension);
+                // should this be moved up?
+                leftextent = rightextent = msra::dbn::augmentationextent(uttframevectors[0].size(), m_dimension);
             }
             else
             {
@@ -184,39 +194,39 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 rightextent = m_context.second;
             }
 
-            msra::dbn::augmentneighbors(uttframevectors, noboundaryflags, sampleId, leftextent, rightextent, feat, tspos);
+            msra::dbn::augmentneighbors(uttframevectors, noboundaryflags, frame.frameIndexInUtterance, leftextent, rightextent, feat, 0);
 
+            Sequence r;
+            r.description = &utterance;
 
-            // copy the frames and class labels
-            tspos += sequence.numberOfSamples;
-            numberOfFrames++;
-        }
+            const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat, 0, feat.cols());
+            const size_t dimensions = featOri.rows();
+            const void* tmp = &featOri(0, 0);
 
-        Sequence r;
-        r.description = &m_sequences[sequenceId];
+            r.numberOfSamples = 1;
 
-        const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat, 0, feat.cols());
-        const size_t dimensions = featOri.rows();
-        const void* tmp = &featOri(0, 0);
+            // eldak: this should not be allocated each time.
+            void* buffer = nullptr;
+            if (m_elementSize == sizeof(float))
+            {
+                buffer = new float[featOri.rows()];
+            }
+            else
+            {
+                buffer = new double[featOri.rows()];
+            }
 
-        r.numberOfSamples = 1;
+            memset(buffer, 0, m_elementSize * dimensions);
+            memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
+            r.data = buffer;
 
-        // eldak: this should not be allocated each time.
-        void* buffer = nullptr;
-        if (m_elementSize == sizeof(float))
-        {
-            buffer = new float[featOri.rows()];
+            return std::vector<Sequence> { r };
         }
         else
         {
-            buffer = new double[featOri.rows()];
+            assert(false);
+            return std::vector<Sequence>();
         }
-
-        memset(buffer, 0, m_elementSize * dimensions);
-        memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
-        r.data = buffer;
-
-        return r;
     }
 
     bool HTKDataDeserializer::RequireChunk(size_t chunkIndex)
@@ -248,5 +258,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             chunkdata.releasedata();
             m_chunksinram--;
         }
+    }
+
+    const std::vector<Utterance>& HTKDataDeserializer::GetUtterances() const
+    {
+        return m_utterances;
     }
 }}}

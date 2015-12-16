@@ -16,21 +16,22 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Private methods
     //
 
-    bool BlockRandomizer::IsValid(const Timeline& timeline) const
+    bool BlockRandomizer::IsValid(const TimelineP& timeline) const
     {
         SequenceDescription previous = {
             static_cast<size_t>(-1),
             0,
             0
         };
+
         auto it = std::find_if_not(timeline.begin(), timeline.end(),
-            [&](const SequenceDescription& current)
+            [&](const SequenceDescription* current)
             {
-                bool result = previous.id + 1 == current.id
-                    && previous.chunkId <= current.chunkId
-                    && current.chunkId <= previous.chunkId + 1
-                    && 0 < current.numberOfSamples;
-                previous = current;
+                bool result = previous.id + 1 == current->id
+                    && previous.chunkId <= current->chunkId
+                    && current->chunkId <= previous.chunkId + 1
+                    && 0 < current->numberOfSamples;
+                previous = *current;
                 return result;
             });
         return it == timeline.end();
@@ -140,7 +141,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void BlockRandomizer::Randomize()
     {
-        const auto & timeline = m_sequencer->GetTimeline();
+        const auto & timeline = m_sequencer->GetSequenceDescriptions();
         RandomizeChunks();
 
         // Set up m_randomTimeline, shuffled by chunks.
@@ -154,7 +155,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 sequencePosition < m_chunkInformation[originalChunkIndex + 1].sequencePositionStart;
                 sequencePosition++)
             {
-                SequenceDescription randomizedSeqDesc = timeline[sequencePosition];
+                SequenceDescription randomizedSeqDesc = *timeline[sequencePosition];
                 randomizedSeqDesc.chunkId = chunkId;
                 m_randomTimeline.push_back(randomizedSeqDesc);
             }
@@ -240,21 +241,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Public methods
     //
 
-    BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer)
+    BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr bundler)
         : m_verbosity(verbosity)
         , m_randomizationRangeInSamples(randomizationRangeInSamples)
-        , m_sequencer(sequencer)
+        , m_sequencer(bundler)
         , m_sweep(SIZE_MAX)
         , m_sequencePositionInSweep(SIZE_MAX)
         , m_samplePositionInEpoch(SIZE_MAX)
         , m_epochSize(SIZE_MAX)
     {
-        assert(sequencer != nullptr);
-        const Timeline & timeline = m_sequencer->GetTimeline();
+        assert(bundler != nullptr);
+        const TimelineP & timeline = m_sequencer->GetSequenceDescriptions();
         assert(IsValid(timeline));
 
-        m_numSequences = timeline.back().id + 1;
-        m_numChunks = timeline.back().chunkId + 1;
+        m_numSequences = timeline.back()->id + 1;
+        m_numChunks = timeline.back()->chunkId + 1;
 
         // Generate additional information about physical chunks
         assert(m_chunkInformation.size() == 0);
@@ -268,13 +269,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_numSamples = 0;
         for (const auto & seqDesc : timeline)
         {
-            auto & chunkInformation = m_chunkInformation[seqDesc.chunkId];
+            auto & chunkInformation = m_chunkInformation[seqDesc->chunkId];
             chunkInformation.sequencePositionStart =
-                min(chunkInformation.sequencePositionStart, seqDesc.id);
+                min(chunkInformation.sequencePositionStart, seqDesc->id);
             chunkInformation.samplePositionStart =
                 min(chunkInformation.samplePositionStart, m_numSamples);
-            maxNumberOfSamples = max(maxNumberOfSamples, seqDesc.numberOfSamples);
-            m_numSamples += seqDesc.numberOfSamples;
+            maxNumberOfSamples = max(maxNumberOfSamples, seqDesc->numberOfSamples);
+            m_numSamples += seqDesc->numberOfSamples;
         }
 
         // Add sentinel
@@ -368,7 +369,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_samplePositionInEpoch += seqDesc.numberOfSamples;
         m_sequencePositionInSweep++;
 
-        return m_sequencer->GetSequenceById(seqDesc.id);
+        auto tmp = m_sequencer->GetSequenceById(seqDesc.id);
+        assert(tmp.size() == 2);
+
+        SequenceData r;
+        r.m_data.insert(std::make_pair(0, tmp[0]));
+        r.m_data.insert(std::make_pair(1, tmp[1]));
+        r.m_endOfEpoch = false;
+        return r;
     };
 
 } } }

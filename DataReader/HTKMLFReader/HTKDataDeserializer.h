@@ -104,23 +104,34 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     };
 
+    struct Utterance : public SequenceDescription
+    {
+        Utterance(utterancedesc&& u) : utterance(u) {}
+
+        utterancedesc utterance;
+        size_t indexInsideChunk;
+    };
+
+    // Should not this be splitted to different deserializers?
+    struct Frame : public SequenceDescription
+    {
+        Frame(Utterance* u) : u(u) {}
+
+        Utterance* u;
+        size_t frameIndexInUtterance;
+    };
+
     class HTKDataDeserializer : public DataDeserializer
     {
-        struct HTKSequenceDescription : public SequenceDescription
-        {
-            HTKSequenceDescription(utterancedesc&& u) : utterance(u) {}
-
-            utterancedesc utterance;
-            size_t indexInsideChunk;
-        };
-
         size_t m_dimension;
         SampleLayoutPtr m_layout;
         std::vector<std::wstring> m_featureFiles;
 
-        std::vector<HTKSequenceDescription> m_sequences;
+        std::vector<Utterance> m_utterances;
+        std::vector<Frame> m_frames;
+
         size_t m_elementSize;
-        TimelineP m_sequencesP;
+        TimelineP m_sequences;
 
         std::vector<chunkdata> m_chunks;
         size_t m_chunksinram;             // (for diagnostics messages)
@@ -130,23 +141,27 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int m_verbosity;
         std::string m_featKind;
         std::pair<size_t, size_t> m_context;
+        bool m_frameMode;
+        std::wstring m_featureName;
 
     public:
-        HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize);
+        HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize, bool frameMode, const std::wstring& featureName);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual TimelineP GetSequenceDescriptions() const override;
+        virtual const TimelineP& GetSequenceDescriptions() const override;
 
-        virtual InputDescriptionPtr GetInput() const override;
-        // TODO const?
+        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
 
-        virtual Sequence GetSequenceById(size_t id) override;
-
-        virtual Sequence GetSampleById(size_t sequenceId, size_t sampleId) override;
+        virtual std::vector<Sequence> GetSequenceById(size_t id) override;
 
         virtual bool RequireChunk(size_t chunkIndex) override;
 
         virtual void ReleaseChunk(size_t chunkIndex) override;
+
+    public:
+        const std::vector<Utterance>& GetUtterances() const;
     };
+
+    typedef std::shared_ptr<HTKDataDeserializer> HTKDataDeserializerPtr;
 }}}

@@ -39,7 +39,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_randomizationRangeInSamples; // full window
 
         // Sequencer and information on the original timeline
-        SequencerPtr m_sequencer;
+        DataDeserializerPtr m_sequencer;
         size_t m_numSequences;
         size_t m_numChunks;
         size_t m_numSamples;
@@ -60,7 +60,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<size_t> m_sequencePositionToChunkIndex; // TODO find on m_randomizedChunks instead?
         Timeline m_randomTimeline;
 
-        bool IsValid(const Timeline& timeline) const;
+        bool IsValid(const TimelineP& timeline) const;
 
         template<typename VECTOR> static void randomShuffle(VECTOR & v, size_t randomseed);
 
@@ -77,7 +77,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool AdvanceToNextPositionForThisWorker();
 
     public:
-        BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, SequencerPtr sequencer);
+        BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr bundler);
 
         virtual ~BlockRandomizer() { }
 

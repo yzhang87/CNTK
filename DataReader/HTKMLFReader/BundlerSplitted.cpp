@@ -63,7 +63,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             featurePaths.push_back(std::move(ConfigHelper::GetFeaturePaths(thisFeature)));
             m_featureIndices.push_back(input->id);
 
-            auto deserializer = std::make_shared<HTKDataDeserializer>(thisFeature, m_elementSize);
+            auto deserializer = std::make_shared<HTKDataDeserializer>(thisFeature, m_elementSize, m_framemode, featureNames[i]);
             m_featureDeserializers.push_back(deserializer);
         }
 
@@ -91,7 +91,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             mlfPaths.push_back(std::move(ConfigHelper::GetMlfPaths(thisLabel)));
             m_labelIndices.push_back(input->id);
 
-            auto deserializer = std::make_shared<MLFDataDeserializer>(thisLabel, m_elementSize);
+            auto deserializer = std::make_shared<MLFDataDeserializer>(thisLabel, m_elementSize,
+                static_cast<HTKDataDeserializer*>(m_featureDeserializers[0].get()), m_framemode, labelNames[i]);
             m_labelDeserializers.push_back(deserializer);
         }
 
@@ -470,18 +471,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    BundlerSplitted::BundlerSplitted(
-        const ConfigParameters& readerConfig,
+    std::vector<DataDeserializerPtr> CreateDeserializers(const ConfigParameters& readerConfig,
         bool framemode,
-        size_t elementSize,
-        int verbosity)
+        size_t elementSize)
     {
-        m_framemode = framemode;
-        m_chunksinram = 0;
-        m_verbosity = readerConfig(L"verbosity", 2);
-        m_verbosity = verbosity; // not needed
-        m_elementSize = elementSize;
-
         std::vector<std::wstring> featureNames;
         std::vector<std::wstring> labelNames;
 
@@ -493,107 +486,48 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             InvalidArgument("network needs at least 1 input and 1 output specified!");
         }
 
+        std::vector<HTKDataDeserializerPtr> featureDeserializers;
+        std::vector<MLFDataDeserializerPtr> labelDeserializers;
+
         std::vector<InputDescriptionPtr> inputs;
         for (const auto& featureName : featureNames)
         {
-            auto deserializer = std::make_shared<HTKDataDeserializer>(readerConfig(featureName), m_elementSize);
-            m_featureDeserializers.push_back(deserializer);
-
-            // eldak: should we simply delegate this to the data deserializer?
-            // who sets the id then?
-            InputDescriptionPtr input = std::make_shared<InputDescription>();
-            input->id = inputs.size();
-            input->name = featureName;
-            input->sampleLayout = deserializer->GetInput()->sampleLayout;
-
-            inputs.push_back(input);
-
-            m_featureIndices.push_back(input->id);
+            auto deserializer = std::make_shared<HTKDataDeserializer>(readerConfig(featureName), elementSize, framemode, featureName);
+            featureDeserializers.push_back(deserializer);
         }
+
+        assert(featureDeserializers.size() == 1);
 
         for (const auto& labelName : labelNames)
         {
-            auto deserializer = std::make_shared<MLFDataDeserializer>(readerConfig(labelName), m_elementSize);
-            m_labelDeserializers.push_back(deserializer);
+            auto deserializer = std::make_shared<MLFDataDeserializer>(readerConfig(labelName), elementSize,
+                featureDeserializers[0].get(), framemode, labelName);
 
-            // eldak: should we simply delegate this to the data deserializer?
-            // who sets the id then?
-            InputDescriptionPtr input = std::make_shared<InputDescription>();
-            input->id = inputs.size();
-            input->name = labelName;
-            input->sampleLayout = deserializer->GetInput()->sampleLayout;
-            inputs.push_back(input);
-
-            m_labelIndices.push_back(input->id);
+            labelDeserializers.push_back(deserializer);
         }
 
-        //eldak TODO: does not belong here
-        std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
-        if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
+        assert(labelDeserializers.size() == 1);
+
+        std::vector<DataDeserializerPtr> deserializers;
+        deserializers.insert(deserializers.end(), featureDeserializers.begin(), featureDeserializers.end());
+        deserializers.insert(deserializers.end(), labelDeserializers.begin(), labelDeserializers.end());
+
+        // Checking end sequences.
+        size_t expected = deserializers[0]->GetSequenceDescriptions().size();
+        std::vector<bool> isValid(expected, true);
+        for (auto d : deserializers)
         {
-            RuntimeError("readMethod must be 'blockRandomize'");
-        }
-
-        m_sequenceIdTolabelId = std::vector<std::vector<size_t>>(m_labelDeserializers.size(), std::vector<size_t>());
-
-        //const std::vector<std::vector<wstring>>& infiles = featurePaths;
-        //const std::vector<map<wstring, std::vector<msra::asr::htkmlfentry>>> & labels = labelsmulti;
-        m_inputs = inputs;
-        m_elementSize = elementSize;
-        //m_featkind = std::vector<string>(infiles.size(), "");
-        //m_sampperiod = std::vector<unsigned int>(infiles.size(), 0);
-
-        // process infiles to know dimensions of things (but not loading features)
-        size_t nomlf = 0;                       // number of entries missing in MLF (diagnostics)
-        //size_t nolat = 0;                       // number of entries missing in lattice archive (diagnostics)
-        std::vector<size_t> numclasses;                  // number of output classes as found in the label file (diagnostics)
-        m_totalframes = 0;
-        wstring key;
-        size_t numutts = 0;
-
-        std::vector<size_t> classidsbegin;
-
-        //assert(infiles.size() == 1); // we are only looking at a single file here...
-
-        //m_allchunks = std::vector<std::vector<utterancechunkdata>>(infiles.size(), std::vector<utterancechunkdata>());
-        //m_featdim = std::vector<size_t>(infiles.size(), 0);
-
-        numclasses = std::vector<size_t>(m_labelDeserializers.size(), 0);
-
-        /*
-        foreach_index(i, labels)
-        {
-        m_classids.push_back(unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>(new msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>()));
-        }
-        */
-
-        const auto& expected = m_featureDeserializers[0]->GetSequenceDescriptions();
-        numutts = expected.size();
-        std::vector<bool> isValid(numutts, true);
-
-        foreach_index(m, m_featureDeserializers)
-        {
-            const auto& utterances = m_featureDeserializers[m]->GetSequenceDescriptions();
-            if (utterances.size() != numutts)
+            const auto& sequences = d->GetSequenceDescriptions();
+            if (sequences.size() != expected)
             {
-                RuntimeError("minibatchutterancesourcemulti: all feature files must have same number of utterances");
+                RuntimeError("We have some invalid alignment\n");
             }
 
-            foreach_index(i, utterances)
+            foreach_index(i, sequences)
             {
-                const SequenceDescription* sequence = utterances[i];
-                if (sequence->numberOfSamples != expected[i]->numberOfSamples || !sequence->isValid)
-                {
-                    //fprintf(stderr, "minibatchutterancesource: skipping %d-th file due to inconsistency in duration in different feature streams (%d vs %d frames)\n", i, (int)uttduration[i], (int)uttframes);
-                    isValid[i] = false;
-                }
+                isValid[i] = isValid[i] && sequences[i]->isValid;
+                assert(isValid[i]);
             }
-        }
-
-        for (auto& m : m_sequenceIdTolabelId)
-        {
-            // eldak: possibly not zero but some max size_t?
-            m.resize(numutts, 0);
         }
 
         // shouldn't this be checked (again) later? more utterances can be invalidated...
@@ -616,232 +550,37 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             fprintf(stderr, "Found inconsistent durations across feature streams in %llu out of %llu files\n", invalidUtts, isValid.size());
         }
 
+        return deserializers;
+    }
 
-        bool isSupervised = !m_labelDeserializers.empty();
-        std::vector<std::map<std::wstring, const SequenceDescription*>> labels;
-        std::map<std::wstring, const SequenceDescription*>* expectedLabels = nullptr;
-        if (isSupervised)
+    BundlerSplitted::BundlerSplitted(
+        const ConfigParameters& readerConfig,
+        bool framemode,
+        int verbosity,
+        DataDeserializerPtr driver,
+        std::vector<DataDeserializerPtr> deserializers)
+        : m_deserializers(deserializers)
+        , m_driver(driver)
+    {
+        m_framemode = framemode;
+        m_chunksinram = 0;
+        m_verbosity = readerConfig(L"verbosity", 2);
+        m_verbosity = verbosity; // not needed
+
+        std::vector<InputDescriptionPtr> inputs;
+        for (auto d : deserializers)
         {
-            for (auto d : m_labelDeserializers)
+            for (auto i : d->GetInputs())
             {
-                labels.push_back(std::map<std::wstring, const SequenceDescription*>());
-                std::map<std::wstring, const SequenceDescription*>& m = labels[labels.size() - 1];
-                for (auto p : d->GetSequenceDescriptions())
-                {
-                    m[p->key] = p;
-                }
+                InputDescriptionPtr input = std::make_shared<InputDescription>();
+                input->id = inputs.size();
+                input->name = i->name;
+                input->sampleLayout = i->sampleLayout;
+                inputs.push_back(input);
             }
-            expectedLabels = &labels[0];
         }
 
-        // now process the features and labels
-        //size_t utterancesetsize = 0;
-        foreach_index(m, m_featureDeserializers)
-        {
-            const auto& utterances = m_featureDeserializers[m]->GetSequenceDescriptions();
-
-            foreach_index(i, utterances)
-            {
-                //if (i % (m_featureDeserializers[m].size() / 100 + 1) == 0)
-                //{
-                //    fprintf(stderr, "."); fflush(stderr);
-                //}
-
-                if (!isValid[i])
-                {
-                    continue;
-                }
-
-                //utterancedesc utterance(msra::asr::htkfeatreader::parsedpath(infiles[m][i]), labels.empty() ? 0 : classidsbegin[i]);  //mseltzer - is this foolproof for multiio? is classids always non-empty?
-                //const size_t uttframes = utterance.numframes(); // will throw if frame bounds not given --required to be given in this mode
-
-                // check whether we have the ref transcript
-                bool lacksmlf = true;
-                if (isSupervised)    // empty means unsupervised mode (don't load any)
-                {
-                    key = utterances[i]->key;
-
-                    auto labelsiter = expectedLabels->find(key);
-                    lacksmlf = (labelsiter == expectedLabels->end());
-
-                    if (lacksmlf)
-                    {
-                        if (nomlf++ < 5)
-                        {
-                            fprintf(stderr, " [no labels for  %ls]", key.c_str());
-                        }
-
-                        isValid[i] = false;
-                        continue;   // skip this utterance at all
-                    }
-                }
-
-                // push the label sequence into classids[], since we already looked it up
-                // TODO: we can store labels more efficiently now since we don't do frame-wise random access anymore.
-
-                // OK, utterance has all we need --remember it
-
-                if (m == 0)
-                {
-                    if (isSupervised)
-                    {
-                        // first verify that all the label files have the proper duration
-                        foreach_index(j, labels)
-                        {
-                            const auto & labseq = labels[j].find(key)->second;
-
-                            //eldak: assume all labels are aligned, could be not true in general.
-                            m_sequenceIdTolabelId[j][utterances[i]->id] = labseq->id;
-
-                            // check if durations match; skip if not
-                            //size_t labframes = labseq-> .empty() ? 0 : (labseq[labseq.size() - 1].firstframe + labseq[labseq.size() - 1].numframes);
-                            if (labseq->numberOfSamples != utterances[i]->numberOfSamples)
-                            {
-                                fprintf(
-                                    stderr,
-                                    " [duration mismatch (%llu in label vs. %llu in feat file), skipping %ls]",
-                                    labseq->numberOfSamples,
-                                    utterances[i]->numberOfSamples,
-                                    key.c_str());
-
-                                nomlf++;
-                                isValid[i] = false;
-                                //continue;   // skip this utterance at all
-                                break;
-                            }
-                        }
-
-                        if (isValid[i])
-                        {
-                            m_totalframes += utterances[i]->numberOfSamples;
-                            // then parse each mlf if the durations are consistent
-                        }
-                    }
-                    else
-                    {
-                        assert(m_classids.empty() && labels.empty());
-                        m_totalframes += utterances[i]->numberOfSamples;
-                    }
-                }
-            }
-
-            // todo: Should put this into the deserializer itself
-            // fprintf(stderr, "feature set %d: %d frames in %d out of %d utterances\n", m, (int)m_totalframes, (int)utteranceset.size(), (int)m_featureDeserializers[m].size());
-
-            if (!labels.empty())
-            {
-                //foreach_index(j, labels)
-                //{
-                //    msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> & cid = *m_classids[j];
-                //    foreach_index(i, utterances){
-                //        //if ((*classids[j])[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (CLASSIDTYPE) -1)
-                //        //printf("index = %d\n",utteranceset[i].classidsbegin + utteranceset[i].numframes());
-                //        //printf("cid[index] = %d\n",cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()]);
-                //        //printf("CLASSIDTYPE(-1) = %d\n",(CLASSIDTYPE) -1);
-                //        if (cid[utteranceset[i].classidsbegin + utteranceset[i].numframes()] != (msra::dbn::CLASSIDTYPE) - 1)
-                //            LogicError("minibatchutterancesource: classids[] out of sync");
-                //    }
-                //}
-            }
-
-            //if (nomlf > 0)
-            //{
-            //    fprintf(stderr, "minibatchutterancesource: out of %d files, %d files not found in label set and %d have no lattice\n", (int)infiles[0].size(), (int)nomlf, (int)nolat);
-            //    if (nomlf + nolat > infiles[m].size() / 2)
-            //        RuntimeError("minibatchutterancesource: too many files not found in label set--assuming broken configuration\n");
-            //}
-
-            assert(nomlf == 0); // For us it's zero
-
-            //if (m == 0) { foreach_index(j, numclasses) { fprintf(stderr, "label set %d: %d classes\n", j, (int)numclasses[j]); } }
-
-            /*
-
-            // distribute them over chunks
-            // We simply count off frames until we reach the chunk size.
-            // Note that we first randomize the chunks, i.e. when used, chunks are non-consecutive and thus cause the disk head to seek for each chunk.
-            const size_t framespersec = 100;                    // we just assume this; our efficiency calculation is based on this
-            const size_t chunkframes = 15 * 60 * framespersec;  // number of frames to target for each chunk
-            // Loading an initial 24-hour range will involve 96 disk seeks, acceptable.
-            // When paging chunk by chunk, chunk size ~14 MB.
-
-
-            thisallchunks.resize(0);
-            thisallchunks.reserve(m_totalframes / chunkframes); // This is ignoring I/O for invalid utterances... // TODO round up?
-
-            foreach_index(i, utterances)
-            {
-            // if exceeding current entry--create a new one
-            // I.e. our chunks are a little larger than wanted (on av. half the av. utterance length).
-            if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= 65535)
-            // TODO > instead of >= ? if (thisallchunks.empty() || thisallchunks.back().totalframes > chunkframes || thisallchunks.back().numutterances() >= frameref::maxutterancesperchunk)
-            thisallchunks.push_back(utterancechunkdata());
-            // append utterance to last chunk
-            utterancechunkdata & currentchunk = thisallchunks.back();
-            currentchunk.push_back(utterances[i]);    // move it out from our temp array into the chunk
-            // TODO: above push_back does not actually 'move' because the internal push_back does not accept that
-            }
-
-            fprintf(stderr, "minibatchutterancesource: %llu utterances grouped into %llu chunks, av. chunk size: %.1f utterances, %.1f frames\n",
-            utteranceset.size(), thisallchunks.size(), utteranceset.size() / (double)thisallchunks.size(), m_totalframes / (double)thisallchunks.size());
-            // Now utterances are stored exclusively in allchunks[]. They are never referred to by a sequential utterance id at this point, only by chunk/within-chunk index.
-            */
-        }
-
-        // eldak: currently create the timeline from the feature deserializer.
-
-        TimelineP timeline = m_featureDeserializers[0]->GetSequenceDescriptions();
-
-        if (m_framemode)
-        {
-            m_timeline.reserve(m_totalframes);
-            m_sequenceIdToFeatureId.reserve(m_totalframes);
-            m_sequences.reserve(m_totalframes);
-        }
-        else
-        {
-            m_timeline.reserve(timeline.size());
-            m_sequenceIdToFeatureId.reserve(m_totalframes);
-            m_sequences.reserve(m_totalframes);
-        }
-        
-
-
-        foreach_index(i, timeline)
-        {
-            if (m_framemode)
-            {
-                for (size_t k = 0; k < timeline[i]->numberOfSamples; ++k)
-                {
-                    SequenceDescription description;
-                    description.id = m_timeline.size();
-                    m_sequenceIdToFeatureId.push_back(timeline[i]->id);
-
-                    description.chunkId = timeline[i]->chunkId;
-                    description.numberOfSamples = 1;
-                    m_timeline.push_back(description);
-
-                    auto sq = sequenceref(description.chunkId, i, k);
-                    sq.numframes = 1;
-                    m_sequences.push_back(sq);
-                }
-            }
-            else
-            {
-                assert(false);
-                SequenceDescription description;
-                description.id = timeline[i]->id;
-                description.chunkId = timeline[i]->chunkId;
-                description.numberOfSamples = timeline[i]->numberOfSamples;
-                m_timeline.push_back(description);
-
-                m_sequenceIdToFeatureId.push_back(timeline[i]->id);
-
-                auto sq = sequenceref(description.chunkId, i, 0);
-                sq.numframes = description.numberOfSamples;
-                m_sequences.push_back(sq);
-            }
-        }
+        m_inputs = inputs;
     }
 
     bool BundlerSplitted::OldRequireChunk(size_t chunkindex)
@@ -882,8 +621,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     bool BundlerSplitted::RequireChunk(size_t chunkindex)
     {
+        // currently simply redirect
+        // todo: we should have a mapping per deserializer actually.
         bool result = false;
-        for (const auto& d: m_featureDeserializers)
+        for (const auto& d: m_deserializers)
         {
             result |= d->RequireChunk(chunkindex);
         }
@@ -893,7 +634,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void BundlerSplitted::ReleaseChunk(size_t chunkIndex)
     {
-        for (const auto& d : m_featureDeserializers)
+        // currently simply redirect
+        // todo: we should have a mapping per deserializer actually.
+        for (const auto& d : m_deserializers)
         {
             d->ReleaseChunk(chunkIndex);
         }
@@ -922,9 +665,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    const Timeline& BundlerSplitted::GetTimeline() const
+    const TimelineP& BundlerSplitted::GetSequenceDescriptions() const
     {
-        return m_timeline;
+        // TODO: we probably will take different deserializers from here.
+        return m_driver->GetSequenceDescriptions();
     }
 
     std::vector<InputDescriptionPtr> BundlerSplitted::GetInputs() const
@@ -1119,23 +863,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    SequenceData BundlerSplitted::GetSequenceById(size_t id)
+    std::vector<Sequence> BundlerSplitted::GetSequenceById(size_t id)
     {
-        assert(m_framemode);
-        assert(m_featureDeserializers.size() == 1);
-        assert(m_labelDeserializers.size() == 1);
-
-        size_t originalSequenceId = m_sequenceIdToFeatureId[id];
-        size_t orginalIndex = m_sequences[id].frameindex;
-        size_t originalLabelId = m_sequenceIdTolabelId[0][originalSequenceId];
-
-        Sequence f = m_featureDeserializers[0]->GetSampleById(originalSequenceId, orginalIndex);
-        Sequence l = m_labelDeserializers[0]->GetSampleById(originalLabelId, orginalIndex);
-
-        SequenceData result;
-        result.m_data.insert(std::make_pair(m_inputs[m_featureIndices[0]]->id, f));
-        result.m_data.insert(std::make_pair(m_inputs[m_labelIndices[0]]->id, l));
-
+        std::vector<Sequence> result;
+        for (auto& d : m_deserializers)
+        {
+            auto r = d->GetSequenceById(id);
+            result.insert(result.end(), r.begin(), r.end());
+        }
         return result;
     }
 

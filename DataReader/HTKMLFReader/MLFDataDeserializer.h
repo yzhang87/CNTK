@@ -2,8 +2,21 @@
 
 #include "InnerInterfaces.h"
 #include "ScpParser.h"
+#include "HTKDataDeserializer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
+
+    struct MLFUtterance : public SequenceDescription
+    {
+        // Where the sequence is stored in m_classIds
+        size_t sequenceStart;
+    };
+
+    struct MLFFrame : public SequenceDescription
+    {
+        // Where the sequence is stored in m_classIds
+        size_t index;
+    };
 
     class MLFDataDeserializer : public DataDeserializer
     {
@@ -11,35 +24,37 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         SampleLayoutPtr m_layout;
         std::wstring m_stateListPath;
         std::vector<std::wstring> m_mlfPaths;
+        const HTKDataDeserializer* m_featureDeserializer;
 
         // [classidsbegin+t] concatenation of all state sequences
         msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> m_classIds;
 
-        struct MLFSequenceDescription : public SequenceDescription
-        {
-            // Where the sequence is stored in m_classIds
-            size_t sequenceStart;
-        };
+        std::vector<MLFUtterance> m_utterances;
+        std::vector<MLFFrame> m_frames;
 
-        std::vector<MLFSequenceDescription> m_sequences;
-        TimelineP m_sequencesP;
+        TimelineP m_sequences;
         size_t m_elementSize;
+        bool m_frameMode;
+        std::wstring m_name;
 
     public:
-        MLFDataDeserializer(const ConfigParameters& label, size_t elementSize);
+        MLFDataDeserializer(const ConfigParameters& label, size_t elementSize, const HTKDataDeserializer* featureDeserializer, bool framMode, const std::wstring& featureName);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual TimelineP GetSequenceDescriptions() const override;
+        virtual const TimelineP& GetSequenceDescriptions() const override;
 
-        virtual InputDescriptionPtr GetInput() const override;
+        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
 
-        virtual Sequence GetSequenceById(size_t id) override;
-
-        virtual Sequence GetSampleById(size_t sequenceId, size_t sampleId) override;
+        virtual std::vector<Sequence> GetSequenceById(size_t id) override;
 
         virtual bool RequireChunk(size_t chunkIndex) override;
 
         virtual void ReleaseChunk(size_t chunkIndex) override;
+
+    public:
+        const std::vector<MLFUtterance>& GetUtterances() const;
     };
+
+    typedef std::shared_ptr<MLFDataDeserializer> MLFDataDeserializerPtr;
 }}}
