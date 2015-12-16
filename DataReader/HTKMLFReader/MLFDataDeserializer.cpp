@@ -112,6 +112,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     f.chunkId = 0;
                     f.numberOfSamples = 1;
                     f.index = m_utterances[i].sequenceStart + k;
+                    assert(m_utterances[i].isValid); // TODO
+                    f.isValid = m_utterances[i].isValid;
                     m_frames.push_back(f);
                     m_sequences.push_back(&m_frames[f.id]);
                 }
