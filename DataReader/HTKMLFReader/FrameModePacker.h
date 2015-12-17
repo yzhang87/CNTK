@@ -8,6 +8,7 @@
 #include "commandArgUtil.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
+
     class FrameModePacker : public Reader
     {
     public:
@@ -86,4 +87,5 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     };
 
     typedef std::shared_ptr<FrameModePacker> FrameModePackerPtr;
+
 }}}

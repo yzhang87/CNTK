@@ -1,3 +1,9 @@
+//
+// <copyright file="HTKDataDeserializer.cpp" company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+
 #include "stdafx.h"
 #include "HTKDataDeserializer.h"
 #include "ConfigHelper.h"
@@ -265,4 +271,5 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         return m_utterances;
     }
+
 }}}

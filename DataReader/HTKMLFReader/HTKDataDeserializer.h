@@ -1,12 +1,17 @@
+//
+// <copyright file="HTKDataDeserializer.h" company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+
 #pragma once
 
 #include "InnerInterfaces.h"
+#include "commandArgUtil.h" // for ConfigParameters
 #include "htkfeatio.h" // for htkfeatreader
 #include "minibatchiterator.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-
-    class ConfigParameters;
 
     // data store (incl. paging in/out of features and lattices)
     struct utterancedesc            // data descriptor for one utterance

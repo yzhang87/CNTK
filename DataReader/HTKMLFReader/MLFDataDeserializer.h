@@ -1,3 +1,9 @@
+//
+// <copyright file="MLFDataDeserializer.h" company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+
 #pragma once
 
 #include "InnerInterfaces.h"

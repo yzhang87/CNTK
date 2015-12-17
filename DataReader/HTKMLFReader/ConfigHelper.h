@@ -7,8 +7,6 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    class ConfigParameters;
-
     class ConfigHelper
     {
     public:

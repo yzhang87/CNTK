@@ -7,10 +7,9 @@
 #pragma once
 
 #include "InnerInterfaces.h"
+#include "commandArgUtil.h" // for ConfigParameters
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-
-    class ConfigParameters;
 
     class Bundler: public DataDeserializer
     {
@@ -27,7 +26,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         DataDeserializerPtr m_driver;
 
     public:
-        Bundler(const ConfigParameters& readerConfig, bool framemode, int verbosity, DataDeserializerPtr driver, std::vector<DataDeserializerPtr> deserializers);
+        Bundler(const ConfigParameters& readerConfig, bool framemode, int verbosity,
+            DataDeserializerPtr driver, std::vector<DataDeserializerPtr> deserializers);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
