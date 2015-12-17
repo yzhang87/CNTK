@@ -144,50 +144,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     class Bundler: public DataDeserializer
     {
-        std::vector<size_t> m_featureIndices;
-        std::vector<size_t> m_labelIndices;
-
         void operator=(const Bundler& other); // non-assignable
 
-        std::vector<size_t> m_leftcontext;             // number of frames to the left of the target frame in the context window
-        std::vector<size_t> m_rightcontext;            // number of frames to the right of the target frame in the context window
-        std::vector<size_t> m_featdim;
-        std::vector<unsigned int> m_sampperiod;        // (for reference and to check against model)
         bool m_framemode;           // true -> actually return frame-level randomized frames (not possible in lattice mode)
         int m_verbosity;
 
-        std::vector<std::vector<utterancechunkdata>> m_allchunks;          // set of utterances organized in chunks, referred to by an iterator (not an index)
-        std::vector<unique_ptr<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> m_classids;            // [classidsbegin+t] concatenation of all state sequences
-
-        bool issupervised() const { return !m_classids.empty(); }
-
         size_t m_totalframes;            // total frames (same as classids.size() if we have labels)
         size_t m_chunksinram;             // (for diagnostics messages)
-
-        // TODO: this may go away if we store classids directly in the utterance data
-        template<class VECTOR> class shiftedvector  // accessing a vector with a non-0 starting index
-        {
-            void operator= (const shiftedvector &);
-            VECTOR & v;
-            size_t first;
-            size_t n;
-            void check(size_t i) const { if (i >= n) LogicError("shiftedvector: index out of bounds"); }
-        public:
-            shiftedvector(VECTOR & v, size_t first, size_t n) : v(v), first(first), n(n) { }
-            // TODO: the following is not templated--do it if needed; also should return a const reference then
-            size_t operator[] (size_t i) const { check(i); return v[first + i]; }
-        };
-
-        class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors
-        {
-            void operator= (const matrixasvectorofvectors &);  // non-assignable
-            msra::dbn::matrixbase & m;
-        public:
-            matrixasvectorofvectors(msra::dbn::matrixbase & m) : m(m) {}
-            size_t size() const { return m.cols(); }
-            const_array_ref<float> operator[] (size_t j) const { return array_ref<float>(&m(0, j), m.rows()); }
-        };
-
 
     public:
         Bundler(const ConfigParameters& readerConfig, bool framemode, int verbosity, DataDeserializerPtr driver, std::vector<DataDeserializerPtr> deserializers);
@@ -212,36 +175,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<DataDeserializerPtr> m_deserializers;
         DataDeserializerPtr m_driver;
 
-        // TODO can more stuff be dropped?
-        struct sequenceref              // described a sequence to be randomized (in frame mode, a single frame; a full utterance otherwise)
-        {
-            size_t chunkindex;          // lives in this chunk (index into randomizedchunks[])
-            size_t utteranceindex;      // utterance index in that chunk
-            size_t numframes;           // (cached since we cannot directly access the underlying data from here)
-            size_t frameindex;          // 0 for utterances
-
-            sequenceref()
-                : chunkindex(0)
-                , utteranceindex(0)
-                , frameindex(0)
-                , numframes(0)
-            {}
-            sequenceref(size_t chunkindex, size_t utteranceindex, size_t frameindex = 0)
-                : chunkindex(chunkindex)
-                , utteranceindex(utteranceindex)
-                , frameindex(frameindex)
-                , numframes(0)
-            {}
-        };
-
-        std::vector<sequenceref> m_sequences;
-
         // TODO: can these two be merged in one array?
         std::vector<DataDeserializerPtr> m_featureDeserializers;
         std::vector<DataDeserializerPtr> m_labelDeserializers;
-
-        // return sub-vector of classids[] for a given utterance
-        std::vector<shiftedvector<msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE>>> GetClassIds(const sequenceref& uttref);
     };
 
     std::vector<DataDeserializerPtr> CreateDeserializers(const ConfigParameters& readerConfig,
