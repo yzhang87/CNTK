@@ -1,7 +1,7 @@
 #pragma once
 
 #include "InnerInterfaces.h"
-#include "BundlerSplitted.h"
+#include "Bundler.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

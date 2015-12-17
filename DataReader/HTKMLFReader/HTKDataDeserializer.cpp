@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "HTKDataDeserializer.h"
 #include "ConfigHelper.h"
-#include "BundlerSplitted.h"
+#include "Bundler.h"
 #include <numeric>
 
 namespace Microsoft { namespace MSR { namespace CNTK {

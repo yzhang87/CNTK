@@ -1,5 +1,5 @@
 //
-// <copyright file="BundlerSplitted.h" company="Microsoft">
+// <copyright file="Bundler.h" company="Microsoft">
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
@@ -142,12 +142,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     };
 
-    class BundlerSplitted : public DataDeserializer
+    class Bundler: public DataDeserializer
     {
         std::vector<size_t> m_featureIndices;
         std::vector<size_t> m_labelIndices;
 
-        void operator=(const BundlerSplitted & other); // non-assignable
+        void operator=(const Bundler& other); // non-assignable
 
         std::vector<size_t> m_leftcontext;             // number of frames to the left of the target frame in the context window
         std::vector<size_t> m_rightcontext;            // number of frames to the right of the target frame in the context window
@@ -190,7 +190,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 
     public:
-        BundlerSplitted(const ConfigParameters& readerConfig, bool framemode, int verbosity, DataDeserializerPtr driver, std::vector<DataDeserializerPtr> deserializers);
+        Bundler(const ConfigParameters& readerConfig, bool framemode, int verbosity, DataDeserializerPtr driver, std::vector<DataDeserializerPtr> deserializers);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 

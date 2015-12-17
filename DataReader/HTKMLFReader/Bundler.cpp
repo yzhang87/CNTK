@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "BundlerSplitted.h"
+#include "Bundler.h"
 #include <DataReader.h>
 #include "Utils.h"
 #include "ConfigHelper.h"
@@ -92,7 +92,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return deserializers;
     }
 
-    BundlerSplitted::BundlerSplitted(
+    Bundler::Bundler(
         const ConfigParameters& readerConfig,
         bool framemode,
         int verbosity,
@@ -122,7 +122,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_inputs = inputs;
     }
 
-    bool BundlerSplitted::RequireChunk(size_t chunkindex)
+    bool Bundler::RequireChunk(size_t chunkindex)
     {
         // currently simply redirect
         // todo: we should have a mapping per deserializer actually.
@@ -135,7 +135,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    void BundlerSplitted::ReleaseChunk(size_t chunkIndex)
+    void Bundler::ReleaseChunk(size_t chunkIndex)
     {
         // currently simply redirect
         // todo: we should have a mapping per deserializer actually.
@@ -145,18 +145,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    const TimelineP& BundlerSplitted::GetSequenceDescriptions() const
+    const TimelineP& Bundler::GetSequenceDescriptions() const
     {
         // TODO: we probably will take different deserializers from here.
         return m_driver->GetSequenceDescriptions();
     }
 
-    std::vector<InputDescriptionPtr> BundlerSplitted::GetInputs() const
+    std::vector<InputDescriptionPtr> Bundler::GetInputs() const
     {
         return m_inputs;
     }
 
-    std::vector<Sequence> BundlerSplitted::GetSequenceById(size_t id)
+    std::vector<Sequence> Bundler::GetSequenceById(size_t id)
     {
         std::vector<Sequence> result;
         for (auto& d : m_deserializers)
@@ -167,7 +167,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    void BundlerSplitted::SetEpochConfiguration(const EpochConfiguration& /*config*/)
+    void Bundler::SetEpochConfiguration(const EpochConfiguration& /*config*/)
     {
         // TODO do we keep SetEpochConfiguration(), now empty?
     }
