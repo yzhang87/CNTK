@@ -17,7 +17,6 @@
 #include "simplesenonehmm.h"            // for MMI scoring
 #include "msra_mgram.h"                 // for unigram scores of ground-truth path in sequence training
 
-// to bre removed: #include "rollingwindowsource.h"        // minibatch sources
 #include "utterancesourcemulti.h"       // minibatch sources
 #include "chunkevalsource.h"
 #include "minibatchiterator.h"
