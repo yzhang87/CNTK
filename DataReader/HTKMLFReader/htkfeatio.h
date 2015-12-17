@@ -68,6 +68,7 @@ protected:
         const unsigned char * b = (const unsigned char *) &v;
         return (short) ((b[0] << 8) + b[1]);
     }
+
     static int swapint (int v) throw()
     {
         const unsigned char * b = (const unsigned char *) &v;
