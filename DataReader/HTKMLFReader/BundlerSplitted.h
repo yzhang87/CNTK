@@ -14,7 +14,6 @@
 #include "minibatchiterator.h"
 #include "biggrowablevectors.h"
 #include "ssematrix.h"
-#include "ScpParser.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -238,7 +237,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<sequenceref> m_sequences;
 
         // TODO: can these two be merged in one array?
-        std::vector<ScpParserPtr> m_scpParsers;
         std::vector<DataDeserializerPtr> m_featureDeserializers;
         std::vector<DataDeserializerPtr> m_labelDeserializers;
 

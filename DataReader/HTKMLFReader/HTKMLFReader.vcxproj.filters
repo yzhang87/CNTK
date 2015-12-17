@@ -21,11 +21,9 @@
     <ClCompile Include="BlockRandomizer.cpp" />
     <ClCompile Include="FrameModePacker.cpp" />
     <ClCompile Include="Utils.cpp" />
-    <ClCompile Include="Bundler.cpp" />
     <ClCompile Include="ConfigHelper.cpp" />
     <ClCompile Include="MLFDataDeserializer.cpp" />
     <ClCompile Include="HTKDataDeserializer.cpp" />
-    <ClCompile Include="ScpParser.cpp" />
     <ClCompile Include="BundlerSplitted.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -66,11 +64,9 @@
     <ClInclude Include="HeapMemoryProvider.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="Utils.h" />
-    <ClInclude Include="Bundler.h" />
     <ClInclude Include="ConfigHelper.h" />
     <ClInclude Include="HTKDataDeserializer.h" />
     <ClInclude Include="MLFDataDeserializer.h" />
-    <ClInclude Include="ScpParser.h" />
     <ClInclude Include="BundlerSplitted.h" />
   </ItemGroup>
   <ItemGroup>

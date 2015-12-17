@@ -1,7 +1,6 @@
 #pragma once
 
 #include "InnerInterfaces.h"
-#include "ScpParser.h"
 #include "HTKDataDeserializer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
