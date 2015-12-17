@@ -21,7 +21,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         const SequenceDescription* description;
         void* data;
-        //size_t numberOfSamples; // TODO -> we have it in the sequence description. Should we have length here?
     };
 
     // Low-level input interface (for file, network, etc.).
@@ -38,25 +37,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     typedef std::vector<SequenceDescription> Timeline;
 
     typedef std::vector<const SequenceDescription*> TimelineP;
-
-    // Timeline offsets specify file offset of sequences. These are used internally
-    // of a Sequence Reader or a Sequencer.
-    typedef std::vector<size_t> TimelineOffsets;
-
-    struct SequenceData
-    {
-        SequenceData() : m_endOfEpoch(false)
-        {}
-
-        std::map<InputId, Sequence> m_data;
-        bool m_endOfEpoch;
-
-        SequenceData(SequenceData&& other)
-            : m_data(std::move(other.m_data))
-            , m_endOfEpoch(std::move(other.m_endOfEpoch))
-        {
-        }
-    };
 
     // Interface to for structured reading from a single data source
     class DataDeserializer
@@ -76,32 +56,27 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     typedef std::shared_ptr<DataDeserializer> DataDeserializerPtr;
 
-
-    // A Sequencer composes Timeline information and a number of Sequence readers, providing
-    // random-access to the Timeline as well as the composed Sequence readers.
-    class Sequencer
-    {
-    public:
-        virtual const Timeline& GetTimeline() const = 0;
-
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
-        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
-        virtual SequenceData GetSequenceById(size_t id) = 0;
-
-        virtual bool RequireChunk(size_t chunkIndex) = 0;
-        virtual void ReleaseChunk(size_t chunkIndex) = 0;
-
-        virtual ~Sequencer() = 0 {};
-    };
-
-    typedef std::shared_ptr<Sequencer> SequencerPtr;
-
     // Defines context augmentation (to the left and to the right).
     // This will be specified as a construction parameter to Sequence Reader.
     struct AugmentationDescriptor
     {
         size_t contextLeft;
         size_t contextRight;
+    };
+
+    struct SequenceData
+    {
+        SequenceData() : m_endOfEpoch(false)
+        {}
+
+        std::map<InputId, Sequence> m_data;
+        bool m_endOfEpoch;
+
+        SequenceData(SequenceData&& other)
+            : m_data(std::move(other.m_data))
+            , m_endOfEpoch(std::move(other.m_endOfEpoch))
+        {
+        }
     };
 
     // Provides Input descriptions and sequential access to sequences.
