@@ -8,13 +8,6 @@
 
 #include "InnerInterfaces.h"
 
-#include "Basics.h"                  // for attempt()
-#include "htkfeatio.h"                  // for htkmlfreader
-#include "minibatchsourcehelpers.h"
-#include "minibatchiterator.h"
-#include "biggrowablevectors.h"
-#include "ssematrix.h"
-
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     class ConfigParameters;

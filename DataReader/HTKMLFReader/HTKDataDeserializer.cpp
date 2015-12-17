@@ -1,7 +1,8 @@
 #include "stdafx.h"
 #include "HTKDataDeserializer.h"
 #include "ConfigHelper.h"
-#include "Bundler.h"
+#include "Basics.h" // for attempt()
+#include "minibatchsourcehelpers.h"
 #include <numeric>
 
 namespace Microsoft { namespace MSR { namespace CNTK {

@@ -2,6 +2,7 @@
 
 #include "InnerInterfaces.h"
 #include "HTKDataDeserializer.h"
+#include "biggrowablevectors.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
