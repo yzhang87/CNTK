@@ -1,9 +1,39 @@
+//
+// <copyright file="HTKDataDeserializer.h" company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+
 #pragma once
 
 #include "InnerInterfaces.h"
-#include "BundlerSplitted.h"
+#include "commandArgUtil.h" // for ConfigParameters
+#include "htkfeatio.h" // for htkfeatreader
+#include "minibatchiterator.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
+
+    // data store (incl. paging in/out of features and lattices)
+    struct utterancedesc            // data descriptor for one utterance
+    {
+        msra::asr::htkfeatreader::parsedpath parsedpath;    // archive filename and frame range in that file
+        size_t classidsbegin;       // index into allclassids[] array (first frame)
+
+        utterancedesc(msra::asr::htkfeatreader::parsedpath&& ppath, size_t classidsbegin) : parsedpath(std::move(ppath)), classidsbegin(classidsbegin) {}
+
+        const wstring & logicalpath() const { return parsedpath; /*type cast will return logical path*/ }
+        size_t numframes() const { return parsedpath.numframes(); }
+        wstring key() const                           // key used for looking up lattice (not stored to save space)
+        {
+#ifdef _MSC_VER
+            static const wstring emptywstring;
+            static const wregex deleteextensionre(L"\\.[^\\.\\\\/:]*$");
+            return regex_replace(logicalpath(), deleteextensionre, emptywstring);  // delete extension (or not if none)
+#else
+            return removeExtension(logicalpath());
+#endif
+        }
+    };
 
     struct chunkdata       // data for a chunk of utterances
     {

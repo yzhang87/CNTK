@@ -3,7 +3,7 @@
 #include "TimerUtility.h"
 #include "Utils.h"
 #include <DataReader.h>
-#include "BundlerSplitted.h"
+#include "Bundler.h"
 #include "ConfigHelper.h"
 #include "BlockRandomizer.h"
 
@@ -67,7 +67,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto deserializers = CreateDeserializers(readerConfig, true, m_elementSize);
         assert(deserializers.size() == 2);
 
-        auto bundler = std::make_shared<BundlerSplitted>(readerConfig, true, m_verbosity, deserializers[0], deserializers);
+        auto bundler = std::make_shared<Bundler>(readerConfig, true, m_verbosity, deserializers[0], deserializers);
 
         std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
         if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))

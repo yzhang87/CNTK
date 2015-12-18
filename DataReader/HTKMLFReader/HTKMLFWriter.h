@@ -4,7 +4,10 @@
 // </copyright>
 //
 // HTKMLFReader.h - Include file for the MTK and MLF format of features and samples 
+//
+
 #pragma once
+
 #include "DataWriter.h"
 #include "ScriptableObjects.h"
 #include <map>

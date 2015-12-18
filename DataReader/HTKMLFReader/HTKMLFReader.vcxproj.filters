@@ -24,7 +24,7 @@
     <ClCompile Include="ConfigHelper.cpp" />
     <ClCompile Include="MLFDataDeserializer.cpp" />
     <ClCompile Include="HTKDataDeserializer.cpp" />
-    <ClCompile Include="BundlerSplitted.cpp" />
+    <ClCompile Include="Bundler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="biggrowablevectors.h" />
@@ -67,7 +67,7 @@
     <ClInclude Include="ConfigHelper.h" />
     <ClInclude Include="HTKDataDeserializer.h" />
     <ClInclude Include="MLFDataDeserializer.h" />
-    <ClInclude Include="BundlerSplitted.h" />
+    <ClInclude Include="Bundler.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
