@@ -153,7 +153,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class HTKDataDeserializer : public DataDeserializer
     {
         size_t m_dimension;
-        SampleLayoutPtr m_layout;
+        TensorShapePtr m_layout;
         std::vector<std::wstring> m_featureFiles;
 
         std::vector<Utterance> m_utterances;

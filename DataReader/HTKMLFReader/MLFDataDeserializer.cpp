@@ -171,7 +171,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             r.data = tmp;
         }
 
-        r.description = m_sequences[id];
+        r.numberOfSamples = m_sequences[id]->numberOfSamples;
 
         return std::vector<Sequence> { r };
     }

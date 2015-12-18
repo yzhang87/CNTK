@@ -22,14 +22,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     typedef size_t InputId;
 
-    typedef std::shared_ptr<ImageLayout> SampleLayoutPtr;
+    typedef std::shared_ptr<ImageLayout> TensorShapePtr;
 
     // Input description.
     struct InputDescription
     {
         std::wstring name;
         InputId id;
-        SampleLayoutPtr sampleLayout;
+        TensorShapePtr sampleLayout;
         std::string targetLayoutType;
         std::map<std::string, std::string> properties;
     };
@@ -56,7 +56,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     struct Layout
     {
         MBLayoutPtr columns;
-        SampleLayoutPtr rows;
+        TensorShapePtr rows;
         StorageType storageType;
         ElementType elementType;
     };

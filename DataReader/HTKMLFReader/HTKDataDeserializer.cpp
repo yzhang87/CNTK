@@ -206,7 +206,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             msra::dbn::augmentneighbors(uttframevectors, noboundaryflags, frame.frameIndexInUtterance, leftextent, rightextent, feat, 0);
 
             Sequence r;
-            r.description = &utterance;
+            r.numberOfSamples = utterance.numberOfSamples;
 
             const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat, 0, feat.cols());
             const size_t dimensions = featOri.rows();

@@ -27,7 +27,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class MLFDataDeserializer : public DataDeserializer
     {
         size_t m_dimension;
-        SampleLayoutPtr m_layout;
+        TensorShapePtr m_layout;
         std::wstring m_stateListPath;
         std::vector<std::wstring> m_mlfPaths;
         const HTKDataDeserializer* m_featureDeserializer;
