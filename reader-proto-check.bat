@@ -78,6 +78,8 @@ if not defined a_nogpu (
 
     rmdir /s /q _out
 
+    if not exist Data\ echo Get the Data first.&exit /b 1
+
 if not defined a_norelease (
     ..\x64\Release\CNTK.exe configFile=AlexNet.config ConfigName=Release "Train=[reader=[readerType=NewImageReader]]"
     echo BASELINE
