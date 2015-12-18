@@ -18,7 +18,6 @@
       <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="HTKMLFReaderShim.cpp" />
-    <ClCompile Include="BlockRandomizer.cpp" />
     <ClCompile Include="FrameModePacker.cpp" />
     <ClCompile Include="Utils.cpp" />
     <ClCompile Include="ConfigHelper.cpp" />
@@ -59,10 +58,6 @@
     </ClInclude>
     <ClInclude Include="HTKMLFReaderShim.h" />
     <ClInclude Include="FrameModePacker.h" />
-    <ClInclude Include="BlockRandomizer.h" />
-    <ClInclude Include="CudaMemoryProvider.h" />
-    <ClInclude Include="HeapMemoryProvider.h" />
-    <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="ConfigHelper.h" />
     <ClInclude Include="HTKDataDeserializer.h" />

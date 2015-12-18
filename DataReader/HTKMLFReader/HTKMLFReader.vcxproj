@@ -67,12 +67,12 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;HTKMLFREADER_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>../Interfaces</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Interfaces;../Reader</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>CNTKMath.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Reader.lib;CNTKMath.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -86,14 +86,14 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalOptions>/d2Zi+ %(AdditionalOptions)</AdditionalOptions>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>../Interfaces</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Interfaces;../Reader</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>CNTKMath.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Reader.lib;CNTKMath.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>
@@ -111,11 +111,8 @@
     <ClInclude Include="chunkevalsource.h" />
     <ClInclude Include="..\..\Common\Include\fileutil.h" />
     <ClInclude Include="..\..\Common\Include\DebugUtil.h" />
-    <ClInclude Include="BlockRandomizer.h" />
     <ClInclude Include="ConfigHelper.h" />
-    <ClInclude Include="CudaMemoryProvider.h" />
     <ClInclude Include="FrameModePacker.h" />
-    <ClInclude Include="HeapMemoryProvider.h" />
     <ClInclude Include="HTKDataDeserializer.h" />
     <ClInclude Include="htkfeatio.h" />
     <ClInclude Include="HTKMLFReader.h" />
@@ -126,7 +123,6 @@
     <ClInclude Include="MLFDataDeserializer.h" />
     <ClInclude Include="msra_mgram.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="utterancesourcemulti.h" />
@@ -156,7 +152,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="BlockRandomizer.cpp" />
     <ClCompile Include="FrameModePacker.cpp" />
     <ClCompile Include="HTKDataDeserializer.cpp" />
     <ClCompile Include="HTKMLFReader.cpp" />

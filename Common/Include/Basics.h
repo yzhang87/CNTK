@@ -217,7 +217,7 @@ namespace msra { namespace strfun { // TODO: rename this
         int rc = MultiByteToWideChar (CP_UTF8, 0, p.c_str(), (int) len,
                                       &buf[0], (int) buf.size());
         if (rc == 0) RuntimeError("MultiByteToWideChar");
-        assert (rc < buf.size ());
+        assert (rc < static_cast<int>(buf.size ()));
         (*(std::wstring*)this) = &buf[0];
     }};
 #endif

@@ -22,6 +22,7 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HTKMLFReader", "DataReader\HTKMLFReader\HTKMLFReader.vcxproj", "{33D2FD22-DEF2-4507-A58A-368F641AEBE5}"
 	ProjectSection(ProjectDependencies) = postProject
 		{60BDB847-D0C4-4FD3-A947-0C15C08BCDB5} = {60BDB847-D0C4-4FD3-A947-0C15C08BCDB5}
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602} = {F0A9637C-20DA-42F0-83D4-23B4704DE602}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MathPerformanceTests", "Math\MathPerformanceTests\MathPerformanceTests.vcxproj", "{668BEED5-AC07-4F35-B3AE-EE65A7F9C976}"
@@ -414,14 +415,16 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ReaderTests", "Tests\UnitTe
 		{E6646FFE-3588-4276-8A15-8D65C22711C1} = {E6646FFE-3588-4276-8A15-8D65C22711C1}
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Reader interfaces", "Reader interfaces", "{824DF649-E168-4C96-AADC-ACDD349FF45B}"
-	ProjectSection(SolutionItems) = preProject
-		DataReader\Interfaces\implementations.h = DataReader\Interfaces\implementations.h
-		DataReader\Interfaces\InnerInterfaces.h = DataReader\Interfaces\InnerInterfaces.h
-		DataReader\Interfaces\ReaderInterfaces.h = DataReader\Interfaces\ReaderInterfaces.h
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NewImageReader", "DataReader\NewImageReader\NewImageReader.vcxproj", "{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{60BDB847-D0C4-4FD3-A947-0C15C08BCDB5} = {60BDB847-D0C4-4FD3-A947-0C15C08BCDB5}
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602} = {F0A9637C-20DA-42F0-83D4-23B4704DE602}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NewImageReader", "DataReader\NewImageReader\NewImageReader.vcxproj", "{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Reader", "DataReader\Reader\Reader.vcxproj", "{F0A9637C-20DA-42F0-83D4-23B4704DE602}"
+	ProjectSection(ProjectDependencies) = postProject
+		{60BDB847-D0C4-4FD3-A947-0C15C08BCDB5} = {60BDB847-D0C4-4FD3-A947-0C15C08BCDB5}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -652,6 +655,18 @@ Global
 		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|Win32.ActiveCfg = Release|x64
 		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|x64.ActiveCfg = Release|x64
 		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|x64.Build.0 = Release|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Debug|Win32.ActiveCfg = Debug|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Debug|Win32.Build.0 = Debug|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Debug|x64.ActiveCfg = Debug|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Debug|x64.Build.0 = Debug|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Release|Mixed Platforms.Build.0 = Release|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Release|Win32.ActiveCfg = Release|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Release|Win32.Build.0 = Release|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Release|x64.ActiveCfg = Release|x64
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -707,7 +722,7 @@ Global
 		{4701E678-5E6F-470D-B348-9CD1A2C095D1} = {6F19321A-65E7-4829-B00C-3886CD6C6EDE}
 		{EB2BE26F-6BD4-4274-971F-86D080779DD1} = {DD043083-71A4-409A-AA91-F9C548DCF7EC}
 		{A4FC3467-4787-43E8-BBC0-D79AE56B468D} = {6F19321A-65E7-4829-B00C-3886CD6C6EDE}
-		{824DF649-E168-4C96-AADC-ACDD349FF45B} = {39E42C4B-A078-4CA4-9D92-B883D8129601}
 		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB} = {33EBFE78-A1A8-4961-8938-92A271941F94}
+		{F0A9637C-20DA-42F0-83D4-23B4704DE602} = {33EBFE78-A1A8-4961-8938-92A271941F94}
 	EndGlobalSection
 EndGlobal
