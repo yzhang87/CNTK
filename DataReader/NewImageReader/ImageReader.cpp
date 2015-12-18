@@ -17,6 +17,8 @@
 #include <unordered_map>
 #include <opencv2/opencv.hpp>
 
+#include "BlockRandomizer.h"
+
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 static bool AreEqual(const std::string& s1, const std::string& s2)
@@ -69,7 +71,7 @@ public:
         }
 #endif
 
-        if (!(0 < m_cropRatioMin && m_cropRatioMin <= 1.0) || 
+        if (!(0 < m_cropRatioMin && m_cropRatioMin <= 1.0) ||
             !(0 < m_cropRatioMax && m_cropRatioMax <= 1.0) ||
             m_cropRatioMin > m_cropRatioMax)
         {
@@ -114,7 +116,7 @@ public:
         mat = mat(GetCropRect(m_cropType, mat.rows, mat.cols, ratio, *rng));
         if (m_hFlip && std::bernoulli_distribution()(*rng))
             cv::flip(mat, mat, 1);
-        
+
         m_rngs.push(std::move(rng));
     }
 
@@ -124,7 +126,7 @@ private:
 
     enum class CropType { Center = 0, Random = 1 };
     enum class RatioJitterType
-    { 
+    {
         None = 0,
         UniRatio = 1,
         UniLength = 2,
@@ -244,7 +246,7 @@ public:
         auto rng = m_rngs.pop_or_create([seed]() { return std::make_unique<std::mt19937>(seed); });
 
         assert(m_interp.size() > 0);
-        cv::resize(mat, mat, cv::Size(static_cast<int>(m_imgWidth), static_cast<int>(m_imgHeight)), 0, 0, 
+        cv::resize(mat, mat, cv::Size(static_cast<int>(m_imgWidth), static_cast<int>(m_imgHeight)), 0, 0,
             m_interp[UniIntT(0, static_cast<int>(m_interp.size()) - 1)(*rng)]);
 
         m_rngs.push(std::move(rng));
@@ -439,7 +441,7 @@ bool ImageReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>
         mbLim = files.size();
 
     std::fill(m_labBuf.begin(), m_labBuf.end(), static_cast<ElemType>(0));
-    
+
 #pragma omp parallel for ordered schedule(dynamic)
     for (long long i = 0; i < static_cast<long long>(mbLim - m_mbStart); i++)
     {
@@ -447,7 +449,7 @@ bool ImageReader<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>
         cv::Mat img{ cv::imread(p.first, cv::IMREAD_COLOR) };
         for (auto& t: m_transforms)
             t->Apply(img);
-       
+
         assert(img.isContinuous());
         auto data = reinterpret_cast<ElemType*>(img.ptr());
         std::copy(data, data + m_featDim, m_featBuf.begin() + m_featDim * i);

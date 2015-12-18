@@ -77,7 +77,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>CNTKMath.lib;$(OpenCVLib);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Reader.lib;CNTKMath.lib;$(OpenCVLib);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command Condition="$(HasOpenCV)">xcopy /Y $(OPENCV_PATH)\x64\vc12\bin\opencv_world300.dll $(TargetDir)</Command>
@@ -87,6 +87,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>../Reader</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -141,7 +142,6 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <Target Name="CheckDependencies">
-    <Warning Condition="!$(HasOpenCV)"
-      Text="ImageReader requires OpenCV library v3.0 or higher to build. Please install the library from http://opencv.org/downloads.html and set OPENCV_PATH environment variable to OpenCV build folder (e.g. C:\src\opencv\build)." />
+    <Warning Condition="!$(HasOpenCV)" Text="ImageReader requires OpenCV library v3.0 or higher to build. Please install the library from http://opencv.org/downloads.html and set OPENCV_PATH environment variable to OpenCV build folder (e.g. C:\src\opencv\build)." />
   </Target>
 </Project>

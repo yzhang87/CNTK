@@ -17,6 +17,7 @@
     </ClCompile>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="ImageReader.cpp" />
+    <ClCompile Include="..\..\Common\DebugUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h" />
