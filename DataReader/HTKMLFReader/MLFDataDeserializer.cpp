@@ -167,6 +167,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         else
         {
             double* tmp = new double[m_dimension];
+            memset(tmp, 0, m_elementSize * m_dimension);
             tmp[label] = 1;
             r.data = tmp;
         }
