@@ -24,8 +24,10 @@ if not defined a_nodebug (
     if errorlevel 1 exit /b 1
 
 if not defined a_notests (
+if not defined a_nounittests (
         .\x64\Debug\UnitTests\ReaderTests.exe -t ReaderTestSuite/HTKMLFReaderSimpleDataLoop
         if errorlevel 1 exit /b 1
+)
 )
 )
 
@@ -34,13 +36,16 @@ if not defined a_norelease (
     if errorlevel 1 exit /b 1
 
 if not defined a_notests (
+if not defined a_nounittests (
     .\x64\Release\UnitTests\ReaderTests.exe -t ReaderTestSuite/HTKMLFReaderSimpleDataLoop
     if errorlevel 1 exit /b 1
+)
 )
 )
 
 set PATH=%PATH%;%CYGWIN_BIN%
 
+if not defined a_nospeech (
 if not defined a_noe2e (
 if not defined a_notests (
 if not defined a_norelease (
@@ -62,5 +67,33 @@ if not defined a_nogpu (
     python2.7.exe Tests/TestDriver.py run -d cpu -f debug Speech/QuickE2E
     if errorlevel 1 exit /b 1
 )
+)
+)
+)
+
+if not defined a_noimage (
+if not defined a_nogpu (
+   
+    cd ImageTest
+
+    rmdir /s /q _out
+
+if not defined a_norelease (
+    ..\x64\Release\CNTK.exe configFile=AlexNet.config ConfigName=Release "Train=[reader=[readerType=NewImageReader]]"
+    echo BASELINE
+    findstr /c:"Finished Epoch" .\Release_Base.log
+    echo CURRENT
+    findstr /c:"Finished Epoch" .\_out\Release_Train.log
+)
+
+if not defined a_nodebug (
+    ..\x64\Debug\CNTK.exe configFile=AlexNet.config ConfigName=Debug "Train=[reader=[readerType=NewImageReader]]"
+    echo BASELINE
+    findstr /c:"Finished Epoch" .\Debug_Base.log
+    echo CURRENT
+    findstr /c:"Finished Epoch" .\_out\Debug_Train.log
+)
+
+    cd ..
 )
 )
