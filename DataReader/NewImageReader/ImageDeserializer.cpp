@@ -6,6 +6,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config, size_t elementSize)
         : m_elementSize(elementSize)
+
     {
         using SectionT = std::pair<std::string, ConfigParameters>;      // TODO: does not work for BrainScript, since configs cannot be copied
         auto getter = [&](const std::string& paramName) -> SectionT
@@ -27,6 +28,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t w = featSect.second("width");
         size_t h = featSect.second("height");
         size_t c = featSect.second("channels");
+        m_imgChannels = static_cast<int>(c); // TODO
+
         m_featDim = w * h * c;
         // TODO we should not need this?
 
@@ -90,8 +93,22 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         cv::Mat cvImage{ cv::imread(imageSequence.path, cv::IMREAD_COLOR) };
         assert(cvImage.isContinuous());
+
+        int dataType = m_elementSize == 4 ? CV_32F : CV_64F;
+
+        // Convert element type.
+        // TODO this shouldnt be here...
+        if (cvImage.type() != CV_MAKETYPE(dataType, m_imgChannels))
+            cvImage.convertTo(cvImage, dataType);
+
         image.data = cvImage.ptr();
-        // TODO label.layout !!
+
+        auto imageSampleLayout = std::make_shared<SampleLayout>();
+        imageSampleLayout->elementType = m_elementSize == 4 ? et_float : et_double;
+        imageSampleLayout->storageType = st_dense;
+        imageSampleLayout->dimensions = std::make_shared<ImageLayout>();
+        *imageSampleLayout->dimensions = ImageLayoutWHC(cvImage.cols, cvImage.rows, m_imgChannels);
+        image.layout = imageSampleLayout;
 
         // Construct label
         Sequence label;
@@ -110,6 +127,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             tmp[imageSequence.classId] = 1;
             label.data = tmp;
         }
+        auto labelSampleLayout = std::make_shared<SampleLayout>();
+        labelSampleLayout->elementType = m_elementSize == 4 ? et_float : et_double;
+        labelSampleLayout->storageType = st_dense;
+        labelSampleLayout->dimensions = std::make_shared<ImageLayout>();
+        *labelSampleLayout->dimensions = ImageLayoutVector(m_labDim);
+        label.layout = labelSampleLayout;
 
         label.numberOfSamples = m_sequences[id]->numberOfSamples;
 

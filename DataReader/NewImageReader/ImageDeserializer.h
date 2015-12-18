@@ -36,6 +36,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         bool m_imgListRand;
         size_t m_elementSize;
+        int m_imgChannels;
         //MBLayoutPtr m_pMBLayout;
 
     public:
