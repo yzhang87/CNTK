@@ -15,14 +15,90 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
     };
 
+    BaseTransformer::BaseTransformer(
+        TransformerPtr next,
+        const std::set<std::wstring>& appliedStreams,
+        unsigned int seed)
+        : m_appliedStreams(appliedStreams)
+        , m_next(next)
+        , m_seed(seed)
+    {
+    }
+
+    void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
+    {
+        const auto& inputs = m_next->GetInputs();
+        m_appliedStreamsHash.resize(inputs.size(), false);
+
+        for (const auto& input : inputs)
+        {
+            if (m_appliedStreams.find(input->name) != m_appliedStreams.end())
+            {
+                m_appliedStreamsHash[input->id] = true;
+            }
+        }
+
+        // todo: check that all streams are exhausted.
+    }
+
+    std::vector<InputDescriptionPtr> BaseTransformer::GetInputs() const
+    {
+        return m_next->GetInputs();
+    }
+
+    SequenceData BaseTransformer::GetNextSequence()
+    {
+        SequenceData sample = m_next->GetNextSequence();
+        if (sample.m_endOfEpoch)
+        {
+            return sample;
+        }
+
+        for (int i = 0; i < m_appliedStreamsHash.size(); ++i)
+        {
+            if (m_appliedStreamsHash[i])
+            {
+                sample.m_data[i] = Apply(sample.m_data[i]);
+            }
+        }
+
+        return sample;
+    }
+
+    Sequence BaseTransformer::Apply(Sequence& s)
+    {
+        int rows = static_cast<int>(s.layout->dimensions->GetHeight());
+        int columns = static_cast<int>(s.layout->dimensions->GetHeight());
+        int channels = static_cast<int>(s.layout->dimensions->GetNumChannels());
+
+        int typeId = 0;
+        if (s.layout->elementType == 8)
+        {
+            typeId = CV_64F;
+        }
+        else
+        {
+            typeId = CV_32F;
+        }
+
+        int type = CV_MAKETYPE(typeId, channels);
+        cv::Mat mat(rows, columns, type, s.data);
+        this->Apply(mat);
+
+        Sequence result;
+        result.layout = s.layout;
+        result.numberOfSamples = result.numberOfSamples;
+        result.data = mat.ptr();
+        return result;
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     CropTransformNew::CropTransformNew(
         TransformerPtr next,
         const std::set<std::wstring>& appliedStreams,
         const ConfigParameters& parameters,
-        unsigned int seed)
-        : m_seed(seed)
-        , m_appliedStreams(appliedStreams)
-        , m_next(next)
+        unsigned int seed) : BaseTransformer(next, appliedStreams, seed)
     {
         InitFromConfig(parameters);
     }
@@ -54,76 +130,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void CropTransformNew::SetEpochConfiguration(const EpochConfiguration& /*config*/)
-    {
-        const auto& inputs = m_next->GetInputs();
-        m_appliedStreamsHash.resize(inputs.size(), false);
-
-        for (const auto& input : inputs)
-        {
-            if (m_appliedStreams.find(input->name) != m_appliedStreams.end())
-            {
-                m_appliedStreamsHash[input->id] = true;
-            }
-        }
-
-        // todo: check that all streams are exhausted.
-    }
-
-    std::vector<InputDescriptionPtr> CropTransformNew::GetInputs() const
-    {
-        return m_next->GetInputs();
-    }
-
-    SequenceData CropTransformNew::GetNextSequence()
-    {
-        SequenceData sample = m_next->GetNextSequence();
-        if (sample.m_endOfEpoch)
-        {
-            return sample;
-        }
-
-        for (int i = 0; i < m_appliedStreamsHash.size(); ++i)
-        {
-            if (m_appliedStreamsHash[i])
-            {
-                sample.m_data[i] = Apply(sample.m_data[i]);
-            }
-        }
-
-        throw std::logic_error("The method or operation is not implemented.");
-    }
-
-    Sequence CropTransformNew::Apply(Sequence& s)
-    {
-        int rows = static_cast<int>(s.layout->dimensions->GetHeight());
-        int columns = static_cast<int>(s.layout->dimensions->GetHeight());
-        int channels = static_cast<int>(s.layout->dimensions->GetNumChannels());
-
-        int typeId = 0;
-        if (s.layout->elementType == 8)
-        {
-            typeId = CV_64F;
-        }
-        else
-        {
-            typeId = CV_32F;
-        }
-
-        int type = CV_MAKETYPE(typeId, channels);
-        cv::Mat mat(rows, columns, type, s.data);
-        this->Apply(mat);
-
-        Sequence result;
-        result.layout = s.layout;
-        result.numberOfSamples = result.numberOfSamples;
-        result.data = mat.ptr();
-        return result;
-    }
-
     void CropTransformNew::Apply(cv::Mat& mat)
     {
-        auto seed = m_seed;
+        auto seed = GetSeed();
         auto rng = m_rngs.pop_or_create([seed]() { return std::make_unique<std::mt19937>(seed); });
 
         double ratio = 1;
@@ -220,5 +229,66 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(0 <= xOff && xOff <= ccol - cropSize);
         assert(0 <= yOff && yOff <= crow - cropSize);
         return cv::Rect(xOff, yOff, cropSize, cropSize);
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    ScaleTransform::ScaleTransform(
+        TransformerPtr next,
+        const std::set<std::wstring>& appliedStreams,
+        unsigned int seed,
+        int dataType,
+        const ConfigParameters& config)
+        : BaseTransformer(next, appliedStreams, seed)
+        , m_dataType(dataType)
+    {
+        assert(m_dataType == CV_32F || m_dataType == CV_64F);
+
+        m_interpMap.emplace("nearest", cv::INTER_NEAREST);
+        m_interpMap.emplace("linear", cv::INTER_LINEAR);
+        m_interpMap.emplace("cubic", cv::INTER_CUBIC);
+        m_interpMap.emplace("lanczos", cv::INTER_LANCZOS4);
+
+        InitFromConfig(config);
+    }
+
+    void ScaleTransform::InitFromConfig(const ConfigParameters& config)
+    {
+        m_imgWidth = config(L"width");
+        m_imgHeight = config(L"height");
+        m_imgChannels = config(L"channels");
+        size_t cfeat = m_imgWidth * m_imgHeight * m_imgChannels;
+        if (cfeat == 0 || cfeat > std::numeric_limits<size_t>().max() / 2)
+            RuntimeError("Invalid image dimensions.");
+
+        m_interp.clear();
+        std::stringstream ss{ config(L"interpolations", "") };
+        for (std::string token = ""; std::getline(ss, token, ':');)
+        {
+            // Explicit cast required for GCC.
+            std::transform(token.begin(), token.end(), token.begin(), (int(*)(int))std::tolower);
+            StrToIntMapT::const_iterator res = m_interpMap.find(token);
+            if (res != m_interpMap.end())
+                m_interp.push_back((*res).second);
+        }
+
+        if (m_interp.size() == 0)
+            m_interp.push_back(cv::INTER_LINEAR);
+    }
+
+    void ScaleTransform::Apply(cv::Mat& mat)
+    {
+        // If matrix has not been converted to the right type, do it now as rescaling requires floating point type.
+        if (mat.type() != CV_MAKETYPE(m_dataType, m_imgChannels))
+            mat.convertTo(mat, m_dataType);
+
+        auto seed = GetSeed();
+        auto rng = m_rngs.pop_or_create([seed]() { return std::make_unique<std::mt19937>(seed); });
+
+        assert(m_interp.size() > 0);
+        cv::resize(mat, mat, cv::Size(static_cast<int>(m_imgWidth), static_cast<int>(m_imgHeight)), 0, 0,
+            m_interp[UniIntT(0, static_cast<int>(m_interp.size()) - 1)(*rng)]);
+
+        m_rngs.push(std::move(rng));
     }
 }}}
