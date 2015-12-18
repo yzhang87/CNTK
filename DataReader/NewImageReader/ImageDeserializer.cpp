@@ -109,6 +109,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         imageSampleLayout->dimensions = std::make_shared<ImageLayout>();
         *imageSampleLayout->dimensions = ImageLayoutWHC(cvImage.cols, cvImage.rows, m_imgChannels);
         image.layout = imageSampleLayout;
+        image.numberOfSamples = imageSequence.numberOfSamples;
 
         // Construct label
         Sequence label;
@@ -134,7 +135,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         *labelSampleLayout->dimensions = ImageLayoutVector(m_labDim);
         label.layout = labelSampleLayout;
 
-        label.numberOfSamples = m_sequences[id]->numberOfSamples;
+        label.numberOfSamples = imageSequence.numberOfSamples;
 
         return std::vector<Sequence> { image, label };
     }
