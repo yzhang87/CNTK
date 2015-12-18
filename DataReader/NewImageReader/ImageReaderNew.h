@@ -6,20 +6,21 @@
 
 #pragma once
 
-#include "Basics.h"
 #include "ReaderInterfaces.h"
-#include "commandArgUtil.h"
-
+#include "ImageTransformers.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-class ImageReaderNew : public Reader
-{
-public:
-    std::vector<InputDescriptionPtr> GetInputs() override;
-    EpochPtr StartNextEpoch(const EpochConfiguration& config) override;
-};
+    class ImageReaderNew : public Reader
+    {
+    public:
+        ImageReaderNew(const ConfigParameters& parameters, TransformerPtr transformer);
 
-typedef std::shared_ptr<ImageReaderNew> ImageReaderNewPtr;
+        std::vector<InputDescriptionPtr> GetInputs() override;
+        EpochPtr StartNextEpoch(const EpochConfiguration& config) override;
+
+    private:
+        TransformerPtr m_transformer;
+    };
 
 }}}

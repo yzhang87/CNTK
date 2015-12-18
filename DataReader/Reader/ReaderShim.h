@@ -16,19 +16,22 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    typedef ReaderPtr(*ReaderFactory)(const ConfigParameters& parameters);
+
     template<class ElemType>
     class ReaderShim : public IDataReader<ElemType>
     {
         ReaderPtr m_reader;
+        ReaderFactory m_factory;
+
         EpochPtr m_epoch;
         MBLayoutPtr m_layout;
-        MemoryProviderPtr m_memoryProvider;
 
         std::map<std::wstring, size_t> m_nameToInputId;
         std::vector<InputDescriptionPtr> m_inputs;
 
     public:
-        explicit ReaderShim(ReaderPtr reader);
+        explicit ReaderShim(ReaderFactory factory);
         virtual ~ReaderShim() {}
 
         virtual void Init(const ScriptableObjects::IConfigRecord & /*config*/) override { assert(false); }

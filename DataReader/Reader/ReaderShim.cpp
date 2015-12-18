@@ -24,10 +24,9 @@
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     template<class ElemType>
-    ReaderShim<ElemType>::ReaderShim(ReaderPtr reader)
-        : m_reader(reader)
-        , m_layout(make_shared<MBLayout>())
-        , m_memoryProvider(std::make_shared<HeapMemoryProvider>())
+    ReaderShim<ElemType>::ReaderShim(ReaderFactory factory)
+        : m_layout(make_shared<MBLayout>())
+        , m_factory(factory)
     {
     }
 
@@ -40,6 +39,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;
         m_layout->Init(numSeqsPerMBForAllEpochs[0], 0, true);
 
+        m_reader = m_factory(config);
         m_inputs = m_reader->GetInputs();
         for (auto i : m_inputs)
         {

@@ -30,11 +30,15 @@ extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
     GetReader(preader);
 }
 
+ReaderPtr CreateReader(const ConfigParameters& parameters)
+{
+    return std::make_shared<ImageReaderNew>(parameters, nullptr);
+}
+
 template<class ElemType>
 void DATAREADER_API GetReaderNew(IDataReader<ElemType>** preader)
 {
-    auto readerPtr = std::make_shared<ImageReaderNew>();
-    *preader = new ReaderShim<ElemType>(nullptr /* TODO */);
+    *preader = new ReaderShim<ElemType>(CreateReader);
 }
 
 extern "C" DATAREADER_API void GetReaderFNew(IDataReader<float>** preader)

@@ -9,6 +9,12 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    ImageReaderNew::ImageReaderNew(
+        const ConfigParameters& /*parameters*/,
+        TransformerPtr transformer)
+        : m_transformer(transformer)
+    {}
+
     std::vector<InputDescriptionPtr> ImageReaderNew::GetInputs()
     {
         std::vector<InputDescriptionPtr> dummy;
