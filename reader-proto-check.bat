@@ -79,7 +79,7 @@ if not defined a_nogpu (
     rmdir /s /q _out
 
 if not defined a_norelease (
-    ..\x64\Release\CNTK.exe configFile=AlexNet.config ConfigName=Release "reader=[readerType=NewImageReader]"
+    ..\x64\Release\CNTK.exe configFile=AlexNet.config ConfigName=Release "Train=[reader=[readerType=NewImageReader]]"
     echo BASELINE
     findstr /c:"Finished Epoch" .\Release_Base.log
     echo CURRENT
@@ -87,7 +87,7 @@ if not defined a_norelease (
 )
 
 if not defined a_nodebug (
-    ..\x64\Debug\CNTK.exe configFile=AlexNet.config ConfigName=Debug "reader=[readerType=NewImageReader]"
+    ..\x64\Debug\CNTK.exe configFile=AlexNet.config ConfigName=Debug "Train=[reader=[readerType=NewImageReader]]"
     echo BASELINE
     findstr /c:"Finished Epoch" .\Debug_Base.log
     echo CURRENT
