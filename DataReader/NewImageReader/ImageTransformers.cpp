@@ -72,13 +72,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int channels = static_cast<int>(s.layout->dimensions->GetNumChannels());
 
         int typeId = 0;
-        if (s.layout->elementType == 8)
+        if (s.layout->elementType == et_double)
         {
             typeId = CV_64F;
         }
-        else
+        else if (s.layout->elementType == et_float)
         {
             typeId = CV_32F;
+        }
+        else
+        {
+            RuntimeError("Unsupported type");
         }
 
         int type = CV_MAKETYPE(typeId, channels);
@@ -290,5 +294,48 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_interp[UniIntT(0, static_cast<int>(m_interp.size()) - 1)(*rng)]);
 
         m_rngs.push(std::move(rng));
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    MeanTransform::MeanTransform(
+        TransformerPtr next,
+        const std::set<std::wstring>& appliedStreams)
+        : BaseTransformer(next, appliedStreams, 0)
+    {}
+
+    void MeanTransform::InitFromConfig(const ConfigParameters & config)
+    {
+        std::wstring meanFile = config(L"meanFile", L"");
+        if (meanFile.empty())
+            m_meanImg.release();
+        else
+        {
+            cv::FileStorage fs;
+            // REVIEW alexeyk: this sort of defeats the purpose of using wstring at all...  [fseide] no, only OpenCV has this problem.
+            fs.open(msra::strfun::utf8(meanFile).c_str(), cv::FileStorage::READ);
+            if (!fs.isOpened())
+                RuntimeError("Could not open file: %ls", meanFile.c_str());
+            fs["MeanImg"] >> m_meanImg;
+            int cchan;
+            fs["Channel"] >> cchan;
+            int crow;
+            fs["Row"] >> crow;
+            int ccol;
+            fs["Col"] >> ccol;
+            if (cchan * crow * ccol != m_meanImg.channels() * m_meanImg.rows * m_meanImg.cols)
+                RuntimeError("Invalid data in file: %ls", meanFile.c_str());
+            fs.release();
+            m_meanImg = m_meanImg.reshape(cchan, crow);
+        }
+    }
+
+    void MeanTransform::Apply(cv::Mat& mat)
+    {
+        assert(m_meanImg.size() == cv::Size(0, 0) || (m_meanImg.size() == mat.size() && m_meanImg.channels() == mat.channels()));
+
+        // REVIEW alexeyk: check type conversion (float/double).
+        if (m_meanImg.size() == mat.size())
+            mat = mat - m_meanImg;
     }
 }}}

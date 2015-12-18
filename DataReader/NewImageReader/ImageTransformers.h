@@ -35,8 +35,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return m_seed;
         }
 
-        conc_stack<std::unique_ptr<std::mt19937>> m_rngs;
-
     private:
         std::set<std::wstring> m_appliedStreams;
         std::vector<bool> m_appliedStreamsHash;
@@ -71,6 +69,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         RatioJitterType ParseJitterType(const std::string& src);
         cv::Rect GetCropRect(CropType type, int crow, int ccol, double cropRatio, std::mt19937& rng);
 
+        conc_stack<std::unique_ptr<std::mt19937>> m_rngs;
         CropType m_cropType;
         double m_cropRatioMin;
         double m_cropRatioMax;
@@ -91,15 +90,27 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void InitFromConfig(const ConfigParameters& config);
         virtual void Apply(cv::Mat& mat) override;
 
-
-        int m_dataType;
-
         using StrToIntMapT = std::unordered_map<std::string, int>;
         StrToIntMapT m_interpMap;
         std::vector<int> m_interp;
 
+        conc_stack<std::unique_ptr<std::mt19937>> m_rngs;
+        int m_dataType;
         size_t m_imgWidth;
         size_t m_imgHeight;
         size_t m_imgChannels;
+    };
+
+    class MeanTransform : public BaseTransformer
+    {
+    public:
+        MeanTransform(TransformerPtr next,
+            const std::set<std::wstring>& appliedStreams);
+
+    private:
+        virtual void Apply(cv::Mat& mat) override;
+        void InitFromConfig(const ConfigParameters & config);
+
+        cv::Mat m_meanImg;
     };
 }}}
