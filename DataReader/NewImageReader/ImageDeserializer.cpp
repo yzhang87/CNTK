@@ -1,9 +1,11 @@
 #include "stdafx.h"
 #include "ImageDeserializer.h"
+#include <opencv2/opencv.hpp>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config)
+    ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config, size_t elementSize)
+        : m_elementSize(elementSize)
     {
         using SectionT = std::pair<std::string, ConfigParameters>;      // TODO: does not work for BrainScript, since configs cannot be copied
         auto getter = [&](const std::string& paramName) -> SectionT
@@ -78,10 +80,40 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_sequences;
     }
 
-    std::vector<Sequence> ImageDataDeserializer::GetSequenceById(size_t /* id */)
+    std::vector<Sequence> ImageDataDeserializer::GetSequenceById(size_t id)
     {
-        std::vector<Sequence> dummy;
-        return dummy;
+        assert(id < m_imageSequences.size());
+        const auto & imageSequence = m_imageSequences[id];
+
+        // Construct image
+        Sequence image;
+
+        cv::Mat cvImage{ cv::imread(imageSequence.path, cv::IMREAD_COLOR) };
+        assert(cvImage.isContinuous());
+        image.data = cvImage.ptr();
+        // TODO label.layout !!
+
+        // Construct label
+        Sequence label;
+        // TODO label.layout !!
+        if (m_elementSize == sizeof(float))
+        {
+            float* tmp = new float[m_labDim];
+            memset(tmp, 0, m_elementSize * m_labDim);
+            tmp[imageSequence.classId] = 1;
+            label.data = tmp;
+        }
+        else
+        {
+            double* tmp = new double[m_labDim];
+            memset(tmp, 0, m_elementSize * m_labDim);
+            tmp[imageSequence.classId] = 1;
+            label.data = tmp;
+        }
+
+        label.numberOfSamples = m_sequences[id]->numberOfSamples;
+
+        return std::vector<Sequence> { image, label };
     }
 
     bool ImageDataDeserializer::RequireChunk(size_t /* chunkIndex */)

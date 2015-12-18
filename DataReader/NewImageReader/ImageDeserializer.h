@@ -35,12 +35,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         //std::vector<ElemType> m_labBuf;
 
         bool m_imgListRand;
-
+        size_t m_elementSize;
         //MBLayoutPtr m_pMBLayout;
 
     public:
-        ImageDataDeserializer(const ConfigParameters& config); // TODO more
-
+        ImageDataDeserializer(const ConfigParameters& config, size_t elementSize);
         std::vector<InputDescriptionPtr> GetInputs() const override;
         void SetEpochConfiguration(const EpochConfiguration& config) override;
         const TimelineP& GetSequenceDescriptions() const override;
