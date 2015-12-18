@@ -110,6 +110,7 @@
     <ClInclude Include="..\..\Common\Include\File.h" />
     <ClInclude Include="..\..\Common\Include\fileutil.h" />
     <ClInclude Include="ImageReader.h" />
+    <ClInclude Include="ImageReaderNew.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -134,6 +135,7 @@
     <ClCompile Include="ImageReader.cpp">
       <ExcludedFromBuild Condition="!$(HasOpenCV)">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="ImageReaderNew.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>

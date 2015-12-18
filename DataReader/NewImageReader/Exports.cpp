@@ -11,6 +11,7 @@
 #include "DataReader.h"
 #include "ImageReader.h"
 #include "ReaderShim.h"
+#include "ImageReaderNew.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -32,6 +33,7 @@ extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
 template<class ElemType>
 void DATAREADER_API GetReaderNew(IDataReader<ElemType>** preader)
 {
+    auto readerPtr = std::make_shared<ImageReaderNew>();
     *preader = new ReaderShim<ElemType>(nullptr /* TODO */);
 }
 
