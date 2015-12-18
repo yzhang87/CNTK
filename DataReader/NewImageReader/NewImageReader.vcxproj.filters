@@ -19,6 +19,8 @@
     <ClCompile Include="ImageReader.cpp" />
     <ClCompile Include="..\..\Common\DebugUtil.cpp" />
     <ClCompile Include="ImageReaderNew.cpp" />
+    <ClCompile Include="ImageTransformers.cpp" />
+    <ClCompile Include="ImageDeserializer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h" />
@@ -37,6 +39,8 @@
     </ClInclude>
     <ClInclude Include="ImageReader.h" />
     <ClInclude Include="ImageReaderNew.h" />
+    <ClInclude Include="ImageTransformers.h" />
+    <ClInclude Include="ImageDeserializer.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Common">
