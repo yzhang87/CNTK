@@ -421,6 +421,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Reader interfaces", "Reader
 		DataReader\Interfaces\ReaderInterfaces.h = DataReader\Interfaces\ReaderInterfaces.h
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NewImageReader", "DataReader\NewImageReader\NewImageReader.vcxproj", "{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -638,6 +640,16 @@ Global
 		{A4FC3467-4787-43E8-BBC0-D79AE56B468D}.Release|Win32.ActiveCfg = Release|x64
 		{A4FC3467-4787-43E8-BBC0-D79AE56B468D}.Release|x64.ActiveCfg = Release|x64
 		{A4FC3467-4787-43E8-BBC0-D79AE56B468D}.Release|x64.Build.0 = Release|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Debug|Win32.ActiveCfg = Debug|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Debug|x64.ActiveCfg = Debug|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Debug|x64.Build.0 = Debug|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|Mixed Platforms.Build.0 = Release|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|Win32.ActiveCfg = Release|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|x64.ActiveCfg = Release|x64
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -694,5 +706,6 @@ Global
 		{EB2BE26F-6BD4-4274-971F-86D080779DD1} = {DD043083-71A4-409A-AA91-F9C548DCF7EC}
 		{A4FC3467-4787-43E8-BBC0-D79AE56B468D} = {6F19321A-65E7-4829-B00C-3886CD6C6EDE}
 		{824DF649-E168-4C96-AADC-ACDD349FF45B} = {39E42C4B-A078-4CA4-9D92-B883D8129601}
+		{9BD0A711-0BBD-45B6-B81C-053F03C26CFB} = {33EBFE78-A1A8-4961-8938-92A271941F94}
 	EndGlobalSection
 EndGlobal
