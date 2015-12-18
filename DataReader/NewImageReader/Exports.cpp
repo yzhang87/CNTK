@@ -10,6 +10,7 @@
 #define DATAREADER_EXPORTS
 #include "DataReader.h"
 #include "ImageReader.h"
+#include "ReaderShim.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -27,4 +28,20 @@ extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
 {
     GetReader(preader);
 }
+
+template<class ElemType>
+void DATAREADER_API GetReaderNew(IDataReader<ElemType>** preader)
+{
+    *preader = new ReaderShim<ElemType>(nullptr /* TODO */);
+}
+
+extern "C" DATAREADER_API void GetReaderFNew(IDataReader<float>** preader)
+{
+    GetReaderNew(preader);
+}
+extern "C" DATAREADER_API void GetReaderDNew(IDataReader<double>** preader)
+{
+    GetReaderNew(preader);
+}
+
 }}}
