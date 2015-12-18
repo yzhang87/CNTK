@@ -196,10 +196,10 @@ private:
     bool m_hFlip;
 };
 
-class ScaleTransform : public ITransform
+class ScaleTransformOld : public ITransform
 {
 public:
-    ScaleTransform(int dataType, unsigned int seed) : m_dataType(dataType), m_seed(seed)
+    ScaleTransformOld(int dataType, unsigned int seed) : m_dataType(dataType), m_seed(seed)
     {
         assert(m_dataType == CV_32F || m_dataType == CV_64F);
 
@@ -269,10 +269,10 @@ private:
     size_t m_imgChannels;
 };
 
-class MeanTransform : public ITransform
+class MeanTransformOld : public ITransform
 {
 public:
-    MeanTransform()
+    MeanTransformOld()
     {
     }
 
@@ -325,8 +325,8 @@ template<class ElemType>
 ImageReader<ElemType>::ImageReader() : m_seed(0), m_rng(m_seed), m_imgListRand(true), m_pMBLayout(make_shared<MBLayout>())
 {
     m_transforms.push_back(std::make_unique<CropTransform>(m_seed));
-    m_transforms.push_back(std::make_unique<ScaleTransform>(sizeof(ElemType) == 4 ? CV_32F : CV_64F, m_seed));
-    m_transforms.push_back(std::make_unique<MeanTransform>());
+    m_transforms.push_back(std::make_unique<ScaleTransformOld>(sizeof(ElemType) == 4 ? CV_32F : CV_64F, m_seed));
+    m_transforms.push_back(std::make_unique<MeanTransformOld>());
 }
 
 template<class ElemType>
@@ -351,7 +351,7 @@ void ImageReader<ElemType>::InitFromConfig(const ConfigRecordType& config)
     // REVIEW alexeyk: currently support only one feature and label section.
     SectionT featSect{ gettter("width") };
     m_featName = msra::strfun::utf16(featSect.first);
-    // REVIEW alexeyk: w, h and c will be read again in ScaleTransform.
+    // REVIEW alexeyk: w, h and c will be read again in ScaleTransformOld.
     size_t w = featSect.second("width");
     size_t h = featSect.second("height");
     size_t c = featSect.second("channels");
