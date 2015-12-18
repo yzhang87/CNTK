@@ -80,10 +80,12 @@
     <ClInclude Include="HeapMemoryProvider.h" />
     <ClInclude Include="InnerInterfaces.h" />
     <ClInclude Include="ReaderInterfaces.h" />
+    <ClInclude Include="ReaderShim.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BlockRandomizer.cpp" />
+    <ClCompile Include="ReaderShim.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

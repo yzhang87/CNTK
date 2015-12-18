@@ -7,8 +7,10 @@
     <ClInclude Include="HeapMemoryProvider.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="BlockRandomizer.h" />
+    <ClInclude Include="ReaderShim.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BlockRandomizer.cpp" />
+    <ClCompile Include="ReaderShim.cpp" />
   </ItemGroup>
 </Project>
