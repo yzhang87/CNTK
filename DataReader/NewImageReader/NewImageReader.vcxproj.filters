@@ -20,7 +20,7 @@
     <ClCompile Include="..\..\Common\DebugUtil.cpp" />
     <ClCompile Include="ImageReaderNew.cpp" />
     <ClCompile Include="ImageTransformers.cpp" />
-    <ClCompile Include="ImageDeserializer.cpp" />
+    <ClCompile Include="ImageDataDeserializer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h" />
@@ -40,7 +40,7 @@
     <ClInclude Include="ImageReader.h" />
     <ClInclude Include="ImageReaderNew.h" />
     <ClInclude Include="ImageTransformers.h" />
-    <ClInclude Include="ImageDeserializer.h" />
+    <ClInclude Include="ImageDataDeserializer.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Common">

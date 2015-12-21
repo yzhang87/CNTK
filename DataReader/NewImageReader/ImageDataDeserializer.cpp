@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "ImageDeserializer.h"
+#include "ImageDataDeserializer.h"
 #include <opencv2/opencv.hpp>
 
 namespace Microsoft { namespace MSR { namespace CNTK {

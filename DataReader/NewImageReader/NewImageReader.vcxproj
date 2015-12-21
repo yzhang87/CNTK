@@ -110,7 +110,7 @@
     <ClInclude Include="..\..\Common\Include\DataReader.h" />
     <ClInclude Include="..\..\Common\Include\File.h" />
     <ClInclude Include="..\..\Common\Include\fileutil.h" />
-    <ClInclude Include="ImageDeserializer.h" />
+    <ClInclude Include="ImageDataDeserializer.h" />
     <ClInclude Include="ImageReader.h" />
     <ClInclude Include="ImageReaderNew.h" />
     <ClInclude Include="ImageTransformers.h" />
@@ -131,7 +131,7 @@
     <ClCompile Include="..\..\Common\fileutil.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="ImageDeserializer.cpp" />
+    <ClCompile Include="ImageDataDeserializer.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Exports.cpp">
       <ExcludedFromBuild Condition="!$(HasOpenCV)">true</ExcludedFromBuild>
