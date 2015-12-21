@@ -11,7 +11,10 @@
 #include "DataReader.h"
 #include "ImageReader.h"
 #include "ReaderShim.h"
+#include "ReaderShim.h"
 #include "ImageReaderNew.h"
+#include "ImageDataDeserializer.h"
+#include "BlockRandomizer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -32,6 +35,10 @@ extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
 
 ReaderPtr CreateReader(const ConfigParameters& parameters)
 {
+
+    auto deserializer = std::make_shared<ImageDataDeserializer>(parameters, sizeof(float) /* TODO */);
+    auto randomizer = std::make_shared<BlockRandomizer>(1 /* TODO verbosity */, SIZE_MAX, deserializer);
+
     return std::make_shared<ImageReaderNew>(parameters, nullptr);
 }
 
