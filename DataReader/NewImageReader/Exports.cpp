@@ -39,7 +39,7 @@ ReaderPtr CreateReader(const ConfigParameters& parameters)
     auto deserializer = std::make_shared<ImageDataDeserializer>(parameters, sizeof(float) /* TODO */);
     auto randomizer = std::make_shared<BlockRandomizer>(1 /* TODO verbosity */, SIZE_MAX, deserializer);
 
-    return std::make_shared<ImageReaderNew>(parameters, nullptr);
+    return std::make_shared<ImageReaderNew>(parameters, sizeof(float), nullptr);
 }
 
 template<class ElemType>
