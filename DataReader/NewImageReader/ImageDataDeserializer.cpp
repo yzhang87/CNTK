@@ -56,6 +56,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void ImageDataDeserializer::CreateSequenceDescriptions(const ConfigParameters& config, size_t labelDimension)
     {
+        UNREFERENCED_PARAMETER(labelDimension);
+
         std::string mapPath = config(L"file");
         std::ifstream mapFile(mapPath);
         if (!mapFile)
