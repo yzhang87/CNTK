@@ -17,28 +17,25 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     BaseTransformer::BaseTransformer(
         TransformerPtr next,
-        const std::set<std::wstring>& appliedStreams,
+        const std::wstring& appliedStream,
         unsigned int seed)
-        : m_appliedStreams(appliedStreams)
+        : m_appliedStream(appliedStream)
         , m_next(next)
         , m_seed(seed)
     {
     }
 
-    void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
+    void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& config)
     {
         const auto& inputs = m_next->GetInputs();
-        m_appliedStreamsHash.resize(inputs.size(), false);
-
-        for (const auto& input : inputs)
+        auto input = std::find_if(inputs.begin(), inputs.end(), [&](const InputDescriptionPtr& i) { return i->name == m_appliedStream; });
+        if (input == inputs.end())
         {
-            if (m_appliedStreams.find(input->name) != m_appliedStreams.end())
-            {
-                m_appliedStreamsHash[input->id] = true;
-            }
+            RuntimeError("Unknown stream name %s", m_appliedStream);
         }
 
-        // todo: check that all streams are exhausted.
+        m_appliedStreamId = (*input)->id;
+        m_next->SetEpochConfiguration(config);
     }
 
     std::vector<InputDescriptionPtr> BaseTransformer::GetInputs() const
@@ -54,20 +51,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return sample;
         }
 
-        for (int i = 0; i < m_appliedStreamsHash.size(); ++i)
-        {
-            if (m_appliedStreamsHash[i])
-            {
-                sample.m_data[i] = Apply(sample.m_data[i]);
-            }
-        }
-
+        sample.m_data[m_appliedStreamId] = Apply(sample.m_data[m_appliedStreamId]);
         return sample;
     }
 
     Sequence BaseTransformer::Apply(Sequence& s)
     {
-        int rows = static_cast<int>(s.layout->dimensions->GetHeight());
+        int rows = static_cast<int>(s.layout->dimensions->GetWidth());
         int columns = static_cast<int>(s.layout->dimensions->GetHeight());
         int channels = static_cast<int>(s.layout->dimensions->GetNumChannels());
 
@@ -86,13 +76,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         int type = CV_MAKETYPE(typeId, channels);
-        cv::Mat mat(rows, columns, type, s.data);
-        this->Apply(mat);
+        m_buffer = cv::Mat(rows, columns, type, s.data);
+        this->Apply(m_buffer);
 
         Sequence result;
-        result.layout = s.layout;
+        result.layout = std::make_shared<SampleLayout>();
+        result.layout->dimensions = std::make_shared<ImageLayout>(std::vector<size_t> {  });
+        *result.layout->dimensions = ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels());
         result.numberOfSamples = result.numberOfSamples;
-        result.data = mat.ptr();
+        result.layout->elementType = s.layout->elementType;
+        result.data = m_buffer.ptr();
         return result;
     }
 
@@ -100,9 +93,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     CropTransformNew::CropTransformNew(
         TransformerPtr next,
-        const std::set<std::wstring>& appliedStreams,
+        const std::wstring& appliedStream,
         const ConfigParameters& parameters,
-        unsigned int seed) : BaseTransformer(next, appliedStreams, seed)
+        unsigned int seed) : BaseTransformer(next, appliedStream, seed)
     {
         InitFromConfig(parameters);
     }
@@ -239,11 +232,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ScaleTransform::ScaleTransform(
         TransformerPtr next,
-        const std::set<std::wstring>& appliedStreams,
+        const std::wstring& appliedStream,
         unsigned int seed,
         int dataType,
         const ConfigParameters& config)
-        : BaseTransformer(next, appliedStreams, seed)
+        : BaseTransformer(next, appliedStream, seed)
         , m_dataType(dataType)
     {
         assert(m_dataType == CV_32F || m_dataType == CV_64F);
@@ -300,8 +293,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     MeanTransform::MeanTransform(
         TransformerPtr next,
-        const std::set<std::wstring>& appliedStreams)
-        : BaseTransformer(next, appliedStreams, 0)
+        const std::wstring& appliedStream)
+        : BaseTransformer(next, appliedStream, 0)
     {}
 
     void MeanTransform::InitFromConfig(const ConfigParameters & config)

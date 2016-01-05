@@ -6,76 +6,99 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config, size_t elementSize)
         : m_elementSize(elementSize)
-
     {
-        using SectionT = std::pair<std::string, ConfigParameters>;      // TODO: does not work for BrainScript, since configs cannot be copied
+        // TODO alexeyk: does not work for BrainScript, since configs cannot be copied
+        using SectionT = std::pair<std::string, ConfigParameters>;
         auto getter = [&](const std::string& paramName) -> SectionT
         {
             auto sect = std::find_if(config.begin(), config.end(),
                 [&](const std::pair<std::string, ConfigValue>& p)
-                {
-                    return ConfigParameters(p.second).ExistsCurrent(paramName);
-                });
+            {
+                return ConfigParameters(p.second).ExistsCurrent(paramName);
+            });
+
             if (sect == config.end())
+            {
                 RuntimeError("ImageReader requires %s parameter.", paramName.c_str());
+            }
             return{ (*sect).first, ConfigParameters((*sect).second) };
         };
 
         // REVIEW alexeyk: currently support only one feature and label section.
         SectionT featSect{ getter("width") };
-        m_featName = msra::strfun::utf16(featSect.first);
+
         // REVIEW alexeyk: w, h and c will be read again in ScaleTransform.
         size_t w = featSect.second("width");
         size_t h = featSect.second("height");
         size_t c = featSect.second("channels");
-        m_imgChannels = static_cast<int>(c); // TODO
+        m_imgChannels = static_cast<int>(c);
 
-        m_featDim = w * h * c;
-        // TODO we should not need this?
+        auto features = std::make_shared<InputDescription>();
+        features->id = 0;
+        features->name = msra::strfun::utf16(featSect.first);
+        features->sampleLayout = std::make_shared<ImageLayout>(std::vector<size_t> { w, h, c });
+        m_inputs.push_back(features);
 
         SectionT labSect{ getter("labelDim") };
-        m_labName = msra::strfun::utf16(labSect.first);
-        m_labDim = labSect.second("labelDim");
+        size_t labelDimension = labSect.second("labelDim");
 
+        auto labels = std::make_shared<InputDescription>();
+        labels->id = 1;
+        labels->name = msra::strfun::utf16(labSect.first);
+        labels->sampleLayout = std::make_shared<ImageLayout>(std::vector<size_t> { labelDimension });
+        m_inputs.push_back(labels);
+
+        m_floatLabelData.resize(labelDimension);
+        m_doubleLabelData.resize(labelDimension);
+
+        CreateSequenceDescriptions(config, labelDimension);
+    }
+
+    void ImageDataDeserializer::CreateSequenceDescriptions(const ConfigParameters& config, size_t labelDimension)
+    {
         std::string mapPath = config(L"file");
         std::ifstream mapFile(mapPath);
         if (!mapFile)
+        {
             RuntimeError("Could not open %s for reading.", mapPath.c_str());
+        }
 
         std::string line{ "" };
 
         ImageSequenceDescription description;
-
         description.numberOfSamples = 1;
         description.isValid = true;
-
         for (size_t cline = 0; std::getline(mapFile, line); cline++)
         {
             std::stringstream ss{ line };
             std::string imgPath;
             std::string clsId;
             if (!std::getline(ss, imgPath, '\t') || !std::getline(ss, clsId, '\t'))
+            {
                 RuntimeError("Invalid map file format, must contain 2 tab-delimited columns: %s, line: %d.", mapPath.c_str(), cline);
+            }
+
             description.id = cline;
-            // Put each image in its own chunk
             description.chunkId = cline;
             description.path = imgPath;
             description.classId = std::stoi(clsId);
-            assert(description.classId < m_labDim);
+            assert(description.classId < labelDimension);
             m_imageSequences.push_back(description);
-            m_sequences.push_back(&m_imageSequences[cline]);
+        }
+
+        for (const auto& sequence : m_imageSequences)
+        {
+            m_sequences.push_back(&sequence);
         }
     }
 
     std::vector<InputDescriptionPtr> ImageDataDeserializer::GetInputs() const
     {
-        std::vector<InputDescriptionPtr> dummy;
-        return dummy;
+        return m_inputs;
     }
 
     void ImageDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /* config */)
     {
-        throw std::logic_error("The method or operation is not implemented.");
     }
 
     const TimelineP& ImageDataDeserializer::GetSequenceDescriptions() const
@@ -91,52 +114,51 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Construct image
         Sequence image;
 
-        cv::Mat cvImage{ cv::imread(imageSequence.path, cv::IMREAD_COLOR) };
-        assert(cvImage.isContinuous());
+        m_currentImage = cv::imread(imageSequence.path, cv::IMREAD_COLOR);
+        assert(m_currentImage.isContinuous());
 
         int dataType = m_elementSize == 4 ? CV_32F : CV_64F;
 
         // Convert element type.
         // TODO this shouldnt be here...
-        if (cvImage.type() != CV_MAKETYPE(dataType, m_imgChannels))
-            cvImage.convertTo(cvImage, dataType);
+        // eldak Where should this be then ?:)
+        if (m_currentImage.type() != CV_MAKETYPE(dataType, m_imgChannels))
+        {
+            m_currentImage.convertTo(m_currentImage, dataType);
+        }
 
-        image.data = cvImage.ptr();
+        image.data = m_currentImage.ptr();
 
         auto imageSampleLayout = std::make_shared<SampleLayout>();
         imageSampleLayout->elementType = m_elementSize == 4 ? et_float : et_double;
         imageSampleLayout->storageType = st_dense;
         imageSampleLayout->dimensions = std::make_shared<ImageLayout>();
-        *imageSampleLayout->dimensions = ImageLayoutWHC(cvImage.cols, cvImage.rows, m_imgChannels);
+        *imageSampleLayout->dimensions = ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_imgChannels);
         image.layout = imageSampleLayout;
         image.numberOfSamples = imageSequence.numberOfSamples;
 
         // Construct label
-        Sequence label;
-        // TODO label.layout !!
-        if (m_elementSize == sizeof(float))
-        {
-            float* tmp = new float[m_labDim];
-            memset(tmp, 0, m_elementSize * m_labDim);
-            tmp[imageSequence.classId] = 1;
-            label.data = tmp;
-        }
-        else
-        {
-            double* tmp = new double[m_labDim];
-            memset(tmp, 0, m_elementSize * m_labDim);
-            tmp[imageSequence.classId] = 1;
-            label.data = tmp;
-        }
         auto labelSampleLayout = std::make_shared<SampleLayout>();
         labelSampleLayout->elementType = m_elementSize == 4 ? et_float : et_double;
         labelSampleLayout->storageType = st_dense;
-        labelSampleLayout->dimensions = std::make_shared<ImageLayout>();
-        *labelSampleLayout->dimensions = ImageLayoutVector(m_labDim);
+        labelSampleLayout->dimensions = m_inputs[1]->sampleLayout;
+
+        Sequence label;
+        if (m_elementSize == sizeof(float))
+        {
+            std::fill(m_floatLabelData.begin(), m_floatLabelData.end(), static_cast<float>(0));
+            m_floatLabelData[imageSequence.classId] = 1;
+            label.data = &m_floatLabelData[0];
+        }
+        else
+        {
+            std::fill(m_doubleLabelData.begin(), m_doubleLabelData.end(), 0);
+            m_doubleLabelData[imageSequence.classId] = 1;
+            label.data = &m_doubleLabelData[0];
+        }
+
         label.layout = labelSampleLayout;
-
         label.numberOfSamples = imageSequence.numberOfSamples;
-
         return std::vector<Sequence> { image, label };
     }
 
@@ -148,5 +170,4 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     void ImageDataDeserializer::ReleaseChunk(size_t /* chunkIndex */)
     {
     }
-
 }}}

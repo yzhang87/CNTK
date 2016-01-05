@@ -17,7 +17,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         BaseTransformer(
             TransformerPtr next,
-            const std::set<std::wstring>& appliedStreams,
+            const std::wstring& appliedStream,
             unsigned int seed);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
@@ -36,10 +36,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
     private:
-        std::set<std::wstring> m_appliedStreams;
-        std::vector<bool> m_appliedStreamsHash;
+        std::wstring m_appliedStream;
+        size_t m_appliedStreamId;
         TransformerPtr m_next;
         unsigned int m_seed;
+        cv::Mat m_buffer;
     };
 
     class CropTransformNew : public BaseTransformer
@@ -47,7 +48,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         CropTransformNew(
             TransformerPtr next,
-            const std::set<std::wstring>& appliedStreams,
+            const std::wstring& appliedStream,
             const ConfigParameters& parameters,
             unsigned int seed);
 
@@ -81,7 +82,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         ScaleTransform(TransformerPtr next,
-            const std::set<std::wstring>& appliedStreams,
+            const std::wstring& appliedStreams,
             unsigned int seed,
             int dataType,
             const ConfigParameters& config);
@@ -104,8 +105,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class MeanTransform : public BaseTransformer
     {
     public:
-        MeanTransform(TransformerPtr next,
-            const std::set<std::wstring>& appliedStreams);
+        MeanTransform(TransformerPtr next, const std::wstring& appliedStreams);
 
     private:
         virtual void Apply(cv::Mat& mat) override;

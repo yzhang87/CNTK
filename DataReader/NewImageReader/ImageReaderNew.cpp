@@ -32,7 +32,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageReaderNew::ImageReaderNew(
         const ConfigParameters& parameters,
-        size_t elementSize) : m_elementSize(elementSize)
+        size_t elementSize)
+        : m_elementSize(elementSize), m_seed(0)
     {
         InitFromConfig(parameters);
     }
@@ -58,10 +59,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_featDim = (*features)->sampleLayout->GetNumElements();
         m_labDim = (*labels)->sampleLayout->GetNumElements();
 
-        std::set<std::wstring> appliedStreams{ (*features)->name };
-        TransformerPtr cropper = std::make_shared<CropTransformNew>(randomizer, appliedStreams, config, m_seed);
-        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, appliedStreams, m_elementSize == 4 ? CV_32F : CV_64F, m_seed, config);
-        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, appliedStreams);
+        TransformerPtr cropper = std::make_shared<CropTransformNew>(randomizer, (*features)->name, config((*features)->name), m_seed);
+        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, (*features)->name, m_seed, m_elementSize == 4 ? CV_32F : CV_64F, config((*features)->name));
+        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, (*features)->name);
         m_transformer = mean;
     }
 
