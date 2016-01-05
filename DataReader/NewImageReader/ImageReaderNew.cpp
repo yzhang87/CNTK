@@ -10,7 +10,6 @@
 #include "ImageTransformers.h"
 #include "BlockRandomizer.h"
 #include "ImageDataDeserializer.h"
-#include "DataReader.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -33,73 +32,38 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageReaderNew::ImageReaderNew(
         const ConfigParameters& parameters,
-        size_t elementSize,
-        TransformerPtr /*transformer*/) : m_elementSize(elementSize)
+        size_t elementSize) : m_elementSize(elementSize)
     {
         InitFromConfig(parameters);
     }
 
     void ImageReaderNew::InitFromConfig(const ConfigParameters& config)
     {
-        std::string mapPath = config(L"file");
-        std::ifstream mapFile(mapPath);
-        if (!mapFile)
-        {
-            RuntimeError("Could not open %s for reading.", mapPath.c_str());
-        }
-
-        std::string line{ "" };
-        for (size_t cline = 0; std::getline(mapFile, line); cline++)
-        {
-            std::stringstream ss{ line };
-            std::string imgPath;
-            std::string clsId;
-            if (!std::getline(ss, imgPath, '\t') || !std::getline(ss, clsId, '\t'))
-                RuntimeError("Invalid map file format, must contain 2 tab-delimited columns: %s, line: %d.", mapPath.c_str(), cline);
-            files.push_back({ imgPath, std::stoi(clsId) });
-        }
-
         DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementSize);
-        TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
-        TransformerPtr cropper = std::make_shared<CropTransformNew>(randomizer, std::set<std::wstring> { L"features" }, config, m_seed);
-        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, std::set<std::wstring> { L"features" }, sizeof(m_elementSize) == 4 ? CV_32F : CV_64F, m_seed, config);
-        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, std::set<std::wstring> { L"features" });
-        m_transformer = mean;
-
-        using SectionT = std::pair<std::string, ConfigParameters>;      // TODO: does not work for BrainScript, since configs cannot be copied
-        auto gettter = [&](const std::string& paramName) -> SectionT
-        {
-            auto sect = std::find_if(config.begin(), config.end(),
-                [&](const std::pair<std::string, ConfigValue>& p) { return ConfigParameters(p.second).ExistsCurrent(paramName); });
-            if (sect == config.end())
-                RuntimeError("ImageReader requires %s parameter.", paramName.c_str());
-            return{ (*sect).first, ConfigParameters((*sect).second) };
-        };
-
-        // REVIEW alexeyk: currently support only one feature and label section.
-        SectionT featSect{ gettter("width") };
-        m_featName = msra::strfun::utf16(featSect.first);
-
-        // REVIEW alexeyk: w, h and c will be read again in ScaleTransformOld.
-        size_t w = featSect.second("width");
-        size_t h = featSect.second("height");
-        size_t c = featSect.second("channels");
-        m_featDim = w * h * c;
-
-        SectionT labSect{ gettter("labelDim") };
-        m_labName = msra::strfun::utf16(labSect.first);
-        m_labDim = labSect.second("labelDim");
 
         std::string rand = config(L"randomize", "auto");
         if (!AreEqual(rand, "auto"))
         {
             RuntimeError("Only Auto is currently supported.");
         }
+        TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
 
-        m_epochStart = 0;
-        m_mbStart = 0;
+        auto inputs = deserializer->GetInputs();
+        assert(inputs.size() == 2);
+        auto features = std::find_if(inputs.begin(), inputs.end(), [](const InputDescriptionPtr& input) { return input->name == L"features"; });
+        assert(features != inputs.end());
+        auto labels = std::find_if(inputs.begin(), inputs.end(), [](const InputDescriptionPtr& input) { return input->name == L"labels"; });
+        assert(labels != inputs.end());
+
+        m_featDim = (*features)->sampleLayout->GetNumElements();
+        m_labDim = (*labels)->sampleLayout->GetNumElements();
+
+        std::set<std::wstring> appliedStreams{ (*features)->name };
+        TransformerPtr cropper = std::make_shared<CropTransformNew>(randomizer, appliedStreams, config, m_seed);
+        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, appliedStreams, m_elementSize == 4 ? CV_32F : CV_64F, m_seed, config);
+        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, appliedStreams);
+        m_transformer = mean;
     }
-
 
     std::vector<InputDescriptionPtr> ImageReaderNew::GetInputs()
     {
@@ -111,63 +75,75 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.minibatchSize > 0);
         assert(config.totalSize > 0);
 
-        m_epochSize = (config.totalSize == requestDataSize ? files.size() : config.totalSize);
+        m_transformer->SetEpochConfiguration(config);
+
+        // TODO: move inside the shim.
+        m_endOfEpoch = false;
         m_mbSize = config.minibatchSize;
 
-        // REVIEW alexeyk: if user provides epoch size explicitly then we assume epoch size is a multiple of mbsize, is this ok?
-        assert(config.totalSize == requestDataSize || (m_epochSize % m_mbSize) == 0);
-
-        m_epoch = config.index;
-        m_epochStart = m_epoch * m_epochSize;
-        if (m_epochStart >= files.size())
-        {
-            m_epochStart = 0;
-            m_mbStart = 0;
-        }
-
-        //m_featBuf.resize(m_mbSize * m_featDim);
-        //m_labBuf.resize(m_mbSize * m_labDim);
+        m_featBuf.resize(m_mbSize * m_featDim * m_elementSize);
+        m_labBuf.resize(m_mbSize * m_labDim * m_elementSize);
 
         return std::make_shared<EpochImplementation>(this);
     }
 
     Minibatch ImageReaderNew::GetMinibatch()
     {
-//        assert(matrices.size() > 0);
-//        assert(matrices.find(m_featName) != matrices.end());
-//        assert(m_mbSize > 0);
-//
-//        if (m_mbStart >= files.size() || m_mbStart >= m_epochStart + m_epochSize)
-//            return false;
-//
-//        size_t mbLim = m_mbStart + m_mbSize;
-//        if (mbLim > files.size())
-//            mbLim = files.size();
-//
-//        std::fill(m_labBuf.begin(), m_labBuf.end(), static_cast<ElemType>(0));
-//
-//#pragma omp parallel for ordered schedule(dynamic)
-//        for (long long i = 0; i < static_cast<long long>(mbLim - m_mbStart); i++)
-//        {
-//            const auto& p = files[i + m_mbStart];
-//            cv::Mat img{ cv::imread(p.first, cv::IMREAD_COLOR) };
-//            for (auto& t : m_transforms)
-//                t->Apply(img);
-//
-//            assert(img.isContinuous());
-//            auto data = reinterpret_cast<ElemType*>(img.ptr());
-//            std::copy(data, data + m_featDim, m_featBuf.begin() + m_featDim * i);
-//            m_labBuf[m_labDim * i + p.second] = 1;
-//        }
-//
-//        size_t mbSize = mbLim - m_mbStart;
-//        features.SetValue(m_featDim, mbSize, features.GetDeviceId(), m_featBuf.data(), matrixFlagNormal);
-//        labels.SetValue(m_labDim, mbSize, labels.GetDeviceId(), m_labBuf.data(), matrixFlagNormal);
-//        m_pMBLayout->Init(mbSize, 1, false);
-//
-//        m_mbStart = mbLim;
-//        return true;
-        throw std::runtime_error("Not implemented.");
+        assert(m_mbSize > 0);
+
+        // TODO: should be in the shim?
+        if (m_endOfEpoch)
+        {
+            Minibatch m;
+            m.atEndOfEpoch = true;
+            return m;
+        }
+
+        std::fill(m_labBuf.begin(), m_labBuf.end(), 0);
+
+        Minibatch m;
+        m.atEndOfEpoch = false;
+
+        // TODO: Check that data deserializer and transformers are thread safe.
+        //#pragma omp parallel for ordered schedule(dynamic)
+        size_t mbSize = 0;
+        for (size_t i = 0; i < m_mbSize; i++)
+        {
+            auto image = m_transformer->GetNextSequence();
+            if(image.m_endOfEpoch)
+            {
+                m_endOfEpoch = true;
+                break;
+            }
+            mbSize++;
+
+            // features
+            std::copy(
+                reinterpret_cast<char*>(image.m_data[0].data),
+                reinterpret_cast<char*>(image.m_data[0].data) + m_featDim * m_elementSize,
+                m_featBuf.begin() + m_featDim * m_elementSize * i);
+
+            // labels
+            std::copy(
+                reinterpret_cast<char*>(image.m_data[1].data),
+                reinterpret_cast<char*>(image.m_data[1].data) + m_labDim * m_elementSize,
+                m_labBuf.begin() + m_labDim * m_elementSize * i);
+        }
+
+        // Features
+        LayoutPtr featureLayout = std::make_shared<Layout>();
+        featureLayout->rows = std::make_shared<ImageLayout>(std::vector<size_t> { m_featDim });
+        featureLayout->columns = std::make_shared<MBLayout>();
+        featureLayout->columns->Init(mbSize, 1);
+        InputPtr features = std::make_shared<Input>(&m_featBuf[0], m_featBuf.size(), featureLayout);
+        m.minibatch.insert(std::make_pair(0, features));
+
+        LayoutPtr labelLayout = std::make_shared<Layout>();
+        labelLayout->rows = std::make_shared<ImageLayout>(std::vector<size_t> { m_labDim });
+        labelLayout->columns = std::make_shared<MBLayout>();
+        labelLayout->columns->Init(mbSize, 1);
+        InputPtr labels = std::make_shared<Input>(&m_featBuf[0], m_featBuf.size(), labelLayout);
+        m.minibatch.insert(std::make_pair(1, labels));
+        return m;
     }
 }}}
-
