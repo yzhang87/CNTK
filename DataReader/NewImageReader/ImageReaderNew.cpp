@@ -142,7 +142,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         labelLayout->rows = std::make_shared<ImageLayout>(std::vector<size_t> { m_labDim });
         labelLayout->columns = std::make_shared<MBLayout>();
         labelLayout->columns->Init(mbSize, 1);
-        InputPtr labels = std::make_shared<Input>(&m_featBuf[0], m_featBuf.size(), labelLayout);
+        InputPtr labels = std::make_shared<Input>(&m_labBuf[0], m_labBuf.size(), labelLayout);
         m.minibatch.insert(std::make_pair(1, labels));
         return m;
     }

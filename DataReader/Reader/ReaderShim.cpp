@@ -105,7 +105,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        return m.atEndOfEpoch;
+        return !m.atEndOfEpoch;
     }
 
     template<class ElemType>
