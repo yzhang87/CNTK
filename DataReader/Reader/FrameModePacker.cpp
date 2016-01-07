@@ -18,6 +18,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_mbSize(minibatchSize)
         , m_elementSize(elementSize)
         , m_inputs(inputs)
+        , m_minibatchLayout(std::make_shared<MBLayout>())
     {
         for (const auto& input : inputs)
         {

@@ -4,6 +4,26 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    template<class TElement>
+    class TypedLabelGenerator : public ImageDataDeserializer::LabelGenerator
+    {
+    public:
+        TypedLabelGenerator(size_t dimensions)
+        {
+            m_labelData.resize(dimensions, 0);
+        }
+
+        virtual void* GetLabelDataFor(size_t classId) override
+        {
+            std::fill(m_labelData.begin(), m_labelData.end(), static_cast<TElement>(0));
+            m_labelData[classId] = 1;
+            return &m_labelData[0];
+        }
+
+    private:
+        std::vector<TElement> m_labelData;
+    };
+
     ImageDataDeserializer::ImageDataDeserializer(ImageConfigHelperPtr configHelper, size_t elementSize)
         : m_elementSize(elementSize)
     {
@@ -18,9 +38,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_inputs.push_back(labels);
 
         size_t labelDimension = labels->sampleLayout->GetHeight();
-
-        m_floatLabelData.resize(labelDimension);
-        m_doubleLabelData.resize(labelDimension);
+        if (m_elementSize == sizeof(float))
+        {
+            m_labelGenerator = std::make_shared<TypedLabelGenerator<float>>(labelDimension);
+        }
+        else if (m_elementSize == sizeof(double))
+        {
+            m_labelGenerator = std::make_shared<TypedLabelGenerator<double>>(labelDimension);
+        }
+        else
+        {
+            RuntimeError("Unsupported element size %ull.", m_elementSize);
+        }
 
         CreateSequenceDescriptions(configHelper, labelDimension);
     }
@@ -117,19 +146,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         labelSampleLayout->dimensions = m_inputs[1]->sampleLayout;
 
         Sequence label;
-        if (m_elementSize == sizeof(float))
-        {
-            std::fill(m_floatLabelData.begin(), m_floatLabelData.end(), static_cast<float>(0));
-            m_floatLabelData[imageSequence.classId] = 1;
-            label.data = &m_floatLabelData[0];
-        }
-        else
-        {
-            std::fill(m_doubleLabelData.begin(), m_doubleLabelData.end(), 0);
-            m_doubleLabelData[imageSequence.classId] = 1;
-            label.data = &m_doubleLabelData[0];
-        }
-
+        label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
         label.layout = labelSampleLayout;
         label.numberOfSamples = imageSequence.numberOfSamples;
         return std::vector<Sequence> { image, label };
