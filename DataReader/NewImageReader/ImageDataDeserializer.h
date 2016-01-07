@@ -26,16 +26,24 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t classId;
         };
 
+        class LabelGenerator
+        {
+        public:
+            virtual void* GetLabelDataFor(size_t classId) = 0;
+            virtual ~LabelGenerator() {}
+        };
+
+        typedef std::shared_ptr<LabelGenerator> LabelGeneratorPtr;
+
         void CreateSequenceDescriptions(ImageConfigHelperPtr configHelper, size_t labelDimension);
 
         std::vector<ImageSequenceDescription> m_imageSequences;
         TimelineP m_sequences;
 
         std::vector<InputDescriptionPtr> m_inputs;
-        std::vector<float> m_floatLabelData;
-        std::vector<double> m_doubleLabelData;
-        cv::Mat m_currentImage;
+        LabelGeneratorPtr m_labelGenerator;
 
+        cv::Mat m_currentImage;
         size_t m_elementSize;
         int m_imgChannels;
     };

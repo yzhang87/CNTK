@@ -22,6 +22,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         : m_appliedStream(appliedStream)
         , m_next(next)
         , m_seed(seed)
+        , m_appliedStreamId(0)
     {
     }
 
