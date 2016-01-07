@@ -32,7 +32,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     std::vector<InputDescriptionPtr> BaseTransformer::GetInputs() const
     {
-        return m_next->GetInputs();
+        assert(false);
+        throw std::runtime_error("Not supported");
     }
 
     SequenceData BaseTransformer::GetNextSequence()

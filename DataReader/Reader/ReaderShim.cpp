@@ -3,7 +3,7 @@
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
-// HTKMLFReaderShim.cpp: implementation for shim that wraps new HTKMLF reader
+// ReaderShim.cpp: implementation for shim wrapping the new reader interface
 //
 
 #define _CRT_SECURE_NO_WARNINGS

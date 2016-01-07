@@ -96,7 +96,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     std::vector<InputDescriptionPtr> ImageDataDeserializer::GetInputs() const
     {
-        return m_inputs;
+        assert(false);
+        throw std::runtime_error("Not supported");
     }
 
     void ImageDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /* config */)

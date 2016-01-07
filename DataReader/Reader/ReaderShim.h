@@ -1,9 +1,9 @@
 //
-// <copyright file="HTKMLFReader.h" company="Microsoft">
+// <copyright file="ReaderShim.h" company="Microsoft">
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
-// HTKMLFReaderShim.cpp: header for shim that wraps new HTKMLF reader
+// ReaderShim.h: header for shim wrapping the new reader interface
 //
 
 #pragma once
