@@ -20,6 +20,7 @@
     <ClCompile Include="ImageTransformers.cpp" />
     <ClCompile Include="ImageDataDeserializer.cpp" />
     <ClCompile Include="ImageReader.cpp" />
+    <ClCompile Include="ImageConfigHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h" />
@@ -39,6 +40,7 @@
     <ClInclude Include="ImageTransformers.h" />
     <ClInclude Include="ImageDataDeserializer.h" />
     <ClInclude Include="ImageReader.h" />
+    <ClInclude Include="ImageConfigHelper.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Common">

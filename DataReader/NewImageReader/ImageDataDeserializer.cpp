@@ -4,61 +4,32 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config, size_t elementSize)
+    ImageDataDeserializer::ImageDataDeserializer(ImageConfigHelperPtr configHelper, size_t elementSize)
         : m_elementSize(elementSize)
     {
-        // TODO alexeyk: does not work for BrainScript, since configs cannot be copied
-        using SectionT = std::pair<std::string, ConfigParameters>;
-        auto getter = [&](const std::string& paramName) -> SectionT
-        {
-            auto sect = std::find_if(config.begin(), config.end(),
-                [&](const std::pair<std::string, ConfigValue>& p)
-            {
-                return ConfigParameters(p.second).ExistsCurrent(paramName);
-            });
+        auto inputs = configHelper->GetInputs();
+        assert(inputs.size() == 2);
+        const auto & features = inputs[configHelper->GetFeatureInputIndex()];
+        const auto & labels = inputs[configHelper->GetLabelInputIndex()];
 
-            if (sect == config.end())
-            {
-                RuntimeError("ImageReader requires %s parameter.", paramName.c_str());
-            }
-            return{ (*sect).first, ConfigParameters((*sect).second) };
-        };
+        m_imgChannels = static_cast<int>(features->sampleLayout->GetNumChannels());
 
-        // REVIEW alexeyk: currently support only one feature and label section.
-        SectionT featSect{ getter("width") };
-
-        // REVIEW alexeyk: w, h and c will be read again in ScaleTransform.
-        size_t w = featSect.second("width");
-        size_t h = featSect.second("height");
-        size_t c = featSect.second("channels");
-        m_imgChannels = static_cast<int>(c);
-
-        auto features = std::make_shared<InputDescription>();
-        features->id = 0;
-        features->name = msra::strfun::utf16(featSect.first);
-        features->sampleLayout = std::make_shared<ImageLayout>(std::vector<size_t> { w, h, c });
         m_inputs.push_back(features);
-
-        SectionT labSect{ getter("labelDim") };
-        size_t labelDimension = labSect.second("labelDim");
-
-        auto labels = std::make_shared<InputDescription>();
-        labels->id = 1;
-        labels->name = msra::strfun::utf16(labSect.first);
-        labels->sampleLayout = std::make_shared<ImageLayout>(std::vector<size_t> { labelDimension });
         m_inputs.push_back(labels);
+
+        size_t labelDimension = labels->sampleLayout->GetHeight();
 
         m_floatLabelData.resize(labelDimension);
         m_doubleLabelData.resize(labelDimension);
 
-        CreateSequenceDescriptions(config, labelDimension);
+        CreateSequenceDescriptions(configHelper, labelDimension);
     }
 
-    void ImageDataDeserializer::CreateSequenceDescriptions(const ConfigParameters& config, size_t labelDimension)
+    void ImageDataDeserializer::CreateSequenceDescriptions(ImageConfigHelperPtr configHelper, size_t labelDimension)
     {
         UNREFERENCED_PARAMETER(labelDimension);
 
-        std::string mapPath = config(L"file");
+        std::string mapPath = configHelper->GetMapPath();
         std::ifstream mapFile(mapPath);
         if (!mapFile)
         {

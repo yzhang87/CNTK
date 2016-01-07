@@ -7,6 +7,7 @@
 #include "stdafx.h"
 #include "ImageReader.h"
 #include "commandArgUtil.h"
+#include "ImageConfigHelper.h"
 #include "ImageTransformers.h"
 #include "BlockRandomizer.h"
 #include "ImageDataDeserializer.h"
@@ -28,7 +29,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void ImageReader::InitFromConfig(const ConfigParameters& config)
     {
-        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementSize);
+        auto configHelper = std::make_shared<ImageConfigHelper>(config);
+        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(configHelper, m_elementSize);
 
         std::string rand = config(L"randomize", "auto");
         if (!AreEqual(rand, "auto"))
