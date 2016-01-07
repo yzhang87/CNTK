@@ -8,9 +8,11 @@
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="BlockRandomizer.h" />
     <ClInclude Include="ReaderShim.h" />
+    <ClInclude Include="FrameModePacker.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BlockRandomizer.cpp" />
     <ClCompile Include="ReaderShim.cpp" />
+    <ClCompile Include="FrameModePacker.cpp" />
   </ItemGroup>
 </Project>
