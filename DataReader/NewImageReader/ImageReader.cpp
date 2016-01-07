@@ -10,6 +10,7 @@
 #include "ImageTransformers.h"
 #include "BlockRandomizer.h"
 #include "ImageDataDeserializer.h"
+#include "FrameModePacker.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -44,9 +45,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto labels = std::find_if(inputs.begin(), inputs.end(), [](const InputDescriptionPtr& input) { return input->name == L"labels"; });
         assert(labels != inputs.end());
 
-        m_featDim = (*features)->sampleLayout->GetNumElements();
-        m_labDim = (*labels)->sampleLayout->GetNumElements();
-
         TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, (*features)->name, config((*features)->name), m_seed);
         TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, (*features)->name, m_seed, m_elementSize == 4 ? CV_32F : CV_64F, config((*features)->name));
         TransformerPtr mean = std::make_shared<MeanTransform>(scaler, (*features)->name);
@@ -64,61 +62,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.totalSize > 0);
 
         m_transformer->SetEpochConfiguration(config);
-        m_mbSize = config.minibatchSize;
-
-        m_featBuf.resize(m_mbSize * m_featDim * m_elementSize);
-        m_labBuf.resize(m_mbSize * m_labDim * m_elementSize);
+        m_packer = std::make_shared<FrameModePacker>(m_transformer, config.minibatchSize, m_elementSize, m_transformer->GetInputs());
     }
 
     Minibatch ImageReader::ReadMinibatch()
     {
-        assert(m_mbSize > 0);
-
-        std::fill(m_labBuf.begin(), m_labBuf.end(), 0);
-
-        Minibatch m;
-        m.atEndOfEpoch = false;
-
-        // TODO: Check that data deserializer and transformers are thread safe.
-        //#pragma omp parallel for ordered schedule(dynamic)
-        size_t mbSize = 0;
-        for (size_t i = 0; i < m_mbSize; i++)
-        {
-            auto image = m_transformer->GetNextSequence();
-            if(image.m_endOfEpoch)
-            {
-                m.atEndOfEpoch = true;
-                break;
-            }
-            mbSize++;
-
-            // features
-            std::copy(
-                reinterpret_cast<char*>(image.m_data[0].data),
-                reinterpret_cast<char*>(image.m_data[0].data) + m_featDim * m_elementSize,
-                m_featBuf.begin() + m_featDim * m_elementSize * i);
-
-            // labels
-            std::copy(
-                reinterpret_cast<char*>(image.m_data[1].data),
-                reinterpret_cast<char*>(image.m_data[1].data) + m_labDim * m_elementSize,
-                m_labBuf.begin() + m_labDim * m_elementSize * i);
-        }
-
-        // Features
-        LayoutPtr featureLayout = std::make_shared<Layout>();
-        featureLayout->rows = std::make_shared<ImageLayout>(std::vector<size_t> { m_featDim });
-        featureLayout->columns = std::make_shared<MBLayout>();
-        featureLayout->columns->Init(mbSize, 1);
-        InputPtr features = std::make_shared<Input>(&m_featBuf[0], m_featBuf.size(), featureLayout);
-        m.minibatch.insert(std::make_pair(0, features));
-
-        LayoutPtr labelLayout = std::make_shared<Layout>();
-        labelLayout->rows = std::make_shared<ImageLayout>(std::vector<size_t> { m_labDim });
-        labelLayout->columns = std::make_shared<MBLayout>();
-        labelLayout->columns->Init(mbSize, 1);
-        InputPtr labels = std::make_shared<Input>(&m_labBuf[0], m_labBuf.size(), labelLayout);
-        m.minibatch.insert(std::make_pair(1, labels));
-        return m;
+        return m_packer->ReadMinibatch();
     }
 }}}

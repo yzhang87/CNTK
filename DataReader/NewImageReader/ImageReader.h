@@ -8,6 +8,7 @@
 
 #include "ReaderInterfaces.h"
 #include "ImageTransformers.h"
+#include "FrameModePacker.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -25,17 +26,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void InitFromConfig(const ConfigParameters& config);
 
         TransformerPtr m_transformer;
+        FrameModePackerPtr m_packer;
         unsigned int m_seed;
 
-        size_t m_featDim;
-        size_t m_labDim;
-
-        size_t m_mbSize;
-        std::vector<char> m_featBuf;
-        std::vector<char> m_labBuf;
-
         bool m_imgListRand;
-        MBLayoutPtr m_pMBLayout;
         size_t m_elementSize;
     };
 

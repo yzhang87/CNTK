@@ -16,7 +16,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         TransformerPtr m_transformer;
         std::vector<InputDescriptionPtr> m_inputs;
         std::vector<std::vector<char>> m_inputBuffers;
-        std::vector<TensorShapePtr> m_inputLayouts;
 
         MBLayoutPtr m_minibatchLayout;
         size_t m_mbSize;
@@ -32,4 +31,5 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Minibatch ReadMinibatch();
     };
 
+    typedef std::shared_ptr<FrameModePacker> FrameModePackerPtr;
 }}}
