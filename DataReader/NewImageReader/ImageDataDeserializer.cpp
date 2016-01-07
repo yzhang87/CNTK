@@ -105,8 +105,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto imageSampleLayout = std::make_shared<SampleLayout>();
         imageSampleLayout->elementType = m_elementSize == 4 ? et_float : et_double;
         imageSampleLayout->storageType = st_dense;
-        imageSampleLayout->dimensions = std::make_shared<ImageLayout>();
-        *imageSampleLayout->dimensions = ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_imgChannels);
+        imageSampleLayout->dimensions = std::make_shared<ImageLayout>(
+            ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_imgChannels));
         image.layout = imageSampleLayout;
         image.numberOfSamples = imageSequence.numberOfSamples;
 

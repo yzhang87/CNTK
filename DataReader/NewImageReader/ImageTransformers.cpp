@@ -81,8 +81,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         Sequence result;
         result.layout = std::make_shared<SampleLayout>();
-        result.layout->dimensions = std::make_shared<ImageLayout>(std::vector<size_t> {  });
-        *result.layout->dimensions = ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels());
+        result.layout->dimensions = std::make_shared<ImageLayout>(
+            ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels()));
         result.numberOfSamples = result.numberOfSamples;
         result.layout->elementType = s.layout->elementType;
         result.data = m_buffer.ptr();
