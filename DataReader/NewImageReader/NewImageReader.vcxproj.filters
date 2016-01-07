@@ -16,7 +16,6 @@
       <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="ImageReader.cpp" />
     <ClCompile Include="..\..\Common\DebugUtil.cpp" />
     <ClCompile Include="ImageReaderNew.cpp" />
     <ClCompile Include="ImageTransformers.cpp" />
@@ -37,7 +36,6 @@
     <ClInclude Include="..\..\Common\Include\fileutil.h">
       <Filter>Common\Include</Filter>
     </ClInclude>
-    <ClInclude Include="ImageReader.h" />
     <ClInclude Include="ImageReaderNew.h" />
     <ClInclude Include="ImageTransformers.h" />
     <ClInclude Include="ImageDataDeserializer.h" />
