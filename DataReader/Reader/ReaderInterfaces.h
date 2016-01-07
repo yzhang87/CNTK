@@ -30,7 +30,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::wstring name;
         InputId id;
         TensorShapePtr sampleLayout;
-        std::string targetLayoutType;
         std::map<std::string, std::string> properties;
     };
     typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
