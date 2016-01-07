@@ -87,6 +87,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             auto image = m_transformer->GetNextSequence();
             if(image.m_endOfEpoch)
             {
+                m.atEndOfEpoch = true;
                 break;
             }
             mbSize++;
