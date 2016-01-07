@@ -7,6 +7,7 @@
 #include "stdafx.h"
 #include "ImageReader.h"
 #include "commandArgUtil.h"
+#include "ImageConfigHelper.h"
 #include "ImageTransformers.h"
 #include "BlockRandomizer.h"
 #include "ImageDataDeserializer.h"
@@ -24,14 +25,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void ImageReader::InitFromConfig(const ConfigParameters& config)
     {
-        m_configHelper = std::make_shared<ImageConfigHelper>(config);
-        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(m_configHelper, m_elementType);
+        auto configHelper = ImageConfigHelper(config);
+        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementType);
 
         TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
 
-        auto inputs = m_configHelper->GetInputs();
-        assert(inputs.size() == 2);
-        const auto & features = inputs[m_configHelper->GetFeatureInputIndex()];
+        m_inputs = configHelper.GetInputs();
+        assert(m_inputs.size() == 2);
+        const auto & features = m_inputs[configHelper.GetFeatureInputIndex()];
 
         TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, features->id, config(features->name), m_seed);
         TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->id, m_seed, m_elementType == et_float ? CV_32F : CV_64F, config(features->name));
@@ -41,7 +42,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     std::vector<InputDescriptionPtr> ImageReader::GetInputs()
     {
-        return m_configHelper->GetInputs();
+        return m_inputs;
     }
 
     void ImageReader::StartEpoch(const EpochConfiguration& config)
@@ -54,7 +55,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_transformer, 
             config.minibatchSize, 
             m_elementType == et_float ? sizeof(float) : sizeof(double),
-            m_configHelper->GetInputs());
+            m_inputs);
     }
 
     Minibatch ImageReader::ReadMinibatch()

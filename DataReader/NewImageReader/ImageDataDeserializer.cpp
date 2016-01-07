@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ImageDataDeserializer.h"
+#include "ImageConfigHelper.h"
 #include <opencv2/opencv.hpp>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -24,13 +25,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<TElement> m_labelData;
     };
 
-    ImageDataDeserializer::ImageDataDeserializer(ImageConfigHelperPtr configHelper, ElementType elementType)
+    ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config, ElementType elementType)
         : m_elementType(elementType)
     {
-        auto inputs = configHelper->GetInputs();
+        auto configHelper = ImageConfigHelper(config);
+        auto inputs = configHelper.GetInputs();
         assert(inputs.size() == 2);
-        const auto & features = inputs[configHelper->GetFeatureInputIndex()];
-        const auto & labels = inputs[configHelper->GetLabelInputIndex()];
+        const auto & features = inputs[configHelper.GetFeatureInputIndex()];
+        const auto & labels = inputs[configHelper.GetLabelInputIndex()];
 
         m_inputs.push_back(features);
         m_inputs.push_back(labels);
@@ -49,14 +51,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError("Unsupported element type %ull.", m_elementType);
         }
 
-        CreateSequenceDescriptions(configHelper, labelDimension);
+        CreateSequenceDescriptions(configHelper.GetMapPath(), labelDimension);
     }
 
-    void ImageDataDeserializer::CreateSequenceDescriptions(ImageConfigHelperPtr configHelper, size_t labelDimension)
+    void ImageDataDeserializer::CreateSequenceDescriptions(std::string mapPath, size_t labelDimension)
     {
         UNREFERENCED_PARAMETER(labelDimension);
 
-        std::string mapPath = configHelper->GetMapPath();
         std::ifstream mapFile(mapPath);
         if (!mapFile)
         {

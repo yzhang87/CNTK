@@ -9,7 +9,6 @@
 #include "ReaderInterfaces.h"
 #include "ImageTransformers.h"
 #include "FrameModePacker.h"
-#include "ImageConfigHelper.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -26,7 +25,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     private:
         void InitFromConfig(const ConfigParameters& config);
 
-        ImageConfigHelperPtr m_configHelper;
+        std::vector<InputDescriptionPtr> m_inputs;
         TransformerPtr m_transformer;
         FrameModePackerPtr m_packer;
         unsigned int m_seed;
