@@ -34,15 +34,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(inputs.size() == 2);
         const auto & features = inputs[configHelper->GetFeatureInputIndex()];
 
-        TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, features->name, config(features->name), m_seed);
-        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->name, m_seed, m_elementType == et_float ? CV_32F : CV_64F, config(features->name));
-        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, features->name);
+        TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, features->id, config(features->name), m_seed);
+        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->id, m_seed, m_elementType == et_float ? CV_32F : CV_64F, config(features->name));
+        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, features->id);
         m_transformer = mean;
     }
 
     std::vector<InputDescriptionPtr> ImageReader::GetInputs()
     {
         return m_transformer->GetInputs();
+        // TODO replace by configHelper->GetInputs();
     }
 
     void ImageReader::StartEpoch(const EpochConfiguration& config)
@@ -55,7 +56,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_transformer, 
             config.minibatchSize, 
             m_elementType == et_float ? sizeof(float) : sizeof(double),
-            m_transformer->GetInputs());
+            m_transformer->GetInputs()/* TODO */);
     }
 
     Minibatch ImageReader::ReadMinibatch()

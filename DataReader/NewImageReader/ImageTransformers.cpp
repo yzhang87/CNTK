@@ -17,25 +17,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     BaseTransformer::BaseTransformer(
         TransformerPtr next,
-        const std::wstring& appliedStream,
+        InputId appliedStreamId,
         unsigned int seed)
-        : m_appliedStream(appliedStream)
+        : m_appliedStreamId(appliedStreamId)
         , m_next(next)
         , m_seed(seed)
-        , m_appliedStreamId(0)
     {
     }
 
     void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& config)
     {
-        const auto& inputs = m_next->GetInputs();
-        auto input = std::find_if(inputs.begin(), inputs.end(), [&](const InputDescriptionPtr& i) { return i->name == m_appliedStream; });
-        if (input == inputs.end())
-        {
-            RuntimeError("Unknown stream name %s", m_appliedStream);
-        }
-
-        m_appliedStreamId = (*input)->id;
         m_next->SetEpochConfiguration(config);
     }
 
@@ -94,9 +85,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     CropTransform::CropTransform(
         TransformerPtr next,
-        const std::wstring& appliedStream,
+        InputId appliedStreamId,
         const ConfigParameters& parameters,
-        unsigned int seed) : BaseTransformer(next, appliedStream, seed)
+        unsigned int seed) : BaseTransformer(next, appliedStreamId, seed)
     {
         InitFromConfig(parameters);
     }
@@ -233,11 +224,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ScaleTransform::ScaleTransform(
         TransformerPtr next,
-        const std::wstring& appliedStream,
+        InputId appliedStreamId,
         unsigned int seed,
         int dataType,
         const ConfigParameters& config)
-        : BaseTransformer(next, appliedStream, seed)
+        : BaseTransformer(next, appliedStreamId, seed)
         , m_dataType(dataType)
     {
         assert(m_dataType == CV_32F || m_dataType == CV_64F);
@@ -294,8 +285,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     MeanTransform::MeanTransform(
         TransformerPtr next,
-        const std::wstring& appliedStream)
-        : BaseTransformer(next, appliedStream, 0)
+        InputId appliedStreamId)
+        : BaseTransformer(next, appliedStreamId, 0)
     {}
 
     void MeanTransform::InitFromConfig(const ConfigParameters & config)
