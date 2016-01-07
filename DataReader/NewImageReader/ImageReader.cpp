@@ -5,7 +5,7 @@
 //
 
 #include "stdafx.h"
-#include "ImageReaderNew.h"
+#include "ImageReader.h"
 #include "commandArgUtil.h"
 #include "ImageTransformers.h"
 #include "BlockRandomizer.h"
@@ -18,19 +18,19 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
     }
 
-    ImageReaderNew::EpochImplementation::EpochImplementation(ImageReaderNew* parent)
+    ImageReader::EpochImplementation::EpochImplementation(ImageReader* parent)
         : m_parent(parent)
     {}
 
-    ImageReaderNew::EpochImplementation::~EpochImplementation()
+    ImageReader::EpochImplementation::~EpochImplementation()
     {}
 
-    Minibatch ImageReaderNew::EpochImplementation::ReadMinibatch()
+    Minibatch ImageReader::EpochImplementation::ReadMinibatch()
     {
         return m_parent->GetMinibatch();
     }
 
-    ImageReaderNew::ImageReaderNew(
+    ImageReader::ImageReader(
         const ConfigParameters& parameters,
         size_t elementSize)
         : m_elementSize(elementSize), m_seed(0)
@@ -38,7 +38,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         InitFromConfig(parameters);
     }
 
-    void ImageReaderNew::InitFromConfig(const ConfigParameters& config)
+    void ImageReader::InitFromConfig(const ConfigParameters& config)
     {
         DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementSize);
 
@@ -59,18 +59,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_featDim = (*features)->sampleLayout->GetNumElements();
         m_labDim = (*labels)->sampleLayout->GetNumElements();
 
-        TransformerPtr cropper = std::make_shared<CropTransformNew>(randomizer, (*features)->name, config((*features)->name), m_seed);
+        TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, (*features)->name, config((*features)->name), m_seed);
         TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, (*features)->name, m_seed, m_elementSize == 4 ? CV_32F : CV_64F, config((*features)->name));
         TransformerPtr mean = std::make_shared<MeanTransform>(scaler, (*features)->name);
         m_transformer = mean;
     }
 
-    std::vector<InputDescriptionPtr> ImageReaderNew::GetInputs()
+    std::vector<InputDescriptionPtr> ImageReader::GetInputs()
     {
         return m_transformer->GetInputs();
     }
 
-    EpochPtr ImageReaderNew::StartNextEpoch(const EpochConfiguration& config)
+    EpochPtr ImageReader::StartNextEpoch(const EpochConfiguration& config)
     {
         assert(config.minibatchSize > 0);
         assert(config.totalSize > 0);
@@ -87,7 +87,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return std::make_shared<EpochImplementation>(this);
     }
 
-    Minibatch ImageReaderNew::GetMinibatch()
+    Minibatch ImageReader::GetMinibatch()
     {
         assert(m_mbSize > 0);
 

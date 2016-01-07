@@ -91,7 +91,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    CropTransformNew::CropTransformNew(
+    CropTransform::CropTransform(
         TransformerPtr next,
         const std::wstring& appliedStream,
         const ConfigParameters& parameters,
@@ -100,7 +100,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         InitFromConfig(parameters);
     }
 
-    void CropTransformNew::InitFromConfig(const ConfigParameters & config)
+    void CropTransform::InitFromConfig(const ConfigParameters & config)
     {
         m_cropType = ParseCropType(config(L"cropType", ""));
 
@@ -127,7 +127,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void CropTransformNew::Apply(cv::Mat& mat)
+    void CropTransform::Apply(cv::Mat& mat)
     {
         auto seed = GetSeed();
         auto rng = m_rngs.pop_or_create([seed]() { return std::make_unique<std::mt19937>(seed); });
@@ -160,7 +160,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_rngs.push(std::move(rng));
     }
 
-    CropTransformNew::CropType CropTransformNew::ParseCropType(const std::string& src)
+    CropTransform::CropType CropTransform::ParseCropType(const std::string& src)
     {
         if (src.empty() || AreEqual(src, "center"))
         {
@@ -175,7 +175,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         RuntimeError("Invalid crop type: %s.", src.c_str());
     }
 
-    CropTransformNew::RatioJitterType CropTransformNew::ParseJitterType(const std::string& src)
+    CropTransform::RatioJitterType CropTransform::ParseJitterType(const std::string& src)
     {
         if (src.empty() || AreEqual(src, "none"))
         {
@@ -200,7 +200,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         RuntimeError("Invalid jitter type: %s.", src.c_str());
     }
 
-    cv::Rect CropTransformNew::GetCropRect(CropType type, int crow, int ccol, double cropRatio, std::mt19937& rng)
+    cv::Rect CropTransform::GetCropRect(CropType type, int crow, int ccol, double cropRatio, std::mt19937& rng)
     {
         assert(crow > 0);
         assert(ccol > 0);

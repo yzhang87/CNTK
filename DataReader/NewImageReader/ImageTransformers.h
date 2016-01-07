@@ -43,10 +43,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         cv::Mat m_buffer;
     };
 
-    class CropTransformNew : public BaseTransformer
+    class CropTransform : public BaseTransformer
     {
     public:
-        CropTransformNew(
+        CropTransform(
             TransformerPtr next,
             const std::wstring& appliedStream,
             const ConfigParameters& parameters,

@@ -11,10 +11,10 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    class ImageReaderNew : public Reader
+    class ImageReader : public Reader
     {
     public:
-        ImageReaderNew(const ConfigParameters& parameters,
+        ImageReader(const ConfigParameters& parameters,
             size_t elementSize);
 
         std::vector<InputDescriptionPtr> GetInputs() override;
@@ -23,10 +23,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     private:
         class EpochImplementation : public Epoch
         {
-            ImageReaderNew* m_parent;
+            ImageReader* m_parent;
 
         public:
-            EpochImplementation(ImageReaderNew* parent);
+            EpochImplementation(ImageReader* parent);
             virtual Minibatch ReadMinibatch() override;
             virtual ~EpochImplementation();
         };
