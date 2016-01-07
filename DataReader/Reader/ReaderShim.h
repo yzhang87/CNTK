@@ -24,7 +24,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         ReaderPtr m_reader;
         ReaderFactory m_factory;
 
-        EpochPtr m_epoch;
         MBLayoutPtr m_layout;
 
         std::map<std::wstring, size_t> m_nameToInputId;

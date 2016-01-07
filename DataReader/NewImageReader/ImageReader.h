@@ -18,21 +18,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t elementSize);
 
         std::vector<InputDescriptionPtr> GetInputs() override;
-        EpochPtr StartNextEpoch(const EpochConfiguration& config) override;
+        void StartEpoch(const EpochConfiguration& config) override;
+        Minibatch ReadMinibatch() override;
 
     private:
-        class EpochImplementation : public Epoch
-        {
-            ImageReader* m_parent;
-
-        public:
-            EpochImplementation(ImageReader* parent);
-            virtual Minibatch ReadMinibatch() override;
-            virtual ~EpochImplementation();
-        };
-
         void InitFromConfig(const ConfigParameters& config);
-        Minibatch GetMinibatch();
 
         TransformerPtr m_transformer;
         unsigned int m_seed;

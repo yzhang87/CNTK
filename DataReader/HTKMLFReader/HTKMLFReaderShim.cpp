@@ -66,7 +66,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         config.totalSize = requestedEpochSamples;
         config.index = epoch;
 
-        m_epoch = m_packer->StartNextEpoch(config);
+        m_packer->StartEpoch(config);
     }
 
     template<class ElemType>
@@ -82,7 +82,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        Minibatch m = m_epoch->ReadMinibatch();
+        Minibatch m = m_packer->ReadMinibatch();
         if (m.atEndOfEpoch)
         {
             return false;

@@ -18,18 +18,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
     }
 
-    ImageReader::EpochImplementation::EpochImplementation(ImageReader* parent)
-        : m_parent(parent)
-    {}
-
-    ImageReader::EpochImplementation::~EpochImplementation()
-    {}
-
-    Minibatch ImageReader::EpochImplementation::ReadMinibatch()
-    {
-        return m_parent->GetMinibatch();
-    }
-
     ImageReader::ImageReader(
         const ConfigParameters& parameters,
         size_t elementSize)
@@ -70,7 +58,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_transformer->GetInputs();
     }
 
-    EpochPtr ImageReader::StartNextEpoch(const EpochConfiguration& config)
+    void ImageReader::StartEpoch(const EpochConfiguration& config)
     {
         assert(config.minibatchSize > 0);
         assert(config.totalSize > 0);
@@ -83,11 +71,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_featBuf.resize(m_mbSize * m_featDim * m_elementSize);
         m_labBuf.resize(m_mbSize * m_labDim * m_elementSize);
-
-        return std::make_shared<EpochImplementation>(this);
     }
 
-    Minibatch ImageReader::GetMinibatch()
+    Minibatch ImageReader::ReadMinibatch()
     {
         assert(m_mbSize > 0);
 

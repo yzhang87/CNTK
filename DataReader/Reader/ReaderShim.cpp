@@ -68,7 +68,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         config.totalSize = requestedEpochSamples;
         config.index = epoch;
 
-        m_epoch = m_reader->StartNextEpoch(config);
+        m_reader->StartEpoch(config);
     }
 
     template<class ElemType>
@@ -85,7 +85,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        Minibatch m = m_epoch->ReadMinibatch();
+        Minibatch m = m_reader->ReadMinibatch();
         if (!m.atEndOfEpoch)
         {
             // Copy returned minibatch to the matrices.

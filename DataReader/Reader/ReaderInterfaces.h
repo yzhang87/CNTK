@@ -118,20 +118,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     };
 
-    class Epoch
-    {
-    public:
-        virtual Minibatch ReadMinibatch() = 0;
-        virtual ~Epoch() = 0 {};
-    };
-    typedef std::shared_ptr<Epoch> EpochPtr;
-
     // Main Reader interface. The border interface between the CNTK and Reader.
     class Reader
     {
     public:
         virtual std::vector<InputDescriptionPtr> GetInputs() = 0;
-        virtual EpochPtr StartNextEpoch(const EpochConfiguration& config) = 0;
+        virtual void StartEpoch(const EpochConfiguration& config) = 0;
+        virtual Minibatch ReadMinibatch() = 0;
         virtual ~Reader() = 0 {};
     };
     typedef std::shared_ptr<Reader> ReaderPtr;

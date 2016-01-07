@@ -19,7 +19,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class HTKMLFReaderShim : public IDataReader<ElemType>
     {
         FrameModePackerPtr m_packer;
-        EpochPtr m_epoch;
         MBLayoutPtr m_layout;
         MemoryProviderPtr m_memoryProvider;
 

@@ -15,23 +15,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         FrameModePacker(const ConfigParameters & config, MemoryProviderPtr memoryProvider, size_t elementSize);
 
         virtual std::vector<InputDescriptionPtr> GetInputs() override;
-        virtual EpochPtr StartNextEpoch(const EpochConfiguration& config) override;
-
-    private:
-        class EpochImplementation : public Epoch
-        {
-            FrameModePacker* m_parent;
-
-        public:
-            EpochImplementation(FrameModePacker* parent);
-            virtual Minibatch ReadMinibatch() override;
-            virtual ~EpochImplementation();
-        };
+        virtual void StartEpoch(const EpochConfiguration& config) override;
+        virtual Minibatch ReadMinibatch() override;
 
     private:
         void InitFromConfig(const ConfigParameters& config);
         void StartDistributedMinibatchLoop(size_t requestedMBSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples /*= requestDataSize*/);
-        Minibatch GetMinibatch();
 
         void PackToMinibatch(Minibatch &mb);
         void FillOneUttDataforParallelmode(size_t startFr,

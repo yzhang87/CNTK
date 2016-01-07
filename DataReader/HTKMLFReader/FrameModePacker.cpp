@@ -24,18 +24,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return *input;
     }
 
-    FrameModePacker::EpochImplementation::EpochImplementation(FrameModePacker* parent)
-        : m_parent(parent)
-    {}
-
-    FrameModePacker::EpochImplementation::~EpochImplementation()
-    {}
-
-    Minibatch FrameModePacker::EpochImplementation::ReadMinibatch()
-    {
-        return m_parent->GetMinibatch();
-    }
-
     FrameModePacker::FrameModePacker(const ConfigParameters& config, MemoryProviderPtr memoryProvider, size_t elementSize)
         : m_pMBLayout(make_shared<MBLayout>())
         , m_memoryProvider(memoryProvider)
@@ -49,7 +37,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_transformer->GetInputs();
     }
 
-    EpochPtr FrameModePacker::StartNextEpoch(const EpochConfiguration& config)
+    void FrameModePacker::StartEpoch(const EpochConfiguration& config)
     {
         assert(config.workerRank < config.numberOfWorkers);
 
@@ -57,7 +45,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_transformer->SetEpochConfiguration(config);
 
         StartDistributedMinibatchLoop(config.minibatchSize, config.index, config.workerRank, config.numberOfWorkers, config.totalSize);
-        return std::make_unique<EpochImplementation>(this);
     }
 
     void FrameModePacker::InitFromConfig(const ConfigParameters & readerConfig)
@@ -240,7 +227,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    Minibatch FrameModePacker::GetMinibatch()
+    Minibatch FrameModePacker::ReadMinibatch()
     {
         assert(m_numSeqsPerMB == 1);
 
