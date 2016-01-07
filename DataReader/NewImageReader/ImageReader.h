@@ -37,7 +37,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool m_imgListRand;
         MBLayoutPtr m_pMBLayout;
         size_t m_elementSize;
-        bool m_endOfEpoch;
     };
 
 }}}

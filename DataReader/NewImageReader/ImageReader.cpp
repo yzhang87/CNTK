@@ -64,9 +64,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.totalSize > 0);
 
         m_transformer->SetEpochConfiguration(config);
-
-        // TODO: move inside the shim.
-        m_endOfEpoch = false;
         m_mbSize = config.minibatchSize;
 
         m_featBuf.resize(m_mbSize * m_featDim * m_elementSize);
@@ -76,14 +73,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     Minibatch ImageReader::ReadMinibatch()
     {
         assert(m_mbSize > 0);
-
-        // TODO: should be in the shim?
-        if (m_endOfEpoch)
-        {
-            Minibatch m;
-            m.atEndOfEpoch = true;
-            return m;
-        }
 
         std::fill(m_labBuf.begin(), m_labBuf.end(), 0);
 
@@ -98,7 +87,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             auto image = m_transformer->GetNextSequence();
             if(image.m_endOfEpoch)
             {
-                m_endOfEpoch = true;
                 break;
             }
             mbSize++;

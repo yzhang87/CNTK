@@ -69,11 +69,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         config.index = epoch;
 
         m_reader->StartEpoch(config);
+        m_endOfEpoch = false;
     }
 
     template<class ElemType>
     bool ReaderShim<ElemType>::GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
     {
+        if (m_endOfEpoch)
+        {
+            return false;
+        }
+
         // Check that all matrices have the same device id.
         // If not we should inject the IMemoryProvider per input.
         int deviceId = matrices.begin()->second->GetDeviceId();
@@ -86,7 +92,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         Minibatch m = m_reader->ReadMinibatch();
-        if (!m.atEndOfEpoch)
+        if(m.atEndOfEpoch)
+        {
+            m_endOfEpoch = true;
+            if (m.minibatch.empty())
+            {
+                return false;
+            }
+        }
+
+        if (!m.minibatch.empty())
         {
             // Copy returned minibatch to the matrices.
             for (const auto& mx : matrices)
@@ -105,7 +120,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        return !m.atEndOfEpoch;
+        return !m.minibatch.empty();
     }
 
     template<class ElemType>

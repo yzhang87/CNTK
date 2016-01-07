@@ -23,6 +23,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         ReaderPtr m_reader;
         ReaderFactory m_factory;
+        bool m_endOfEpoch;
 
         MBLayoutPtr m_layout;
 
