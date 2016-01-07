@@ -16,19 +16,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 extern "C" DATAREADER_API void GetReaderF(IDataReader<float>** preader)
 {
-    GetReader(preader);
+    auto factory = [](const ConfigParameters& parameters) -> ReaderPtr { return std::make_shared<ImageReader>(parameters, et_float); };
+    *preader = new ReaderShim<float>(factory);
 }
 
 extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
 {
-    GetReader(preader);
-}
-
-template<class ElemType>
-void DATAREADER_API GetReader(IDataReader<ElemType>** preader)
-{
-    auto factory = [](const ConfigParameters& parameters) -> ReaderPtr { return std::make_shared<ImageReader>(parameters, sizeof(ElemType)); };
-    *preader = new ReaderShim<ElemType>(factory);
+    auto factory = [](const ConfigParameters& parameters) -> ReaderPtr { return std::make_shared<ImageReader>(parameters, et_double); };
+    *preader = new ReaderShim<double>(factory);
 }
 
 }}}

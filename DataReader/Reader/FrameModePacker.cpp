@@ -59,13 +59,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        m_minibatchLayout->Init(mbSize, 1);
-
         if (mbSize == 0)
         {
             return m;
         }
 
+        m_minibatchLayout->Init(mbSize, 1);
         for (int i = 0; i < m_inputs.size(); ++i)
         {
             LayoutPtr layout = std::make_shared<Layout>();

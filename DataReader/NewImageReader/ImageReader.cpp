@@ -17,8 +17,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageReader::ImageReader(
         const ConfigParameters& parameters,
-        size_t elementSize)
-        : m_elementSize(elementSize), m_seed(0)
+        ElementType elementType)
+        : m_seed(0), m_elementType(elementType)
     {
         InitFromConfig(parameters);
     }
@@ -26,7 +26,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     void ImageReader::InitFromConfig(const ConfigParameters& config)
     {
         auto configHelper = std::make_shared<ImageConfigHelper>(config);
-        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(configHelper, m_elementSize);
+        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(configHelper, m_elementType);
 
         TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
 
@@ -35,7 +35,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const auto & features = inputs[configHelper->GetFeatureInputIndex()];
 
         TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, features->name, config(features->name), m_seed);
-        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->name, m_seed, m_elementSize == 4 ? CV_32F : CV_64F, config(features->name));
+        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->name, m_seed, m_elementType == et_float ? CV_32F : CV_64F, config(features->name));
         TransformerPtr mean = std::make_shared<MeanTransform>(scaler, features->name);
         m_transformer = mean;
     }
@@ -51,7 +51,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.totalSize > 0);
 
         m_transformer->SetEpochConfiguration(config);
-        m_packer = std::make_shared<FrameModePacker>(m_transformer, config.minibatchSize, m_elementSize, m_transformer->GetInputs());
+        m_packer = std::make_shared<FrameModePacker>(
+            m_transformer, 
+            config.minibatchSize, 
+            m_elementType == et_float ? sizeof(float) : sizeof(double),
+            m_transformer->GetInputs());
     }
 
     Minibatch ImageReader::ReadMinibatch()

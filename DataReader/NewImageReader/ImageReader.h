@@ -16,7 +16,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         ImageReader(const ConfigParameters& parameters,
-            size_t elementSize);
+            ElementType elementType);
 
         std::vector<InputDescriptionPtr> GetInputs() override;
         void StartEpoch(const EpochConfiguration& config) override;
@@ -30,7 +30,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         unsigned int m_seed;
 
         bool m_imgListRand;
-        size_t m_elementSize;
+        ElementType m_elementType;
     };
-
 }}}

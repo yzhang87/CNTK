@@ -24,8 +24,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<TElement> m_labelData;
     };
 
-    ImageDataDeserializer::ImageDataDeserializer(ImageConfigHelperPtr configHelper, size_t elementSize)
-        : m_elementSize(elementSize)
+    ImageDataDeserializer::ImageDataDeserializer(ImageConfigHelperPtr configHelper, ElementType elementType)
+        : m_elementType(elementType)
     {
         auto inputs = configHelper->GetInputs();
         assert(inputs.size() == 2);
@@ -38,17 +38,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_inputs.push_back(labels);
 
         size_t labelDimension = labels->sampleLayout->GetHeight();
-        if (m_elementSize == sizeof(float))
+        if (m_elementType == ElementType::et_float)
         {
             m_labelGenerator = std::make_shared<TypedLabelGenerator<float>>(labelDimension);
         }
-        else if (m_elementSize == sizeof(double))
+        else if (m_elementType == ElementType::et_double)
         {
             m_labelGenerator = std::make_shared<TypedLabelGenerator<double>>(labelDimension);
         }
         else
         {
-            RuntimeError("Unsupported element size %ull.", m_elementSize);
+            RuntimeError("Unsupported element type %ull.", m_elementType);
         }
 
         CreateSequenceDescriptions(configHelper, labelDimension);
@@ -119,7 +119,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_currentImage = cv::imread(imageSequence.path, cv::IMREAD_COLOR);
         assert(m_currentImage.isContinuous());
 
-        int dataType = m_elementSize == 4 ? CV_32F : CV_64F;
+        int dataType = m_elementType == et_float ? CV_32F : CV_64F;
 
         // Convert element type.
         // TODO this shouldnt be here...
@@ -132,7 +132,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         image.data = m_currentImage.ptr();
 
         auto imageSampleLayout = std::make_shared<SampleLayout>();
-        imageSampleLayout->elementType = m_elementSize == 4 ? et_float : et_double;
+        imageSampleLayout->elementType = m_elementType;
         imageSampleLayout->storageType = st_dense;
         imageSampleLayout->dimensions = std::make_shared<ImageLayout>(
             ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_imgChannels));
@@ -141,7 +141,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Construct label
         auto labelSampleLayout = std::make_shared<SampleLayout>();
-        labelSampleLayout->elementType = m_elementSize == 4 ? et_float : et_double;
+        labelSampleLayout->elementType = m_elementType;
         labelSampleLayout->storageType = st_dense;
         labelSampleLayout->dimensions = m_inputs[1]->sampleLayout;
 

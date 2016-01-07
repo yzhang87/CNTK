@@ -9,7 +9,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class ImageDataDeserializer : public DataDeserializer
     {
     public:
-        ImageDataDeserializer(ImageConfigHelperPtr configHelper, size_t elementSize);
+        ImageDataDeserializer(ImageConfigHelperPtr configHelper, ElementType elementType);
         virtual ~ImageDataDeserializer() {}
 
         std::vector<InputDescriptionPtr> GetInputs() const override;
@@ -44,7 +44,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         LabelGeneratorPtr m_labelGenerator;
 
         cv::Mat m_currentImage;
-        size_t m_elementSize;
+        ElementType m_elementType;
         int m_imgChannels;
     };
 }}}
