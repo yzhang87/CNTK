@@ -45,6 +45,5 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         cv::Mat m_currentImage;
         ElementType m_elementType;
-        int m_imgChannels;
     };
 }}}

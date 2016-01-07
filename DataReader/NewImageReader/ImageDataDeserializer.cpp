@@ -32,8 +32,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const auto & features = inputs[configHelper->GetFeatureInputIndex()];
         const auto & labels = inputs[configHelper->GetLabelInputIndex()];
 
-        m_imgChannels = static_cast<int>(features->sampleLayout->GetNumChannels());
-
         m_inputs.push_back(features);
         m_inputs.push_back(labels);
 
@@ -123,9 +121,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int dataType = m_elementType == et_float ? CV_32F : CV_64F;
 
         // Convert element type.
-        // TODO this shouldnt be here...
-        // eldak Where should this be then ?:)
-        if (m_currentImage.type() != CV_MAKETYPE(dataType, m_imgChannels))
+        if (m_currentImage.type() != CV_MAKETYPE(dataType, m_currentImage.channels()))
         {
             m_currentImage.convertTo(m_currentImage, dataType);
         }
@@ -136,7 +132,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         imageSampleLayout->elementType = m_elementType;
         imageSampleLayout->storageType = st_dense;
         imageSampleLayout->dimensions = std::make_shared<ImageLayout>(
-            ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_imgChannels));
+            ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_currentImage.channels()));
         image.layout = imageSampleLayout;
         image.numberOfSamples = imageSequence.numberOfSamples;
 
