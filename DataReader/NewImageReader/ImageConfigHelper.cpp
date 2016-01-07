@@ -4,6 +4,11 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    static bool AreEqual(const std::string& s1, const std::string& s2)
+    {
+        return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
+    }
+
     ImageConfigHelper::ImageConfigHelper(const ConfigParameters& config)
     {
         // TODO alexeyk: does not work for BrainScript, since configs cannot be copied
@@ -22,6 +27,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
             return{ (*sect).first, ConfigParameters((*sect).second) };
         };
+
+        std::string rand = config(L"randomize", "auto");
+        if (!AreEqual(rand, "auto"))
+        {
+            RuntimeError("Only Auto is currently supported.");
+        }
 
         // REVIEW alexeyk: currently support only one feature and label section.
         SectionT featSect{ getter("width") };
