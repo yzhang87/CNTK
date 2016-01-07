@@ -1,7 +1,7 @@
 #pragma once
 
 #include "InnerInterfaces.h"
-#include "commandArgUtil.h"
+#include "ImageConfigHelper.h"
 #include <opencv2/core/mat.hpp>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -9,7 +9,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class ImageDataDeserializer : public DataDeserializer
     {
     public:
-        ImageDataDeserializer(const ConfigParameters& config, size_t elementSize);
+        ImageDataDeserializer(ImageConfigHelperPtr configHelper, size_t elementSize);
         virtual ~ImageDataDeserializer() {}
 
         std::vector<InputDescriptionPtr> GetInputs() const override;
@@ -26,7 +26,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             size_t classId;
         };
 
-        void CreateSequenceDescriptions(const ConfigParameters& config, size_t labelDimension);
+        void CreateSequenceDescriptions(ImageConfigHelperPtr configHelper, size_t labelDimension);
 
         std::vector<ImageSequenceDescription> m_imageSequences;
         TimelineP m_sequences;
