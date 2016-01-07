@@ -72,7 +72,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     size_t ImageConfigHelper::GetLabelInputIndex() const
     {
-        return 1 - GetFeatureInputIndex();
+        // Hard-wired.
+        return 1;
     }
 
     std::string ImageConfigHelper::GetMapPath() const
