@@ -269,6 +269,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     void ScaleTransform::Apply(cv::Mat& mat)
     {
         // If matrix has not been converted to the right type, do it now as rescaling requires floating point type.
+        //
         if (mat.type() != CV_MAKETYPE(m_dataType, m_imgChannels))
             mat.convertTo(mat, m_dataType);
 
