@@ -31,17 +31,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         it_label
     };
 
-    // Input description.
-    struct InputDescription
-    {
-        std::wstring name;
-        InputId id;
-        InputType type;
-        TensorShapePtr sampleLayout;
-        std::map<std::string, std::string> properties;
-    };
-    typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
-
     // TODO: We can support more types in the future.
     enum ElementType
     {
@@ -57,6 +46,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         st_sparse_csc,
     };
 
+    // Input description.
+    struct InputDescription
+    {
+        std::wstring name;
+        InputId id;
+        InputType type;
+        TensorShapePtr sampleLayout;
+        StorageType storageType;
+        ElementType elementType;
+    };
+    typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
+
     // We introduced input type and
     // that essentially describes the representation of a particular element type
     // Also input type that describes the stream/input
@@ -64,8 +65,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         MBLayoutPtr columns;
         TensorShapePtr rows;
-        StorageType storageType;
-        ElementType elementType;
     };
     typedef std::shared_ptr<Layout> LayoutPtr;
 

@@ -69,9 +69,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             LayoutPtr layout = std::make_shared<Layout>();
             layout->rows = m_inputs[i]->sampleLayout;
             layout->columns = m_minibatchLayout;
-            layout->storageType = st_dense;
-            // TODO: add element type
-
             size_t dimensions = m_inputs[i]->sampleLayout->GetNumElements() * m_elementSize;
             InputPtr stream = std::make_shared<Input>(m_inputBuffers[i].get(), mbSize * dimensions, layout);
             m.minibatch.insert(std::make_pair(i, stream));
