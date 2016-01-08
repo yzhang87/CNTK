@@ -33,6 +33,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             return m_seed;
         }
+        const std::vector<InputId> & GetFeatureStreamIds() const;
 
     private:
         std::vector<InputId> m_featureStreamIds;
@@ -47,7 +48,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         CropTransform(
             TransformerPtr next,
             const std::vector<InputDescriptionPtr> & inputs,
-            const ConfigParameters& parameters,
+            const ConfigParameters& readerConfig,
             unsigned int seed);
 
     protected:
@@ -63,7 +64,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             UniArea = 3
         };
 
-        void InitFromConfig(const ConfigParameters & config);
+        void InitFromConfig(const ConfigParameters& config);
         CropType ParseCropType(const std::string& src);
         RatioJitterType ParseJitterType(const std::string& src);
         cv::Rect GetCropRect(CropType type, int crow, int ccol, double cropRatio, std::mt19937& rng);
@@ -81,7 +82,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         ScaleTransform(TransformerPtr next,
             const std::vector<InputDescriptionPtr> & inputs,
-            const ConfigParameters& config,
+            const ConfigParameters& readerConfig,
             unsigned int seed,
             int dataType);
 
@@ -107,7 +108,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     private:
         virtual void Apply(cv::Mat& mat) override;
-        void InitFromConfig(const ConfigParameters & config);
+        void InitFromConfig(const ConfigParameters& config);
 
         cv::Mat m_meanImg;
     };

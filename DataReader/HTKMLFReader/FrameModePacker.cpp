@@ -145,7 +145,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_verbosity = readerConfig(L"verbosity", 2);
 
-        // determine if we partial minibatches are desired
+        // determine if partial minibatches are desired
         wstring minibatchMode(readerConfig(L"minibatchMode", L"partial"));
         m_partialMinibatch = !_wcsicmp(minibatchMode.c_str(), L"partial");
     }
@@ -293,7 +293,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 auto layout = std::make_shared<Layout>();
                 layout->columns = m_pMBLayout;
-
 
                 std::vector<size_t> dimensions;
                 dimensions.push_back(dim);
