@@ -25,28 +25,29 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<TElement> m_labelData;
     };
 
-    ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config, ElementType elementType)
-        : m_elementType(elementType)
+    ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config)
     {
         auto configHelper = ImageConfigHelper(config);
         auto inputs = configHelper.GetInputs();
         assert(inputs.size() == 2);
-        const auto & labels = inputs[configHelper.GetLabelInputIndex()];
+        const auto & label = inputs[configHelper.GetLabelInputIndex()];
+        const auto & feature = inputs[configHelper.GetFeatureInputIndex()];
 
-        m_labelSampleLayout = labels->sampleLayout;
-
+        m_featureElementType = feature->elementType;
+        m_labelSampleLayout = label->sampleLayout;
         size_t labelDimension = m_labelSampleLayout->GetHeight();
-        if (m_elementType == ElementType::et_float)
+
+        if (label->elementType == ElementType::et_float)
         {
             m_labelGenerator = std::make_shared<TypedLabelGenerator<float>>(labelDimension);
         }
-        else if (m_elementType == ElementType::et_double)
+        else if (label->elementType == ElementType::et_double)
         {
             m_labelGenerator = std::make_shared<TypedLabelGenerator<double>>(labelDimension);
         }
         else
         {
-            RuntimeError("Unsupported element type %ull.", m_elementType);
+            RuntimeError("Unsupported label element type %ull.", label->elementType);
         }
 
         CreateSequenceDescriptions(configHelper.GetMapPath(), labelDimension);
@@ -118,7 +119,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(m_currentImage.isContinuous());
 
         // Convert element type.
-        int dataType = m_elementType == et_float ? CV_32F : CV_64F;
+        int dataType = m_featureElementType == et_float ? CV_32F : CV_64F;
         if (m_currentImage.type() != CV_MAKETYPE(dataType, m_currentImage.channels()))
         {
             m_currentImage.convertTo(m_currentImage, dataType);

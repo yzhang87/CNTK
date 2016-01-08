@@ -9,7 +9,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class ImageDataDeserializer : public DataDeserializer
     {
     public:
-        ImageDataDeserializer(const ConfigParameters& config, ElementType elementType);
+        ImageDataDeserializer(const ConfigParameters& config);
         virtual ~ImageDataDeserializer() {}
 
         std::vector<InputDescriptionPtr> GetInputs() const override;
@@ -45,6 +45,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         LabelGeneratorPtr m_labelGenerator;
 
         cv::Mat m_currentImage;
-        ElementType m_elementType;
+        ElementType m_featureElementType;
     };
 }}}

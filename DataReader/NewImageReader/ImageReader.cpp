@@ -26,7 +26,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto configHelper = ImageConfigHelper(config);
         m_inputs = configHelper.GetInputs();
         assert(m_inputs.size() == 2);
-        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementType);
+        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config);
         TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
 
         TransformerPtr cropper = std::make_shared<CropTransform>();
