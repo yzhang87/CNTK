@@ -91,7 +91,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
     // Load all input and output data. 
-    // Note that the terms features imply be real-valued quanities and 
+    // Note that the terms features imply be real-valued quantities and 
     // labels imply categorical quantities, irrespective of whether they 
     // are inputs or targets for the network
     template<class ElemType> template<class ConfigRecordType>
@@ -301,7 +301,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_partialMinibatch = !_wcsicmp(minibatchMode.c_str(), L"partial");
 
             // get the read method, defaults to "blockRandomize" other option is "rollingWindow"
-            wstring readMethod(readerConfig(L"readMethod",L"blockRandomize"));
+            wstring readMethod(readerConfig(L"readMethod", L"blockRandomize"));
 
             if (readMethod == L"blockRandomize" && randomize == randomizeNone)
                 InvalidArgument("'randomize' cannot be 'none' when 'readMethod' is 'blockRandomize'.");

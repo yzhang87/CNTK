@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "Bundler.h"
-#include "Utils.h"
+#include "ConfigHelper.h"
 #include "HTKDataDeserializer.h"
 #include "MLFDataDeserializer.h"
 
@@ -14,7 +14,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<std::wstring> labelNames;
 
         std::vector<std::wstring> notused;
-        Utils::GetDataNamesFromConfig(readerConfig, featureNames, labelNames, notused, notused);
+        ConfigHelper::GetDataNamesFromConfig(readerConfig, featureNames, labelNames, notused, notused);
         if (featureNames.size() < 1 || labelNames.size() < 1)
         {
             // eldak: Don't we support unsupervised training?

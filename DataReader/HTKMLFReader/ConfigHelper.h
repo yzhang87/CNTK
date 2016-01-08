@@ -16,6 +16,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         static void CheckFeatureType(const ConfigParameters& config);
         static void CheckLabelType(const ConfigParameters& config);
 
+        static void GetDataNamesFromConfig(
+            const ConfigParameters& readerConfig,
+            std::vector<std::wstring>& features,
+            std::vector<std::wstring>& labels,
+            std::vector<std::wstring>& hmms,
+            std::vector<std::wstring>& lattices);
+
         static std::vector<std::wstring> GetMlfPaths(const ConfigParameters& config);
         static std::vector<std::wstring> ConfigHelper::GetFeaturePaths(const ConfigParameters& config);
 

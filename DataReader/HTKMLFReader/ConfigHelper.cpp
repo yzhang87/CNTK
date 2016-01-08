@@ -68,6 +68,41 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
+    // GetFileConfigNames - determine the names of the features and labels sections in the config file
+    // features - [in,out] a vector of feature name strings
+    // labels - [in,out] a vector of label name strings
+    void ConfigHelper::GetDataNamesFromConfig(
+        const ConfigParameters& readerConfig,
+        std::vector<std::wstring>& features,
+        std::vector<std::wstring>& labels,
+        std::vector<std::wstring>& hmms,
+        std::vector<std::wstring>& lattices)
+    {
+        for (const auto & id : readerConfig.GetMemberIds())
+        {
+            if (!readerConfig.CanBeConfigRecord(id))
+                continue;
+            const ConfigParameters& temp = readerConfig(id);
+            // see if we have a config parameters that contains a "file" element, it's a sub key, use it
+            if (temp.ExistsCurrent(L"scpFile"))
+            {
+                features.push_back(id);
+            }
+            else if (temp.ExistsCurrent(L"mlfFile") || temp.ExistsCurrent(L"mlfFileList"))
+            {
+                labels.push_back(id);
+            }
+            else if (temp.ExistsCurrent(L"phoneFile"))
+            {
+                hmms.push_back(id);
+            }
+            else if (temp.ExistsCurrent(L"denlatTocFile"))
+            {
+                lattices.push_back(id);
+            }
+        }
+    }
+
     size_t ConfigHelper::GetLabelDimension(const ConfigParameters& config)
     {
         if (config.Exists(L"labelDim"))

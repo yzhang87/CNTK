@@ -89,7 +89,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<std::wstring> featureNames;
         std::vector<std::wstring> labelNames;
         std::vector<std::wstring> notused;
-        Utils::GetDataNamesFromConfig(readerConfig, featureNames, labelNames, notused, notused);
+        ConfigHelper::GetDataNamesFromConfig(readerConfig, featureNames, labelNames, notused, notused);
 
         // eldak: why not consolidate features and labels on this level? should not they be packed in the same manner essentially?
         foreach_index(i, featureNames)
