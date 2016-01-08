@@ -454,7 +454,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return;
         }
 
-        std::vector<std::map<size_t, Sequence>> sequences;
+        std::vector<std::vector<Sequence>> sequences;
         for (size_t currentIndex = 0; currentIndex < m_requestedMBSize; ++currentIndex)
         {
             auto sequence = m_transformer->GetNextSequence();
@@ -595,7 +595,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             for(const auto& i : s)
             {
-                delete[] i.second.data;
+                delete[] i.data;
             }
         }
     }

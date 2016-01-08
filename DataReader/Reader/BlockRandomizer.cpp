@@ -387,12 +387,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_samplePositionInEpoch += seqDesc.numberOfSamples;
         m_sequencePositionInSweep++;
 
-        auto tmp = m_sequencer->GetSequenceById(seqDesc.id);
-        assert(tmp.size() == 2);
-
         SequenceData r;
-        r.m_data.insert(std::make_pair(0, tmp[0]));
-        r.m_data.insert(std::make_pair(1, tmp[1]));
+        r.m_data = m_sequencer->GetSequenceById(seqDesc.id);
         r.m_endOfEpoch = false;
         return r;
     };

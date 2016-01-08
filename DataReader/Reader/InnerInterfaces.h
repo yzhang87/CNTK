@@ -29,7 +29,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         SampleLayoutPtr layout;
         size_t numberOfSamples;
-        //const SequenceDescription* description;
         void* data;
     };
 
@@ -66,20 +65,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     typedef std::shared_ptr<DataDeserializer> DataDeserializerPtr;
 
-    // Defines context augmentation (to the left and to the right).
-    // This will be specified as a construction parameter to Sequence Reader.
-    struct AugmentationDescriptor
-    {
-        size_t contextLeft;
-        size_t contextRight;
-    };
-
     struct SequenceData
     {
         SequenceData() : m_endOfEpoch(false)
         {}
 
-        std::map<InputId, Sequence> m_data;
+        std::vector<Sequence> m_data;
         bool m_endOfEpoch;
 
         SequenceData(SequenceData&& other)
