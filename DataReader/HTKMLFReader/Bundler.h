@@ -38,7 +38,4 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void ReleaseChunk(size_t chunkIndex) override;
     };
 
-    std::vector<DataDeserializerPtr> CreateDeserializers(const ConfigParameters& readerConfig,
-        bool framemode,
-        size_t elementSize);
 }}}
