@@ -19,21 +19,19 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         MemoryProviderPtr provider,
         const ConfigParameters& config,
         ElementType elementType)
-        : m_seed(0)
+        : m_provider(provider)
+        , m_seed(0)
         , m_elementType(elementType)
-        , m_provider(provider)
     {
         auto configHelper = ImageConfigHelper(config);
-        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementType);
-
-        TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
-
         m_inputs = configHelper.GetInputs();
         assert(m_inputs.size() == 2);
-        const auto & features = m_inputs[configHelper.GetFeatureInputIndex()];
+        const auto& features = m_inputs[configHelper.GetFeatureInputIndex()];
 
+        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementType);
+        TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
         TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, features->id, config(features->name), m_seed);
-        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->id, m_seed, m_elementType == et_float ? CV_32F : CV_64F, config(features->name));
+        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->id, config(features->name), m_seed, m_elementType == et_float ? CV_32F : CV_64F);
         TransformerPtr mean = std::make_shared<MeanTransform>(scaler, features->id);
         m_transformer = mean;
     }
@@ -61,4 +59,5 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         return m_packer->ReadMinibatch();
     }
+
 }}}

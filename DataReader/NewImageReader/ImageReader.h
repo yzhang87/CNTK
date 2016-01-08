@@ -29,8 +29,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         FrameModePackerPtr m_packer;
         MemoryProviderPtr m_provider;
         unsigned int m_seed;
-
-        bool m_imgListRand;
         ElementType m_elementType;
     };
 }}}

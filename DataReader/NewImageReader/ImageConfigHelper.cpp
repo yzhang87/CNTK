@@ -80,5 +80,4 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         return m_mapPath;
     }
-
 }}}

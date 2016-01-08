@@ -220,9 +220,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     ScaleTransform::ScaleTransform(
         TransformerPtr next,
         InputId appliedStreamId,
+        const ConfigParameters& config,
         unsigned int seed,
-        int dataType,
-        const ConfigParameters& config)
+        int dataType)
         : BaseTransformer(next, appliedStreamId, seed)
         , m_dataType(dataType)
     {
