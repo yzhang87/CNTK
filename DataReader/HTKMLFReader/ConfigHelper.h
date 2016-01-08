@@ -11,6 +11,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         static std::pair<size_t, size_t> GetContextWindow(const ConfigParameters& config);
+        static size_t GetFeatureDimension(const ConfigParameters& config);
         static size_t GetLabelDimension(const ConfigParameters& config);
 
         static void CheckFeatureType(const ConfigParameters& config);

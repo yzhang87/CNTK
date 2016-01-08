@@ -103,6 +103,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
+    size_t ConfigHelper::GetFeatureDimension(const ConfigParameters& config)
+    {
+        if (config.Exists(L"dim"))
+        {
+            return config(L"dim");
+        }
+
+        InvalidArgument("features must specify dim");
+    }
+
     size_t ConfigHelper::GetLabelDimension(const ConfigParameters& config)
     {
         if (config.Exists(L"labelDim"))

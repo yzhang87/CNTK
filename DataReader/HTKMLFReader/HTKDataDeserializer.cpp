@@ -26,7 +26,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto context = ConfigHelper::GetContextWindow(feature);
 
-        m_dimension = feature(L"dim");
+        m_dimension = ConfigHelper::GetFeatureDimension(feature);
         m_dimension = m_dimension * (1 + context.first + context.second);
 
         m_layout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
