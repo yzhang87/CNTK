@@ -5,15 +5,6 @@
 #include "ReaderInterfaces.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-
-    struct SampleLayout
-    {
-        TensorShapePtr dimensions;
-        StorageType storageType;
-        ElementType elementType;
-    };
-    typedef std::shared_ptr<SampleLayout> SampleLayoutPtr;
-
     // Defines identifier and length of a Sequence.
     struct SequenceDescription
     {
@@ -27,7 +18,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // of frames, which have the same encoding and are layed out in memory contiguously.
     struct Sequence
     {
-        SampleLayoutPtr layout;
+        TensorShapePtr layout;
         size_t numberOfSamples;
         void* data;
     };

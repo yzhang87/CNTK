@@ -117,33 +117,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_currentImage = cv::imread(imageSequence.path, cv::IMREAD_COLOR);
         assert(m_currentImage.isContinuous());
 
-        int dataType = m_elementType == et_float ? CV_32F : CV_64F;
-
         // Convert element type.
+        int dataType = m_elementType == et_float ? CV_32F : CV_64F;
         if (m_currentImage.type() != CV_MAKETYPE(dataType, m_currentImage.channels()))
         {
             m_currentImage.convertTo(m_currentImage, dataType);
         }
 
         image.data = m_currentImage.ptr();
-
-        auto imageSampleLayout = std::make_shared<SampleLayout>();
-        imageSampleLayout->elementType = m_elementType;
-        imageSampleLayout->storageType = st_dense;
-        imageSampleLayout->dimensions = std::make_shared<ImageLayout>(
-            ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_currentImage.channels()));
-        image.layout = imageSampleLayout;
+        image.layout = std::make_shared<ImageLayout>(ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_currentImage.channels()));;
         image.numberOfSamples = imageSequence.numberOfSamples;
 
         // Construct label
-        auto labelSampleLayout = std::make_shared<SampleLayout>();
-        labelSampleLayout->elementType = m_elementType;
-        labelSampleLayout->storageType = st_dense;
-        labelSampleLayout->dimensions = m_labelSampleLayout;
-
         Sequence label;
         label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
-        label.layout = labelSampleLayout;
+        label.layout = m_labelSampleLayout;
         label.numberOfSamples = imageSequence.numberOfSamples;
         return std::vector<Sequence> { image, label };
     }

@@ -21,6 +21,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         unsigned int seed)
         : m_next(next)
         , m_seed(seed)
+        , m_inputs(inputs)
     {
         for (const auto & input : inputs)
         {
@@ -46,23 +47,23 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         for (auto id : m_featureStreamIds)
         {
-            sample.m_data[id] = Apply(sample.m_data[id]);
+            sample.m_data[id] = Apply(sample.m_data[id], m_inputs[id]);
         }
         return sample;
     }
 
-    Sequence BaseTransformer::Apply(Sequence& s)
+    Sequence BaseTransformer::Apply(Sequence& s, InputDescriptionPtr input)
     {
-        int rows = static_cast<int>(s.layout->dimensions->GetWidth());
-        int columns = static_cast<int>(s.layout->dimensions->GetHeight());
-        int channels = static_cast<int>(s.layout->dimensions->GetNumChannels());
+        int rows = static_cast<int>(s.layout->GetWidth());
+        int columns = static_cast<int>(s.layout->GetHeight());
+        int channels = static_cast<int>(s.layout->GetNumChannels());
 
         int typeId = 0;
-        if (s.layout->elementType == et_double)
+        if (input->elementType == et_double)
         {
             typeId = CV_64F;
         }
-        else if (s.layout->elementType == et_float)
+        else if (input->elementType == et_float)
         {
             typeId = CV_32F;
         }
@@ -76,11 +77,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         this->Apply(m_buffer);
 
         Sequence result;
-        result.layout = std::make_shared<SampleLayout>();
-        result.layout->dimensions = std::make_shared<ImageLayout>(
+        result.layout = std::make_shared<ImageLayout>(
             ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels()));
         result.numberOfSamples = result.numberOfSamples;
-        result.layout->elementType = s.layout->elementType;
         result.data = m_buffer.ptr();
         return result;
     }

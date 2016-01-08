@@ -27,7 +27,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         using UniRealT = std::uniform_real_distribution<double>;
         using UniIntT = std::uniform_int_distribution<int>;
 
-        Sequence Apply(Sequence& mat);
+        Sequence Apply(Sequence& mat, InputDescriptionPtr input);
         virtual void Apply(cv::Mat& mat) = 0;
         unsigned int GetSeed() const
         {
@@ -36,6 +36,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const std::vector<InputId> & GetFeatureStreamIds() const;
 
     private:
+        std::vector<InputDescriptionPtr> m_inputs;
         std::vector<InputId> m_featureStreamIds;
         TransformerPtr m_next;
         unsigned int m_seed;

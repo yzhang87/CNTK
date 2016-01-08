@@ -51,9 +51,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::wstring name;
         InputId id;
         InputType type;
-        TensorShapePtr sampleLayout;
         StorageType storageType;
         ElementType elementType;
+
+        TensorShapePtr sampleLayout;
     };
     typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
 
