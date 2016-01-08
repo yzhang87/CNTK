@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "ReaderInterfaces.h"
+#include "commandArgUtil.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
     // Defines identifier and length of a Sequence.
@@ -72,13 +73,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     };
 
     // Provides Input descriptions and sequential access to sequences.
+    class Transformer;
+    typedef std::shared_ptr<Transformer> TransformerPtr;
+
     class Transformer
     {
     public:
+        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs) = 0;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
         virtual ~Transformer() = 0 {}
         virtual SequenceData GetNextSequence() = 0;
     };
 
-    typedef std::shared_ptr<Transformer> TransformerPtr;
 }}}

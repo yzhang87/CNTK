@@ -68,7 +68,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     }
 
     // Shuffle a vector into random order by randomly swapping elements
-    
+
 
     void BlockRandomizer::RandomizeChunks()
     {
@@ -296,6 +296,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Frame mode to the randomizer just means there are only single-sample sequences
         m_frameMode = (maxNumberOfSamples == 1);
+    }
+
+    void BlockRandomizer::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs)
+    {
+        // Not used for the block randomizer.
+        UNREFERENCED_PARAMETER(inputTransformer);
+        UNREFERENCED_PARAMETER(readerConfig);
+        UNREFERENCED_PARAMETER(inputs);
     }
 
     void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)

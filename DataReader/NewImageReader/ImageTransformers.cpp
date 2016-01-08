@@ -15,14 +15,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
     };
 
-    BaseTransformer::BaseTransformer(
-        TransformerPtr next,
-        const std::vector<InputDescriptionPtr> & inputs,
-        unsigned int seed)
-        : m_next(next)
-        , m_seed(seed)
-        , m_inputs(inputs)
+    BaseTransformer::BaseTransformer()
+        : m_next(nullptr)
     {
+    }
+
+    void BaseTransformer::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs)
+    {
+        m_next = inputTransformer;
+        m_inputs = inputs;
+        m_seed = std::stoi(readerConfig(L"seed", "0"));
+
         for (const auto & input : inputs)
         {
             if (input->type == it_feature)
@@ -34,11 +37,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& config)
     {
+        assert(m_next != nullptr);
         m_next->SetEpochConfiguration(config);
     }
 
     SequenceData BaseTransformer::GetNextSequence()
     {
+        assert(m_next != nullptr);
         SequenceData sample = m_next->GetNextSequence();
         if (sample.m_endOfEpoch)
         {
@@ -91,12 +96,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    CropTransform::CropTransform(
-        TransformerPtr next,
-        const std::vector<InputDescriptionPtr> & inputs,
-        const ConfigParameters& readerConfig)
-        : BaseTransformer(next, inputs, std::stoi(readerConfig(L"seed", "0")))
+    CropTransform::CropTransform()
     {
+    }
+
+    void CropTransform::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs)
+    {
+        BaseTransformer::Initialize(inputTransformer, readerConfig, inputs);
         auto featureStreamIds = GetFeatureStreamIds();
 
         if (featureStreamIds.size() != 1)
@@ -237,12 +243,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    ScaleTransform::ScaleTransform(
-        TransformerPtr next,
-        const std::vector<InputDescriptionPtr> & inputs,
-        const ConfigParameters& readerConfig)
-        : BaseTransformer(next, inputs, std::stoi(readerConfig(L"seed", "0")))
+    ScaleTransform::ScaleTransform()
     {
+    }
+
+    void ScaleTransform::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs)
+    {
+        BaseTransformer::Initialize(inputTransformer, readerConfig, inputs);
         m_interpMap.emplace("nearest", cv::INTER_NEAREST);
         m_interpMap.emplace("linear", cv::INTER_LINEAR);
         m_interpMap.emplace("cubic", cv::INTER_CUBIC);
@@ -305,13 +312,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    MeanTransform::MeanTransform(
-        TransformerPtr next,
-        const std::vector<InputDescriptionPtr> & inputs,
-        const ConfigParameters& readerConfig)
-        : BaseTransformer(next, inputs, 0)
+    MeanTransform::MeanTransform()
     {
-        UNREFERENCED_PARAMETER(readerConfig);
+    }
+
+    void MeanTransform::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs)
+    {
+        BaseTransformer::Initialize(inputTransformer, readerConfig, inputs);
     }
 
     void MeanTransform::InitFromConfig(const ConfigParameters & config)

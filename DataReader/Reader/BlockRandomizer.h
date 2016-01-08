@@ -18,6 +18,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr bundler);
         virtual ~BlockRandomizer() { }
 
+        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs) override;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
         virtual SequenceData GetNextSequence() override;
 
@@ -69,7 +70,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         bool IsValid(const TimelineP& timeline) const;
 
-        template<typename VECTOR> 
+        template<typename VECTOR>
         static void randomShuffle(VECTOR & v, size_t randomseed);
 
         void RandomizeChunks();
