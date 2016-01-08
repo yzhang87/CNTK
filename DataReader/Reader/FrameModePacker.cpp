@@ -71,7 +71,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             layout->columns = m_minibatchLayout;
             size_t dimensions = m_inputs[i]->sampleLayout->GetNumElements() * m_elementSize;
             InputPtr stream = std::make_shared<Input>(m_inputBuffers[i].get(), mbSize * dimensions, layout);
-            m.minibatch.insert(std::make_pair(i, stream));
+            m.minibatch.push_back(stream);
         }
 
         return m;

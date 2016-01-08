@@ -95,22 +95,23 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             idToName.insert(std::make_pair(i->id, i->name));
         }
 
-        for (auto input : m.minibatch)
+        for (int i = 0; i < m.minibatch.size(); i++)
         {
-            const std::wstring& name = idToName[input.first];
+            const auto& input = m.minibatch[i];
+            const std::wstring& name = idToName[i];
             if (matrices.find(name) == matrices.end())
             {
                 continue;
             }
 
-            auto layout = input.second->GetLayout();
+            auto layout = input->GetLayout();
             size_t columnNumber = layout->columns->GetNumCols();
             size_t rowNumber = layout->rows->GetNumElements();
 
             // Current hack.
             m_layout = layout->columns;
 
-            auto data = reinterpret_cast<const ElemType*>(input.second->GetData());
+            auto data = reinterpret_cast<const ElemType*>(input->GetData());
             matrices[name]->SetValue(rowNumber, columnNumber, matrices[name]->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);
         }
 

@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <memory>
-#include <map>
 #include "Sequences.h"
 #include "DataTensor.h"
 
@@ -116,7 +115,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     struct Minibatch
     {
         bool atEndOfEpoch;
-        std::map<size_t /*id from the Input description*/, InputPtr> minibatch;
+        std::vector<InputPtr> minibatch;
 
         operator bool() const
         {

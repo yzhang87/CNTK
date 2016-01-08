@@ -259,6 +259,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         ReNewBufferForMultiIO(0);
+        mb.minibatch.resize(m_nameToTypeMap.size());
         PackToMinibatch(mb);
 
         mb.atEndOfEpoch = false;
