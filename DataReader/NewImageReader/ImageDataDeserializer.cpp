@@ -31,13 +31,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto configHelper = ImageConfigHelper(config);
         auto inputs = configHelper.GetInputs();
         assert(inputs.size() == 2);
-        const auto & features = inputs[configHelper.GetFeatureInputIndex()];
         const auto & labels = inputs[configHelper.GetLabelInputIndex()];
 
-        m_inputs.push_back(features);
-        m_inputs.push_back(labels);
+        m_labelSampleLayout = labels->sampleLayout;
 
-        size_t labelDimension = labels->sampleLayout->GetHeight();
+        size_t labelDimension = m_labelSampleLayout->GetHeight();
         if (m_elementType == ElementType::et_float)
         {
             m_labelGenerator = std::make_shared<TypedLabelGenerator<float>>(labelDimension);
@@ -141,7 +139,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto labelSampleLayout = std::make_shared<SampleLayout>();
         labelSampleLayout->elementType = m_elementType;
         labelSampleLayout->storageType = st_dense;
-        labelSampleLayout->dimensions = m_inputs[1]->sampleLayout;
+        labelSampleLayout->dimensions = m_labelSampleLayout;
 
         Sequence label;
         label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
