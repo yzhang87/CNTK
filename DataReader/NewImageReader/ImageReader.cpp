@@ -30,7 +30,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
         TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, m_inputs, config);
         TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, m_inputs, config);
-        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, m_inputs);
+        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, m_inputs, config);
         m_transformer = mean;
     }
 

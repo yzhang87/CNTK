@@ -307,9 +307,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     MeanTransform::MeanTransform(
         TransformerPtr next,
-        const std::vector<InputDescriptionPtr> & inputs)
+        const std::vector<InputDescriptionPtr> & inputs,
+        const ConfigParameters& readerConfig)
         : BaseTransformer(next, inputs, 0)
-    {}
+    {
+        UNREFERENCED_PARAMETER(readerConfig);
+    }
 
     void MeanTransform::InitFromConfig(const ConfigParameters & config)
     {
