@@ -241,13 +241,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         TransformerPtr next,
         const std::vector<InputDescriptionPtr> & inputs,
         const ConfigParameters& readerConfig,
-        unsigned int seed,
-        int dataType)
+        unsigned int seed)
         : BaseTransformer(next, inputs, seed)
-        , m_dataType(dataType)
     {
-        assert(m_dataType == CV_32F || m_dataType == CV_64F);
-
         m_interpMap.emplace("nearest", cv::INTER_NEAREST);
         m_interpMap.emplace("linear", cv::INTER_LINEAR);
         m_interpMap.emplace("cubic", cv::INTER_CUBIC);
@@ -260,7 +256,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError("Only a single feature stream is supported.");
         }
 
-        InitFromConfig(readerConfig(inputs[featureStreamIds[0]]->name));
+        const auto & feature = inputs[featureStreamIds[0]];
+        m_dataType = feature->elementType == et_float ? CV_32F : CV_64F;
+
+        InitFromConfig(readerConfig(feature->name));
     }
 
     void ScaleTransform::InitFromConfig(const ConfigParameters& config)
@@ -268,6 +267,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_imgWidth = config(L"width");
         m_imgHeight = config(L"height");
         m_imgChannels = config(L"channels");
+
         size_t cfeat = m_imgWidth * m_imgHeight * m_imgChannels;
         if (cfeat == 0 || cfeat > std::numeric_limits<size_t>().max() / 2)
             RuntimeError("Invalid image dimensions.");

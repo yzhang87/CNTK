@@ -84,8 +84,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         ScaleTransform(TransformerPtr next,
             const std::vector<InputDescriptionPtr> & inputs,
             const ConfigParameters& readerConfig,
-            unsigned int seed,
-            int dataType);
+            unsigned int seed);
 
     private:
         void InitFromConfig(const ConfigParameters& config);
