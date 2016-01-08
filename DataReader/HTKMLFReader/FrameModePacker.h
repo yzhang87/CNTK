@@ -6,8 +6,6 @@
 #include "ReaderInterfaces.h"
 #include <InnerInterfaces.h>
 #include "commandArgUtil.h"
-#include "HTKDataDeserializer.h"
-#include "MLFDataDeserializer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
