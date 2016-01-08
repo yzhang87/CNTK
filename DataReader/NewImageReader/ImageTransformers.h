@@ -102,7 +102,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class MeanTransform : public BaseTransformer
     {
     public:
-        MeanTransform(TransformerPtr next, const std::vector<InputDescriptionPtr> & inputs);
+        MeanTransform(TransformerPtr next,
+            const std::vector<InputDescriptionPtr>& inputs,
+            const ConfigParameters& readerConfig);
 
     private:
         virtual void Apply(cv::Mat& mat) override;
