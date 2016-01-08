@@ -59,6 +59,23 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_inputs.push_back(labels);
 
         m_mapPath = config(L"file");
+
+        // Identify precision
+        string precision = config.Find("precision", "");
+        if (AreEqual(precision, "float"))
+        {
+            features->elementType = et_float;
+            labels->elementType = et_float;
+        }
+        else if (AreEqual(precision, "double"))
+        {
+            features->elementType = et_double;
+            labels->elementType = et_double;
+        }
+        else
+        {
+            RuntimeError("Not supported precision '%s'", precision);
+        }
     }
 
     std::vector<InputDescriptionPtr> ImageConfigHelper::GetInputs() const
