@@ -109,13 +109,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 assert(m_nameToInputId.find(mx.first) != m_nameToInputId.end());
 
                 const auto& input = m.minibatch[m_nameToInputId[mx.first]];
-                LayoutPtr layout = input->GetLayout();
+                LayoutPtr layout = input->layout;
                 m_layout = layout->columns;
 
                 size_t columnNumber = layout->columns->GetNumCols();
                 size_t rowNumber = layout->rows->GetNumElements();
 
-                auto data = reinterpret_cast<const ElemType*>(input->GetData());
+                auto data = reinterpret_cast<const ElemType*>(input->data);
                 mx.second->SetValue(rowNumber, columnNumber, mx.second->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);
             }
         }

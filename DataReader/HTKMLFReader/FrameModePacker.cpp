@@ -283,8 +283,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 dimensions.push_back(dim);
                 layout->rows = std::make_shared<ImageLayout>(dimensions);
 
-                mb.minibatch[m_nameToId[name.first]] =
-                    std::make_shared<Input>(m_featuresBufferMultiIO[id].get(), dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize, layout);
+                InputPtr input = std::make_shared<Input>();
+                input->data = m_featuresBufferMultiIO[id].get();
+                input->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
+                input->layout = layout;
+                mb.minibatch[m_nameToId[name.first]] = input;
             }
             else if (m_nameToTypeMap[name.first] == InputOutputTypes::category)
             {
@@ -298,8 +301,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 dimensions.push_back(dim);
                 layout->rows = std::make_shared<ImageLayout>(dimensions);
 
-                mb.minibatch[m_nameToId[name.first]] =
-                    std::make_shared<Input>(m_labelsBufferMultiIO[id].get(), dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize, layout);
+                InputPtr input = std::make_shared<Input>();
+                input->data = m_labelsBufferMultiIO[id].get();
+                input->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
+                input->layout = layout;
+                mb.minibatch[m_nameToId[name.first]] = input;
             }
         }
     }

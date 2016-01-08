@@ -71,34 +71,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Input data.
     // TODO: possibly get the data and size one function call.
     // Possibly change this to Stream - because it will be more network alligned
-    class Input
+    struct Input
     {
-        void* data_;
-        size_t data_size_;
-        LayoutPtr layout_;
-
-    public:
-        Input(void* data, size_t dataSize, LayoutPtr layout)
-            : data_(data)
-            , data_size_(dataSize)
-            , layout_(layout)
-        {
-        }
-
-        const void* GetData() const
-        {
-            return data_;
-        }
-
-        size_t GetDataSize() const
-        {
-            return data_size_;
-        }
-
-        LayoutPtr GetLayout() const
-        {
-            return layout_;
-        }
+        void* data;
+        size_t dataSize;
+        LayoutPtr layout;
     };
     typedef std::shared_ptr<Input> InputPtr;
 
@@ -117,6 +94,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         bool atEndOfEpoch;
         std::vector<InputPtr> minibatch;
+
+        Minibatch() : atEndOfEpoch(false)
+        {}
+
+        Minibatch(Minibatch&& other)
+            : atEndOfEpoch(std::move(other.atEndOfEpoch))
+            , minibatch(std::move(other.minibatch))
+        {}
 
         operator bool() const
         {

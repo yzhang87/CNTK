@@ -104,14 +104,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 continue;
             }
 
-            auto layout = input->GetLayout();
+            auto layout = input->layout;
             size_t columnNumber = layout->columns->GetNumCols();
             size_t rowNumber = layout->rows->GetNumElements();
 
             // Current hack.
             m_layout = layout->columns;
 
-            auto data = reinterpret_cast<const ElemType*>(input->GetData());
+            auto data = reinterpret_cast<const ElemType*>(input->data);
             matrices[name]->SetValue(rowNumber, columnNumber, matrices[name]->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);
         }
 
