@@ -46,11 +46,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return begin + randno % (end - begin);
     }
 
-    std::vector<InputDescriptionPtr> BlockRandomizer::GetInputs() const
-    {
-        return m_sequencer->GetInputs();
-    }
-
     bool BlockRandomizer::IsValid(const TimelineP& timeline) const
     {
         SequenceDescription previous = {

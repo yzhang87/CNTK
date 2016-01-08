@@ -21,7 +21,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             unsigned int seed);
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
-        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
         virtual SequenceData GetNextSequence() override;
 
     protected:

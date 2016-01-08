@@ -24,7 +24,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<HTKDataDeserializerPtr> featureDeserializers;
         std::vector<MLFDataDeserializerPtr> labelDeserializers;
 
-        std::vector<InputDescriptionPtr> inputs;
         for (const auto& featureName : featureNames)
         {
             auto deserializer = std::make_shared<HTKDataDeserializer>(readerConfig(featureName), elementSize, framemode, featureName);

@@ -19,7 +19,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual ~BlockRandomizer() { }
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
-        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
         virtual SequenceData GetNextSequence() override;
 
     private:

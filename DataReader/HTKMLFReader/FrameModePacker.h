@@ -43,6 +43,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool m_noData;
         MBLayoutPtr m_pMBLayout;
 
+        std::vector<InputDescriptionPtr> m_inputs;
         std::map<std::wstring, size_t> m_nameToTypeMap;
         std::map<std::wstring, size_t> m_featureNameToIdMap;
         std::map<std::wstring, size_t> m_featureNameToDimMap;

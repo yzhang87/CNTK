@@ -30,12 +30,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_next->SetEpochConfiguration(config);
     }
 
-    std::vector<InputDescriptionPtr> BaseTransformer::GetInputs() const
-    {
-        assert(false);
-        throw std::runtime_error("Not supported");
-    }
-
     SequenceData BaseTransformer::GetNextSequence()
     {
         SequenceData sample = m_next->GetNextSequence();

@@ -85,7 +85,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
-        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0; // TODO will remove
         virtual ~Transformer() = 0 {}
         virtual SequenceData GetNextSequence() = 0;
     };

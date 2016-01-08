@@ -34,7 +34,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     std::vector<InputDescriptionPtr> FrameModePacker::GetInputs()
     {
-        return m_transformer->GetInputs();
+        return m_inputs;
     }
 
     void FrameModePacker::StartEpoch(const EpochConfiguration& config)
@@ -55,6 +55,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(deserializers.size() == 2);
 
         auto bundler = std::make_shared<Bundler>(readerConfig, true, m_verbosity, deserializers[0], deserializers);
+        m_inputs = bundler->GetInputs();
 
         std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
         if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
@@ -78,10 +79,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError("legacy mode has been deprecated\n");
 
         // eldak: we should introduce a separate class describing inputs with proper interface.
-        std::vector<InputDescriptionPtr> inputs = m_transformer->GetInputs();
-        for (size_t i = 0; i < inputs.size(); ++i)
+        for (size_t i = 0; i < m_inputs.size(); ++i)
         {
-            m_nameToId.insert(std::make_pair(inputs[i]->name, inputs[i]->id));
+            m_nameToId.insert(std::make_pair(m_inputs[i]->name, m_inputs[i]->id));
         }
 
         size_t iFeat = 0, iLabel = 0;
@@ -95,7 +95,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         foreach_index(i, featureNames)
         {
             const std::wstring& featureName = featureNames[i];
-            auto input = GetInputByName(featureName, inputs);
+            auto input = GetInputByName(featureName, m_inputs);
 
             const ConfigParameters& thisFeature = readerConfig(featureName);
             m_featDims.push_back(input->sampleLayout->GetNumElements());
@@ -120,7 +120,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         foreach_index(i, labelNames)
         {
             const std::wstring& labelName = labelNames[i];
-            auto input = GetInputByName(labelName, inputs);
+            auto input = GetInputByName(labelName, m_inputs);
 
             m_labelDims.push_back(input->sampleLayout->GetNumElements());
 
@@ -394,7 +394,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return;
         }
 
-        const auto& inputs = m_transformer->GetInputs();
+        const auto& inputs = m_inputs;
         size_t numOfFea = m_featuresBufferMultiIO.size();
         size_t numOfLabel = m_labelsBufferMultiIO.size();
         size_t totalFeatNum = 0;
