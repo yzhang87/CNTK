@@ -158,6 +158,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         InputDescriptionPtr input = std::make_shared<InputDescription>();
         input->id = 0;
+        input->type = it_feature;
         input->name = m_featureName;
         input->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
         return std::vector<InputDescriptionPtr> { input };

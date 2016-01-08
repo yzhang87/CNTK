@@ -32,9 +32,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(m_inputs.size() == 2);
         const auto & features = m_inputs[configHelper.GetFeatureInputIndex()];
 
-        TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, features->id, config(features->name), m_seed);
-        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->id, m_seed, m_elementType == et_float ? CV_32F : CV_64F, config(features->name));
-        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, features->id);
+        TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, m_inputs, config(features->name), m_seed);
+        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, m_inputs, m_seed, m_elementType == et_float ? CV_32F : CV_64F, config(features->name));
+        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, m_inputs);
         m_transformer = mean;
     }
 
