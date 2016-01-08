@@ -2,9 +2,6 @@
 // <copyright file="HTKMLFWriter.cpp" company="Microsoft">
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
-//
-// HTKMLFReader.cpp : Defines the exported functions for the DLL application.
-//
 
 #include "stdafx.h"
 #ifdef _WIN32

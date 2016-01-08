@@ -115,7 +115,6 @@
     <ClInclude Include="FrameModePacker.h" />
     <ClInclude Include="HTKDataDeserializer.h" />
     <ClInclude Include="htkfeatio.h" />
-    <ClInclude Include="HTKMLFReader.h" />
     <ClInclude Include="HTKMLFReaderShim.h" />
     <ClInclude Include="HTKMLFWriter.h" />
     <ClInclude Include="minibatchiterator.h" />
@@ -154,7 +153,6 @@
     </ClCompile>
     <ClCompile Include="FrameModePacker.cpp" />
     <ClCompile Include="HTKDataDeserializer.cpp" />
-    <ClCompile Include="HTKMLFReader.cpp" />
     <ClCompile Include="HTKMLFReaderShim.cpp" />
     <ClCompile Include="HTKMLFWriter.cpp" />
     <ClCompile Include="latticearchive.cpp" />

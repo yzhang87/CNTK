@@ -20,7 +20,6 @@
 #include "chunkevalsource.h"
 #define DATAREADER_EXPORTS
 #include "DataReader.h"
-#include "HTKMLFReader.h"
 #include "HTKMLFReaderShim.h"
 #include "commandArgUtil.h"
 

@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClCompile Include="DataWriter.cpp" />
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="HTKMLFReader.cpp" />
     <ClCompile Include="HTKMLFWriter.cpp" />
     <ClCompile Include="latticearchive.cpp" />
     <ClCompile Include="stdafx.cpp" />
@@ -29,7 +28,6 @@
     <ClInclude Include="biggrowablevectors.h" />
     <ClInclude Include="chunkevalsource.h" />
     <ClInclude Include="htkfeatio.h" />
-    <ClInclude Include="HTKMLFReader.h" />
     <ClInclude Include="HTKMLFWriter.h" />
     <ClInclude Include="minibatchiterator.h" />
     <ClInclude Include="minibatchsourcehelpers.h" />

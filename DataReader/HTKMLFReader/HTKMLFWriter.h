@@ -3,8 +3,6 @@
 //     Copyright (c) Microsoft Corporation.  All rights reserved.
 // </copyright>
 //
-// HTKMLFReader.h - Include file for the MTK and MLF format of features and samples 
-//
 
 #pragma once
 
