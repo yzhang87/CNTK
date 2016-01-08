@@ -49,8 +49,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         CropTransform(
             TransformerPtr next,
             const std::vector<InputDescriptionPtr> & inputs,
-            const ConfigParameters& readerConfig,
-            unsigned int seed);
+            const ConfigParameters& readerConfig);
 
     protected:
         virtual void Apply(cv::Mat& mat) override;
@@ -83,8 +82,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         ScaleTransform(TransformerPtr next,
             const std::vector<InputDescriptionPtr> & inputs,
-            const ConfigParameters& readerConfig,
-            unsigned int seed);
+            const ConfigParameters& readerConfig);
 
     private:
         void InitFromConfig(const ConfigParameters& config);

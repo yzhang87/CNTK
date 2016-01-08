@@ -94,8 +94,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     CropTransform::CropTransform(
         TransformerPtr next,
         const std::vector<InputDescriptionPtr> & inputs,
-        const ConfigParameters& readerConfig,
-        unsigned int seed) : BaseTransformer(next, inputs, seed)
+        const ConfigParameters& readerConfig)
+        : BaseTransformer(next, inputs, std::stoi(readerConfig(L"seed", "0")))
     {
         auto featureStreamIds = GetFeatureStreamIds();
 
@@ -240,9 +240,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     ScaleTransform::ScaleTransform(
         TransformerPtr next,
         const std::vector<InputDescriptionPtr> & inputs,
-        const ConfigParameters& readerConfig,
-        unsigned int seed)
-        : BaseTransformer(next, inputs, seed)
+        const ConfigParameters& readerConfig)
+        : BaseTransformer(next, inputs, std::stoi(readerConfig(L"seed", "0")))
     {
         m_interpMap.emplace("nearest", cv::INTER_NEAREST);
         m_interpMap.emplace("linear", cv::INTER_LINEAR);
