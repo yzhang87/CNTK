@@ -40,7 +40,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<ImageSequenceDescription> m_imageSequences;
         TimelineP m_sequences;
 
-        std::vector<InputDescriptionPtr> m_inputs;
+        TensorShapePtr m_labelSampleLayout;
+
         LabelGeneratorPtr m_labelGenerator;
 
         cv::Mat m_currentImage;
