@@ -149,6 +149,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         input->type = it_label;
         input->name = m_name;
         input->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
+        input->elementType = m_elementSize == sizeof(float) ? et_float : et_double;
         return std::vector<InputDescriptionPtr> { input };
     }
 
