@@ -24,11 +24,19 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     typedef std::shared_ptr<ImageLayout> TensorShapePtr;
 
+    // TODO: support more / extensible types?
+    enum InputType
+    {
+        it_feature,
+        it_label
+    };
+
     // Input description.
     struct InputDescription
     {
         std::wstring name;
         InputId id;
+        InputType type;
         TensorShapePtr sampleLayout;
         std::map<std::string, std::string> properties;
     };

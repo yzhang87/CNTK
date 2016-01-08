@@ -30,9 +30,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementType);
         TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
-        TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, features->id, config(features->name), m_seed);
-        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, features->id, config(features->name), m_seed, m_elementType == et_float ? CV_32F : CV_64F);
-        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, features->id);
+        TransformerPtr cropper = std::make_shared<CropTransform>(randomizer, m_inputs, config(features->name), m_seed);
+        TransformerPtr scaler = std::make_shared<ScaleTransform>(cropper, m_inputs, config(features->name), m_seed, m_elementType == et_float ? CV_32F : CV_64F);
+        TransformerPtr mean = std::make_shared<MeanTransform>(scaler, m_inputs);
         m_transformer = mean;
     }
 

@@ -17,12 +17,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     BaseTransformer::BaseTransformer(
         TransformerPtr next,
-        InputId appliedStreamId,
+        const std::vector<InputDescriptionPtr> & inputs,
         unsigned int seed)
-        : m_appliedStreamId(appliedStreamId)
-        , m_next(next)
+        : m_next(next)
         , m_seed(seed)
     {
+        for (const auto & input : inputs)
+        {
+            if (input->type == it_feature)
+            {
+                m_featureStreamIds.push_back(input->id);
+            }
+        }
     }
 
     void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& config)
@@ -38,7 +44,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return sample;
         }
 
-        sample.m_data[m_appliedStreamId] = Apply(sample.m_data[m_appliedStreamId]);
+        for (auto id : m_featureStreamIds)
+        {
+            sample.m_data[id] = Apply(sample.m_data[id]);
+        }
         return sample;
     }
 
@@ -80,9 +89,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     CropTransform::CropTransform(
         TransformerPtr next,
-        InputId appliedStreamId,
+        const std::vector<InputDescriptionPtr> & inputs,
         const ConfigParameters& parameters,
-        unsigned int seed) : BaseTransformer(next, appliedStreamId, seed)
+        unsigned int seed) : BaseTransformer(next, inputs, seed)
     {
         InitFromConfig(parameters);
     }
@@ -219,11 +228,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ScaleTransform::ScaleTransform(
         TransformerPtr next,
-        InputId appliedStreamId,
+        const std::vector<InputDescriptionPtr> & inputs,
         const ConfigParameters& config,
         unsigned int seed,
         int dataType)
-        : BaseTransformer(next, appliedStreamId, seed)
+        : BaseTransformer(next, inputs, seed)
         , m_dataType(dataType)
     {
         assert(m_dataType == CV_32F || m_dataType == CV_64F);
@@ -281,8 +290,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     MeanTransform::MeanTransform(
         TransformerPtr next,
-        InputId appliedStreamId)
-        : BaseTransformer(next, appliedStreamId, 0)
+        const std::vector<InputDescriptionPtr> & inputs)
+        : BaseTransformer(next, inputs, 0)
     {}
 
     void MeanTransform::InitFromConfig(const ConfigParameters & config)
