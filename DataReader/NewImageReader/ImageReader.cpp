@@ -16,14 +16,12 @@
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageReader::ImageReader(
-        const ConfigParameters& parameters,
+        MemoryProviderPtr provider,
+        const ConfigParameters& config,
         ElementType elementType)
-        : m_seed(0), m_elementType(elementType)
-    {
-        InitFromConfig(parameters);
-    }
-
-    void ImageReader::InitFromConfig(const ConfigParameters& config)
+        : m_seed(0)
+        , m_elementType(elementType)
+        , m_provider(provider)
     {
         auto configHelper = ImageConfigHelper(config);
         DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config, m_elementType);
@@ -52,8 +50,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         m_transformer->SetEpochConfiguration(config);
         m_packer = std::make_shared<FrameModePacker>(
-            m_transformer, 
-            config.minibatchSize, 
+            m_provider,
+            m_transformer,
+            config.minibatchSize,
             m_elementType == et_float ? sizeof(float) : sizeof(double),
             m_inputs);
     }

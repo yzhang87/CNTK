@@ -11,18 +11,28 @@
 #include "DataReader.h"
 #include "ReaderShim.h"
 #include "ImageReader.h"
+#include "HeapMemoryProvider.h"
+#include "CudaMemoryProvider.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+// TODO: Memory provider should be injected by SGD.
+
 extern "C" DATAREADER_API void GetReaderF(IDataReader<float>** preader)
 {
-    auto factory = [](const ConfigParameters& parameters) -> ReaderPtr { return std::make_shared<ImageReader>(parameters, et_float); };
+    auto factory = [](const ConfigParameters& parameters) -> ReaderPtr 
+    {
+        return std::make_shared<ImageReader>(std::make_shared<HeapMemoryProvider>(), parameters, et_float);
+    };
     *preader = new ReaderShim<float>(factory);
 }
 
 extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
 {
-    auto factory = [](const ConfigParameters& parameters) -> ReaderPtr { return std::make_shared<ImageReader>(parameters, et_double); };
+    auto factory = [](const ConfigParameters& parameters) -> ReaderPtr
+    {
+        return std::make_shared<ImageReader>(std::make_shared<HeapMemoryProvider>(), parameters, et_double);
+    };
     *preader = new ReaderShim<double>(factory);
 }
 

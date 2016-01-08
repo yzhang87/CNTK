@@ -4,12 +4,14 @@
 // </copyright>
 //
 #define _CRT_SECURE_NO_WARNINGS
+#define _SCL_SECURE_NO_WARNINGS
 
 #include "FrameModePacker.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     FrameModePacker::FrameModePacker(
+        MemoryProviderPtr memoryProvider,
         TransformerPtr transformer,
         size_t minibatchSize,
         size_t elementSize,
@@ -19,14 +21,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_elementSize(elementSize)
         , m_inputs(inputs)
         , m_minibatchLayout(std::make_shared<MBLayout>())
+        , m_memoryProvider(memoryProvider)
     {
         for (const auto& input : inputs)
         {
-            size_t dimensions = input->sampleLayout->GetNumElements() * m_elementSize;
-
-            std::vector<char> tmp;
-            tmp.resize(m_mbSize * dimensions, 0);
-            m_inputBuffers.push_back(tmp);
+            m_inputBuffers.push_back(AllocateBuffer(m_mbSize * input->sampleLayout->GetNumElements(), m_elementSize));
         }
     }
 
@@ -55,7 +54,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 std::copy(
                     reinterpret_cast<char*>(image.m_data[j].data),
                     reinterpret_cast<char*>(image.m_data[j].data) + dimensions,
-                    m_inputBuffers[j].begin() + dimensions * i);
+                    reinterpret_cast<char*>(m_inputBuffers[j].get()) + dimensions * i);
             }
         }
 
@@ -70,12 +69,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             LayoutPtr layout = std::make_shared<Layout>();
             layout->rows = m_inputs[i]->sampleLayout;
             layout->columns = m_minibatchLayout;
-            // TODO: add element and storage type
+            layout->storageType = st_dense;
+            // TODO: add element type
 
             size_t dimensions = m_inputs[i]->sampleLayout->GetNumElements() * m_elementSize;
-            InputPtr stream = std::make_shared<Input>(&m_inputBuffers[i][0], mbSize * dimensions, layout);
+            InputPtr stream = std::make_shared<Input>(m_inputBuffers[i].get(), mbSize * dimensions, layout);
             m.minibatch.insert(std::make_pair(i, stream));
         }
+
         return m;
+    }
+
+    std::shared_ptr<void> FrameModePacker::AllocateBuffer(size_t numElements, size_t elementSize)
+    {
+        return std::shared_ptr<void>(
+            m_memoryProvider->Alloc(elementSize, numElements),
+            [this](void* p) { m_memoryProvider->Free(p); });
     }
 }}}

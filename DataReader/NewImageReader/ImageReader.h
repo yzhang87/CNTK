@@ -15,7 +15,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class ImageReader : public Reader
     {
     public:
-        ImageReader(const ConfigParameters& parameters,
+        ImageReader(MemoryProviderPtr provider,
+            const ConfigParameters& parameters,
             ElementType elementType);
 
         std::vector<InputDescriptionPtr> GetInputs() override;
@@ -23,11 +24,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Minibatch ReadMinibatch() override;
 
     private:
-        void InitFromConfig(const ConfigParameters& config);
-
         std::vector<InputDescriptionPtr> m_inputs;
         TransformerPtr m_transformer;
         FrameModePackerPtr m_packer;
+        MemoryProviderPtr m_provider;
         unsigned int m_seed;
 
         bool m_imgListRand;
