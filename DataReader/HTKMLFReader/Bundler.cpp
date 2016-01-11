@@ -140,7 +140,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    const TimelineP& Bundler::GetSequenceDescriptions() const
+    const Timeline& Bundler::GetSequenceDescriptions() const
     {
         // TODO: we probably will take different deserializers from here.
         return m_driver->GetSequenceDescriptions();

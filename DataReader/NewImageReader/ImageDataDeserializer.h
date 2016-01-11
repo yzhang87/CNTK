@@ -14,7 +14,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::vector<InputDescriptionPtr> GetInputs() const override;
         void SetEpochConfiguration(const EpochConfiguration& config) override;
-        const TimelineP& GetSequenceDescriptions() const override;
+        const Timeline& GetSequenceDescriptions() const override;
         std::vector<Sequence> GetSequenceById(size_t id) override;
         bool RequireChunk(size_t chunkIndex) override;
         void ReleaseChunk(size_t chunkIndex) override;
@@ -38,7 +38,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void CreateSequenceDescriptions(std::string mapPath, size_t labelDimension);
 
         std::vector<ImageSequenceDescription> m_imageSequences;
-        TimelineP m_sequences;
+        Timeline m_sequences;
 
         TensorShapePtr m_labelSampleLayout;
 

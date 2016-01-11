@@ -160,7 +160,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<Frame> m_frames;
 
         size_t m_elementSize;
-        TimelineP m_sequences;
+        Timeline m_sequences;
 
         std::vector<chunkdata> m_chunks;
         size_t m_chunksinram;             // (for diagnostics messages)
@@ -178,7 +178,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual const TimelineP& GetSequenceDescriptions() const override;
+        virtual const Timeline& GetSequenceDescriptions() const override;
 
         virtual std::vector<InputDescriptionPtr> GetInputs() const override;
 

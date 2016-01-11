@@ -66,9 +66,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_sequencePositionInSweep;
         std::vector<RandomizedChunk> m_randomizedChunks;
         std::vector<size_t> m_sequencePositionToChunkIndex; // TODO find on m_randomizedChunks instead?
-        Timeline m_randomTimeline;
+        std::vector<SequenceDescription> m_randomTimeline;
 
-        bool IsValid(const TimelineP& timeline) const;
+        bool IsValid(const Timeline& timeline) const;
 
         template<typename VECTOR>
         static void randomShuffle(VECTOR & v, size_t randomseed);

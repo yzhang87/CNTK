@@ -102,7 +102,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     }
 
-    const TimelineP& ImageDataDeserializer::GetSequenceDescriptions() const
+    const Timeline& ImageDataDeserializer::GetSequenceDescriptions() const
     {
         return m_sequences;
     }

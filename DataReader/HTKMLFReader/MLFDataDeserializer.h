@@ -38,7 +38,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<MLFUtterance> m_utterances;
         std::vector<MLFFrame> m_frames;
 
-        TimelineP m_sequences;
+        Timeline m_sequences;
         size_t m_elementSize;
         bool m_frameMode;
         std::wstring m_name;
@@ -48,7 +48,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
-        virtual const TimelineP& GetSequenceDescriptions() const override;
+        virtual const Timeline& GetSequenceDescriptions() const override;
 
         virtual std::vector<InputDescriptionPtr> GetInputs() const override;
 

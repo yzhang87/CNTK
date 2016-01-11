@@ -46,7 +46,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return begin + randno % (end - begin);
     }
 
-    bool BlockRandomizer::IsValid(const TimelineP& timeline) const
+    bool BlockRandomizer::IsValid(const Timeline& timeline) const
     {
         SequenceDescription previous = {
             static_cast<size_t>(-1),
@@ -264,7 +264,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_epochSize(SIZE_MAX)
     {
         assert(bundler != nullptr);
-        const TimelineP & timeline = m_sequencer->GetSequenceDescriptions();
+        const Timeline& timeline = m_sequencer->GetSequenceDescriptions();
         assert(IsValid(timeline));
 
         m_numSequences = timeline.back()->id + 1;

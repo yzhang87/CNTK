@@ -32,11 +32,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual ~BlockReader() = 0 {}
     };
 
-    // Timeline specifies a vector of Sequence IDs and lengths.
-    // This information is exposed by a Sequencer, e.g., to be used by the Randomizer.
-    typedef std::vector<SequenceDescription> Timeline;
-
-    typedef std::vector<const SequenceDescription*> TimelineP;
+    typedef std::vector<const SequenceDescription*> Timeline;
 
     // Interface to for structured reading from a single data source
     class DataDeserializer
@@ -45,7 +41,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual std::vector<InputDescriptionPtr> GetInputs() const = 0; // TODO will remove
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
-        virtual const TimelineP& GetSequenceDescriptions() const = 0;
+        virtual const Timeline& GetSequenceDescriptions() const = 0;
         virtual std::vector<Sequence> GetSequenceById(size_t id) = 0;
 
         virtual bool RequireChunk(size_t chunkIndex) = 0;
