@@ -152,6 +152,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
+    // TODO RequireChunk: re-ahead here (in cooperation with randomizer requesting images)
     bool ImageDataDeserializer::RequireChunk(size_t /* chunkIndex */)
     {
         return true;
