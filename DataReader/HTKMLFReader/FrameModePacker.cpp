@@ -370,7 +370,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return;
         }
 
-        std::vector<std::vector<Sequence>> sequences;
+        std::vector<std::vector<SequenceData>> sequences;
         for (size_t currentIndex = 0; currentIndex < m_requestedMBSize; ++currentIndex)
         {
             auto sequence = m_transformer->GetNextSequences(1 /* TODO */);

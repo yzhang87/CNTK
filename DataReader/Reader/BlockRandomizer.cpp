@@ -352,13 +352,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_epochSize <= m_samplePositionInEpoch;
     }
 
-    SequencesData BlockRandomizer::GetNextSequences(size_t count)
+    Sequences BlockRandomizer::GetNextSequences(size_t count)
     {
         assert(m_samplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
 
         std::vector<size_t> ids;
         bool endOfEpoch = false;
-        SequencesData result;
+        Sequences result;
 
         while (ids.size() < count)
         {

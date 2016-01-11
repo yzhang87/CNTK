@@ -107,11 +107,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_sequences;
     }
 
-    std::vector<std::vector<Sequence>> ImageDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
+    std::vector<std::vector<SequenceData>> ImageDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
     {
         assert(0 < ids.size());
 
-        std::vector<std::vector<Sequence>> result;
+        std::vector<std::vector<SequenceData>> result;
 
         m_currentImages.resize(ids.size());
         result.resize(ids.size());
@@ -123,7 +123,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const auto& imageSequence = m_imageSequences[ids[i]];
 
             // Construct image
-            Sequence image;
+            SequenceData image;
 
             m_currentImages[i] = std::move(cv::imread(imageSequence.path, cv::IMREAD_COLOR));
             cv::Mat& cvImage = m_currentImages[i];
@@ -141,11 +141,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             image.numberOfSamples = imageSequence.numberOfSamples;
 
             // Construct label
-            Sequence label;
+            SequenceData label;
             label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
             label.layout = m_labelSampleLayout;
             label.numberOfSamples = imageSequence.numberOfSamples;
-            result[i] = std::move(std::vector<Sequence> { image, label });
+
+            result[i] = std::move(std::vector<SequenceData> { image, label });
         }
 
         return result;

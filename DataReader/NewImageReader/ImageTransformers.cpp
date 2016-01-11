@@ -39,10 +39,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_next->SetEpochConfiguration(config);
     }
 
-    SequencesData BaseTransformer::GetNextSequences(size_t count)
+    Sequences BaseTransformer::GetNextSequences(size_t count)
     {
         assert(m_next != nullptr);
-        SequencesData samples = m_next->GetNextSequences(count);
+        Sequences samples = m_next->GetNextSequences(count);
 
         if (samples.m_endOfEpoch)
         {
@@ -62,7 +62,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return samples;
     }
 
-    Sequence BaseTransformer::Apply(Sequence& s, InputDescriptionPtr input)
+    SequenceData BaseTransformer::Apply(SequenceData& s, InputDescriptionPtr input)
     {
         int rows = static_cast<int>(s.layout->GetWidth());
         int columns = static_cast<int>(s.layout->GetHeight());
@@ -86,7 +86,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_buffer = cv::Mat(rows, columns, type, s.data);
         this->Apply(m_buffer);
 
-        Sequence result;
+        SequenceData result;
         result.layout = std::make_shared<ImageLayout>(
             ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels()));
         result.numberOfSamples = result.numberOfSamples;
