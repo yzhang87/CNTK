@@ -54,7 +54,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_numChunks;
         size_t m_numSamples;
         bool m_frameMode; // true iff only single-sample sequences
-        std::vector<ChunkInformation> m_chunkInformation;
+        std::vector<ChunkInformation> m_chunkInformation; // (includes a sentinel)
 
         // Per-epoch configuration
         size_t m_workerRank;
@@ -66,7 +66,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_sweep;
         size_t m_sweepStartInSamples; // TODO do we need it?
         size_t m_sequencePositionInSweep;
-        std::vector<RandomizedChunk> m_randomizedChunks;
+        std::vector<RandomizedChunk> m_randomizedChunks; // (includes a sentinel)
         std::vector<size_t> m_sequencePositionToChunkIndex; // TODO find on m_randomizedChunks instead?
         std::vector<SequenceDescription> m_randomTimeline;
 

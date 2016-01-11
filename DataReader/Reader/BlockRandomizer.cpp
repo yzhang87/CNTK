@@ -14,6 +14,7 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    // Shuffle a vector into random order by randomly swapping elements
     template<typename TVector>
     static void BlockRandomizer::randomShuffle(TVector& v, size_t randomseed)
     {
@@ -66,9 +67,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             });
         return it == timeline.end();
     }
-
-    // Shuffle a vector into random order by randomly swapping elements
-
 
     void BlockRandomizer::RandomizeChunks()
     {
