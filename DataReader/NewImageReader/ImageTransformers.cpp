@@ -54,6 +54,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return samples;
         }
 
+        // TODO parallelization like in the original image reader
         for (auto & sample : samples.m_data)
         {
             assert(sample.size() == m_inputs.size());

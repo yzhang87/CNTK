@@ -129,6 +129,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             assert(cvImage.isContinuous());
 
             // Convert element type.
+            // TODO in original image reader, this conversion happened later. Should we support all native CV element types to be able to match this behavior?
             int dataType = m_featureElementType == ElementType::et_float ? CV_32F : CV_64F;
             if (cvImage.type() != CV_MAKETYPE(dataType, cvImage.channels()))
             {
@@ -151,6 +152,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
+    // TODO RequireChunk: re-ahead here (in cooperation with randomizer requesting images)
     bool ImageDataDeserializer::RequireChunk(size_t /* chunkIndex */)
     {
         return true;
