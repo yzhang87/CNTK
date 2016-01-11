@@ -44,8 +44,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(m_next != nullptr);
         SequencesData samples = m_next->GetNextSequences(count);
 
-        assert(!samples.m_endOfEpoch || samples.m_data.size() == 0); // TODO for now, will change
-
         if (samples.m_endOfEpoch)
         {
             return samples;
@@ -53,6 +51,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         for (auto & sample : samples.m_data)
         {
+            assert(sample.size() == m_inputs.size());
+
             for (auto id : m_featureStreamIds)
             {
                 sample[id] = Apply(sample[id], m_inputs[id]);

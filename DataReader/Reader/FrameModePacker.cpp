@@ -38,7 +38,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto images = m_transformer->GetNextSequences(m_mbSize);
 
-        assert(!images.m_endOfEpoch || images.m_data.size() == 0); // TODO for now, will change
         if (images.m_endOfEpoch)
         {
             m.atEndOfEpoch = true;
