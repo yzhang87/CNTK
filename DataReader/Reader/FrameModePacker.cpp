@@ -36,41 +36,41 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Minibatch m;
         m.atEndOfEpoch = false;
 
-        size_t mbSize = 0;
-        for (size_t i = 0; i < m_mbSize; i++)
-        {
-            auto image = m_transformer->GetNextSequence();
-            if (image.m_endOfEpoch)
-            {
-                m.atEndOfEpoch = true;
-                break;
-            }
-            mbSize++;
+        auto images = m_transformer->GetNextSequences(m_mbSize);
 
-            assert(m_inputBuffers.size() == image.m_data.size());
-            for (int j = 0; j < image.m_data.size(); ++j)
+        assert(!images.m_endOfEpoch || images.m_data.size() == 0); // TODO for now, will change
+        if (images.m_endOfEpoch)
+        {
+            m.atEndOfEpoch = true;
+        }
+
+        for (size_t i = 0; i < images.m_data.size(); i++)
+        {
+            assert(m_inputBuffers.size() == images.m_data[i].size());
+            for (int j = 0; j < images.m_data[i].size(); ++j)
             {
                 size_t dimensions = m_inputs[j]->sampleLayout->GetNumElements() * m_elementSize;
                 std::copy(
-                    reinterpret_cast<char*>(image.m_data[j].data),
-                    reinterpret_cast<char*>(image.m_data[j].data) + dimensions,
+                    reinterpret_cast<char*>(images.m_data[i][j].data),
+                    reinterpret_cast<char*>(images.m_data[i][j].data) + dimensions,
                     reinterpret_cast<char*>(m_inputBuffers[j].get()) + dimensions * i);
             }
         }
 
-        if (mbSize == 0)
+        if (images.m_data.size() == 0)
         {
             return m;
         }
 
-        m_minibatchLayout->Init(mbSize, 1);
+        m_minibatchLayout->Init(images.m_data.size(), 1);
         for (int i = 0; i < m_inputs.size(); ++i)
         {
             size_t dimensions = m_inputs[i]->sampleLayout->GetNumElements() * m_elementSize;
             InputPtr stream = std::make_shared<Input>();
             stream->data = m_inputBuffers[i].get();
-            stream->dataSize = mbSize * dimensions;
+            stream->dataSize = images.m_data.size() * dimensions;
             stream->layout = m_minibatchLayout;
+
             m.minibatch.push_back(stream);
         }
 

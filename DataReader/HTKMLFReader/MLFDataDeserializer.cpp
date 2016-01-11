@@ -152,9 +152,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return std::vector<InputDescriptionPtr> { input };
     }
 
-    std::vector<Sequence> MLFDataDeserializer::GetSequenceById(size_t id)
+    std::vector<std::vector<Sequence>> MLFDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
     {
         assert(m_frameMode);
+        assert(ids.size() == 1);
+        auto id = ids[0];
 
         size_t label = m_classIds[m_frames[id].index];
         Sequence r;
@@ -175,7 +177,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         r.numberOfSamples = m_sequences[id]->numberOfSamples;
 
-        return std::vector<Sequence> { r };
+        std::vector<std::vector<Sequence>> result;
+        result.push_back(std::vector<Sequence> { r });
+        return result;
     }
 
     bool MLFDataDeserializer::RequireChunk(size_t /*chunkIndex*/)
