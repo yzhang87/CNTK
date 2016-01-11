@@ -18,9 +18,6 @@
 #include "commandArgUtil.h"
 #include "ReaderShim.h"
 
-#include "SubstitutingMemoryProvider.h"
-#include "HeapMemoryProvider.h"
-
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     template<class ElemType>

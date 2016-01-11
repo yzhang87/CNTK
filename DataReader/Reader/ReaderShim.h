@@ -12,7 +12,7 @@
 #include <string>
 #include "DataReader.h"
 #include "commandArgUtil.h"
-#include "SubstitutingMemoryProvider.h"
+#include "ReaderInterfaces.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
