@@ -47,7 +47,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
         virtual const TimelineP& GetSequenceDescriptions() const = 0;
-        virtual std::vector<Sequence> GetSequenceById(size_t id) = 0;
+        virtual std::vector<std::vector<Sequence>> GetSequencesById(const std::vector<size_t> & ids) = 0;
 
         virtual bool RequireChunk(size_t chunkIndex) = 0;
         virtual void ReleaseChunk(size_t chunkIndex) = 0;
@@ -57,15 +57,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     typedef std::shared_ptr<DataDeserializer> DataDeserializerPtr;
 
-    struct SequenceData
+    struct SequencesData
     {
-        SequenceData() : m_endOfEpoch(false)
+        SequencesData() : m_endOfEpoch(false)
         {}
 
-        std::vector<Sequence> m_data;
+        std::vector<std::vector<Sequence>> m_data;
         bool m_endOfEpoch;
 
-        SequenceData(SequenceData&& other)
+        SequencesData(SequencesData&& other)
             : m_data(std::move(other.m_data))
             , m_endOfEpoch(std::move(other.m_endOfEpoch))
         {
@@ -82,7 +82,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs) = 0;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
         virtual ~Transformer() = 0 {}
-        virtual SequenceData GetNextSequence() = 0;
+        virtual SequencesData GetNextSequences(size_t count) = 0;
     };
 
 }}}

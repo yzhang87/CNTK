@@ -107,34 +107,49 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_sequences;
     }
 
-    std::vector<Sequence> ImageDataDeserializer::GetSequenceById(size_t id)
+    std::vector<std::vector<Sequence>> ImageDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
     {
-        assert(id < m_imageSequences.size());
-        const auto & imageSequence = m_imageSequences[id];
+        assert(0 < ids.size());
 
-        // Construct image
-        Sequence image;
+        std::vector<std::vector<Sequence>> result;
 
-        m_currentImage = cv::imread(imageSequence.path, cv::IMREAD_COLOR);
-        assert(m_currentImage.isContinuous());
+        // Remove old images
+        m_currentImages.clear();
 
-        // Convert element type.
-        int dataType = m_featureElementType == et_float ? CV_32F : CV_64F;
-        if (m_currentImage.type() != CV_MAKETYPE(dataType, m_currentImage.channels()))
+        for (auto id : ids)
         {
-            m_currentImage.convertTo(m_currentImage, dataType);
+            assert(id < m_imageSequences.size());
+            const auto & imageSequence = m_imageSequences[id];
+
+            // Construct image
+            Sequence image;
+
+            cv::Mat cvImage;
+            cvImage = cv::imread(imageSequence.path, cv::IMREAD_COLOR);
+            assert(cvImage.isContinuous());
+
+            // Convert element type.
+            int dataType = m_featureElementType == et_float ? CV_32F : CV_64F;
+            if (cvImage.type() != CV_MAKETYPE(dataType, cvImage.channels()))
+            {
+                cvImage.convertTo(cvImage, dataType);
+            }
+
+            image.data = cvImage.ptr();
+            image.layout = std::make_shared<ImageLayout>(ImageLayoutWHC(cvImage.cols, cvImage.rows, cvImage.channels()));;
+            image.numberOfSamples = imageSequence.numberOfSamples;
+
+            m_currentImages.push_back(std::move(cvImage));
+
+            // Construct label
+            Sequence label;
+            label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
+            label.layout = m_labelSampleLayout;
+            label.numberOfSamples = imageSequence.numberOfSamples;
+            result.push_back(std::vector<Sequence> { image, label });
         }
 
-        image.data = m_currentImage.ptr();
-        image.layout = std::make_shared<ImageLayout>(ImageLayoutWHC(m_currentImage.cols, m_currentImage.rows, m_currentImage.channels()));;
-        image.numberOfSamples = imageSequence.numberOfSamples;
-
-        // Construct label
-        Sequence label;
-        label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
-        label.layout = m_labelSampleLayout;
-        label.numberOfSamples = imageSequence.numberOfSamples;
-        return std::vector<Sequence> { image, label };
+        return result;
     }
 
     bool ImageDataDeserializer::RequireChunk(size_t /* chunkIndex */)

@@ -20,7 +20,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs) override;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
-        virtual SequenceData GetNextSequence() override;
+        virtual SequencesData GetNextSequences(size_t count) override;
 
     private:
         // Structure for per-chunk information

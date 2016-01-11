@@ -352,26 +352,41 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_epochSize <= m_samplePositionInEpoch;
     }
 
-    SequenceData BlockRandomizer::GetNextSequence()
+    SequencesData BlockRandomizer::GetNextSequences(size_t count)
     {
         assert(m_samplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
 
-        bool endOfEpoch = AdvanceToNextPositionForThisWorker();
+        std::vector<size_t> ids;
+        bool endOfEpoch = false;
+        SequencesData result;
 
-        if (endOfEpoch)
+        while (ids.size() < count)
         {
-            SequenceData result;
-            result.m_endOfEpoch = true;
+            endOfEpoch = AdvanceToNextPositionForThisWorker();
+            if (endOfEpoch)
+            {
+                break;
+            }
+            else
+            {
+                assert(m_sequencePositionInSweep < m_numSequences);
+                ids.push_back(m_sequencePositionInSweep);
+                const auto & seqDesc = m_randomTimeline[m_sequencePositionInSweep];
+                m_samplePositionInEpoch += seqDesc.numberOfSamples;
+                m_sequencePositionInSweep++;
+            }
+        };
+
+        result.m_endOfEpoch = endOfEpoch;
+
+        if (ids.size() == 0)
+        {
             return result;
         }
 
-        assert(m_sequencePositionInSweep < m_numSequences);
-        const auto & seqDesc = m_randomTimeline[m_sequencePositionInSweep];
-
         // Require and release chunks from the sequencer
-        const auto & chunk = m_randomizedChunks[m_sequencePositionToChunkIndex[m_sequencePositionInSweep]];
-        const size_t windowbegin = chunk.windowbegin;
-        const size_t windowend = chunk.windowend;
+        const size_t windowbegin = m_randomizedChunks[m_sequencePositionToChunkIndex[ids[0]]].windowbegin;
+        const size_t windowend = m_randomizedChunks[m_sequencePositionToChunkIndex[ids.back()]].windowend;
 
         for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
         {
@@ -387,13 +402,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
         }
 
-        m_samplePositionInEpoch += seqDesc.numberOfSamples;
-        m_sequencePositionInSweep++;
+        // Construct vector of original IDs and request data
+        std::vector<size_t> originalIds;
+        for (auto id : ids)
+        {
+            const auto & seqDesc = m_randomTimeline[id];
+            originalIds.push_back(seqDesc.id);
+        }
 
-        SequenceData r;
-        r.m_data = m_sequencer->GetSequenceById(seqDesc.id);
-        r.m_endOfEpoch = false;
-        return r;
+        result.m_data = m_sequencer->GetSequencesById(originalIds);
+        return result;
     };
 
 } } }

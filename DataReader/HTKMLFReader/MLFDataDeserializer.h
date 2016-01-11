@@ -52,7 +52,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual std::vector<InputDescriptionPtr> GetInputs() const override;
 
-        virtual std::vector<Sequence> GetSequenceById(size_t id) override;
+        virtual std::vector<std::vector<Sequence>> GetSequencesById(const std::vector<size_t> & ids) override;
 
         virtual bool RequireChunk(size_t chunkIndex) override;
 
