@@ -12,7 +12,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         ImageDataDeserializer(const ConfigParameters& config);
         virtual ~ImageDataDeserializer() {}
 
-        std::vector<InputDescriptionPtr> GetInputs() const override;
+        std::vector<StreamDescriptionPtr> GetStreams() const override;
         void SetEpochConfiguration(const EpochConfiguration& config) override;
         const Timeline& GetSequenceDescriptions() const override;
         std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) override;
@@ -46,6 +46,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::vector<cv::Mat> m_currentImages;
         ElementType m_featureElementType;
-        std::vector<InputDescriptionPtr> m_inputs;
+        std::vector<StreamDescriptionPtr> m_streams;
     };
 }}}

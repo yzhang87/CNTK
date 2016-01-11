@@ -38,34 +38,33 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         st_dense, // dense
     };
 
-    typedef size_t InputId;
+    typedef size_t StreamId;
 
-    // This class describes a particular input: its name, elements, storage, etc.
-    struct InputDescription
+    // This class describes a particular stream: its name, elements, storage, etc.
+    struct StreamDescription
     {
-        std::wstring name;              // Name of the input
-        InputId id;                     // Id of the input
+        std::wstring name;              // Name of the stream
+        StreamId id;                    // Id of the stream
         StorageType storageType;        // Storage type
         ElementType elementType;        // Element type
-        TensorShapePtr sampleLayout;    // Layout of the sample for the input
+        TensorShapePtr sampleLayout;    // Layout of the sample for the stream
     };
-    typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
+    typedef std::shared_ptr<StreamDescription> StreamDescriptionPtr;
 
     // Input data.
-    // TODO: change it to Stream - because it will be more network alligned
-    struct Input
+    struct Stream
     {
         void* data;
         size_t dataSize;
         MBLayoutPtr layout;           // Layout out of the data.
     };
-    typedef std::shared_ptr<Input> InputPtr;
+    typedef std::shared_ptr<Stream> StreamPtr;
 
     // Represents a single minibatch, that contains information about all streams.
     struct Minibatch
     {
-        bool atEndOfEpoch;                  // Signifies the end of the epoch.
-        std::vector<InputPtr> minibatch;    // Minibatch data.
+        bool atEndOfEpoch;                   // Signifies the end of the epoch.
+        std::vector<StreamPtr> minibatch;    // Minibatch data.
 
         Minibatch() : atEndOfEpoch(false)
         {}
@@ -80,8 +79,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class Reader
     {
     public:
-        // Describes the inputs this reader produces.
-        virtual std::vector<InputDescriptionPtr> GetInputs() = 0;
+        // Describes the streams this reader produces.
+        virtual std::vector<StreamDescriptionPtr> GetStreams() = 0;
 
         // Starts a new epoch.
         virtual void StartEpoch(const EpochConfiguration& config) = 0;

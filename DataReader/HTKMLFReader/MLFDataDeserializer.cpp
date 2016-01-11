@@ -142,14 +142,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_sequences;
     }
 
-    std::vector<InputDescriptionPtr> MLFDataDeserializer::GetInputs() const
+    std::vector<StreamDescriptionPtr> MLFDataDeserializer::GetStreams() const
     {
-        InputDescriptionPtr input = std::make_shared<InputDescription>();
-        input->id = 0;
-        input->name = m_name;
-        input->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
-        input->elementType = m_elementSize == sizeof(float) ? ElementType::et_float : ElementType::et_double;
-        return std::vector<InputDescriptionPtr> { input };
+        StreamDescriptionPtr stream = std::make_shared<StreamDescription>();
+        stream->id = 0;
+        stream->name = m_name;
+        stream->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
+        stream->elementType = m_elementSize == sizeof(float) ? ElementType::et_float : ElementType::et_double;
+        return std::vector<StreamDescriptionPtr> { stream };
     }
 
     std::vector<std::vector<SequenceData>> MLFDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)

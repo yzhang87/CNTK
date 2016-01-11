@@ -13,10 +13,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Sequences() : m_endOfEpoch(false)
         {}
 
-        // Data per stream. Id in the outer vector have to corresponds to the stream id provided in the Initialize.
+        // Data for up to a requested number of sequences.
+        // Indices in the inner vector have to correspond to the stream IDs
+        // given by GetStream().
         std::vector<std::vector<SequenceData>> m_data;
 
-        // End of epoch.
+        // Indicates whether the epoch ends with the data returned.
         bool m_endOfEpoch;
 
         Sequences(Sequences&& other)
@@ -35,17 +37,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         // Initialization.
         virtual void Initialize(
-            TransformerPtr inputTransformer,
+            TransformerPtr next,
             const ConfigParameters& readerConfig) = 0;
 
-        // Describes streams the transorm produces.
-        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
+        // Describes streams the transformer produces.
+        virtual std::vector<StreamDescriptionPtr> GetStreams() const = 0;
 
         // Sets current epoch configuration.
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
         // Gets next sequences.
-        // The return value can be used till the next call to GetNextSequences.
+        // The return value can be used until the next call to GetNextSequences.
         virtual Sequences GetNextSequences(size_t count) = 0;
 
         virtual ~Transformer() = 0 {}

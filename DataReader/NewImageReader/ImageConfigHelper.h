@@ -11,15 +11,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         ImageConfigHelper(const ConfigParameters& config);
-        std::vector<InputDescriptionPtr> GetInputs() const;
+        std::vector<StreamDescriptionPtr> GetStreams() const;
 
-        size_t GetFeatureInputIndex() const;
-        size_t GetLabelInputIndex() const;
+        size_t GetFeatureStreamId() const;
+        size_t GetLabelStreamId() const;
         std::string GetMapPath() const;
 
     private:
         std::string m_mapPath;
-        std::vector<InputDescriptionPtr> m_inputs;
+        std::vector<StreamDescriptionPtr> m_streams;
     };
 
     typedef std::shared_ptr<ImageConfigHelper> ImageConfigHelperPtr;

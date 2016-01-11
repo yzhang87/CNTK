@@ -15,7 +15,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         FrameModePacker(const ConfigParameters & config, MemoryProviderPtr memoryProvider, size_t elementSize);
 
-        virtual std::vector<InputDescriptionPtr> GetInputs() override;
+        virtual std::vector<StreamDescriptionPtr> GetStreams() override;
         virtual void StartEpoch(const EpochConfiguration& config) override;
         virtual Minibatch ReadMinibatch() override;
 
@@ -44,7 +44,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool m_noData;
         MBLayoutPtr m_pMBLayout;
 
-        std::vector<InputDescriptionPtr> m_inputs;
+        std::vector<StreamDescriptionPtr> m_streams;
         std::map<std::wstring, size_t> m_nameToTypeMap;
         std::map<std::wstring, size_t> m_featureNameToIdMap;
         std::map<std::wstring, size_t> m_featureNameToDimMap;

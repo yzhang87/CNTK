@@ -298,10 +298,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_frameMode = (maxNumberOfSamples == 1);
     }
 
-    void BlockRandomizer::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig)
+    void BlockRandomizer::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
         // Not used for the block randomizer.
-        UNREFERENCED_PARAMETER(inputTransformer);
+        UNREFERENCED_PARAMETER(next);
         UNREFERENCED_PARAMETER(readerConfig);
     }
 

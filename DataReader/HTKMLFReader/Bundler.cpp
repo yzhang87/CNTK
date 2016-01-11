@@ -101,20 +101,20 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_verbosity = readerConfig(L"verbosity", 2);
         m_verbosity = verbosity; // not needed
 
-        std::vector<InputDescriptionPtr> inputs;
+        std::vector<StreamDescriptionPtr> streams;
         for (auto d : deserializers)
         {
-            for (auto i : d->GetInputs())
+            for (auto i : d->GetStreams())
             {
-                InputDescriptionPtr input = std::make_shared<InputDescription>();
-                input->id = inputs.size();
-                input->name = i->name;
-                input->sampleLayout = i->sampleLayout;
-                inputs.push_back(input);
+                StreamDescriptionPtr stream = std::make_shared<StreamDescription>();
+                stream->id = streams.size();
+                stream->name = i->name;
+                stream->sampleLayout = i->sampleLayout;
+                streams.push_back(stream);
             }
         }
 
-        m_inputs = inputs;
+        m_streams = streams;
     }
 
     bool Bundler::RequireChunk(size_t chunkindex)
@@ -146,9 +146,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_driver->GetSequenceDescriptions();
     }
 
-    std::vector<InputDescriptionPtr> Bundler::GetInputs() const
+    std::vector<StreamDescriptionPtr> Bundler::GetStreams() const
     {
-        return m_inputs;
+        return m_streams;
     }
 
     std::vector<std::vector<SequenceData>> Bundler::GetSequencesById(const std::vector<size_t> & ids)

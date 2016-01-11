@@ -180,7 +180,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual const Timeline& GetSequenceDescriptions() const override;
 
-        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
+        virtual std::vector<StreamDescriptionPtr> GetStreams() const override;
 
         virtual std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) override;
 

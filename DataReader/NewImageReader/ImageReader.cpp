@@ -24,8 +24,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_elementType(elementType)
     {
         auto configHelper = ImageConfigHelper(config);
-        m_inputs = configHelper.GetInputs();
-        assert(m_inputs.size() == 2);
+        m_streams = configHelper.GetStreams();
+        assert(m_streams.size() == 2);
         DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config);
         TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
 
@@ -39,9 +39,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_transformer = mean;
     }
 
-    std::vector<InputDescriptionPtr> ImageReader::GetInputs()
+    std::vector<StreamDescriptionPtr> ImageReader::GetStreams()
     {
-        return m_inputs;
+        return m_streams;
     }
 
     void ImageReader::StartEpoch(const EpochConfiguration& config)
@@ -55,7 +55,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_transformer,
             config.minibatchSize,
             m_elementType == ElementType::et_float ? sizeof(float) : sizeof(double),
-            m_inputs);
+            m_streams);
     }
 
     Minibatch ImageReader::ReadMinibatch()

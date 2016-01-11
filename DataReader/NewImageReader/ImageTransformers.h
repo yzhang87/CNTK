@@ -17,27 +17,27 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         BaseTransformer();
 
-        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig) override;
+        virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
         virtual Sequences GetNextSequences(size_t count) override;
-        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
+        virtual std::vector<StreamDescriptionPtr> GetStreams() const override;
 
     protected:
         using UniRealT = std::uniform_real_distribution<double>;
         using UniIntT = std::uniform_int_distribution<int>;
 
-        SequenceData Apply(SequenceData& mat, InputDescriptionPtr input);
+        SequenceData Apply(SequenceData& mat, StreamDescriptionPtr stream);
         virtual void Apply(cv::Mat& mat) = 0;
         unsigned int GetSeed() const
         {
             return m_seed;
         }
 
-        const std::vector<InputId> & GetFeatureStreamIds() const;
-        std::vector<InputDescriptionPtr> m_inputs;
+        const std::vector<StreamId> & GetFeatureStreamIds() const;
+        std::vector<StreamDescriptionPtr> m_streams;
 
     private:
-        std::vector<InputId> m_featureStreamIds;
+        std::vector<StreamId> m_featureStreamIds;
         TransformerPtr m_next;
         unsigned int m_seed;
         cv::Mat m_buffer;
@@ -47,7 +47,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         CropTransform();
-        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig) override;
+        virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
 
     protected:
         virtual void Apply(cv::Mat& mat) override;
@@ -79,7 +79,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         ScaleTransform();
-        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig) override;
+        virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
 
     private:
         void InitFromConfig(const ConfigParameters& config);
@@ -100,7 +100,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         MeanTransform();
-        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig) override;
+        virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
 
     private:
         virtual void Apply(cv::Mat& mat) override;

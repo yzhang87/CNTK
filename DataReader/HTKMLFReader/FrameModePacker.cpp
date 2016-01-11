@@ -9,19 +9,19 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    InputDescriptionPtr GetInputByName(const std::wstring& name, const std::vector<InputDescriptionPtr>& inputs)
+    StreamDescriptionPtr GetStreamByName(const std::wstring& name, const std::vector<StreamDescriptionPtr>& streams)
     {
-        auto predicate = [name](InputDescriptionPtr input) {
-            return input->name == name;
+        auto predicate = [name](StreamDescriptionPtr stream) {
+            return stream->name == name;
         };
 
-        auto input = std::find_if(std::begin(inputs), std::end(inputs), predicate);
-        if (input == std::end(inputs))
+        auto stream = std::find_if(std::begin(streams), std::end(streams), predicate);
+        if (stream == std::end(streams))
         {
             InvalidArgument("Unknown feature!");
         }
 
-        return *input;
+        return *stream;
     }
 
     FrameModePacker::FrameModePacker(const ConfigParameters& config, MemoryProviderPtr memoryProvider, size_t elementSize)
@@ -32,9 +32,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         InitFromConfig(config);
     }
 
-    std::vector<InputDescriptionPtr> FrameModePacker::GetInputs()
+    std::vector<StreamDescriptionPtr> FrameModePacker::GetStreams()
     {
-        return m_inputs;
+        return m_streams;
     }
 
     void FrameModePacker::StartEpoch(const EpochConfiguration& config)
@@ -55,7 +55,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(deserializers.size() == 2);
 
         auto bundler = std::make_shared<Bundler>(readerConfig, true, m_verbosity, deserializers[0], deserializers);
-        m_inputs = bundler->GetInputs();
+        m_streams = bundler->GetStreams();
 
         std::wstring readMethod = ConfigHelper::GetRandomizer(readerConfig);
         if (_wcsicmp(readMethod.c_str(), L"blockRandomize"))
@@ -79,9 +79,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError("legacy mode has been deprecated\n");
 
         // eldak: we should introduce a separate class describing inputs with proper interface.
-        for (size_t i = 0; i < m_inputs.size(); ++i)
+        for (size_t i = 0; i < m_streams.size(); ++i)
         {
-            m_nameToId.insert(std::make_pair(m_inputs[i]->name, m_inputs[i]->id));
+            m_nameToId.insert(std::make_pair(m_streams[i]->name, m_streams[i]->id));
         }
 
         size_t iFeat = 0, iLabel = 0;
@@ -95,10 +95,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         foreach_index(i, featureNames)
         {
             const std::wstring& featureName = featureNames[i];
-            auto input = GetInputByName(featureName, m_inputs);
+            auto stream = GetStreamByName(featureName, m_streams);
 
             const ConfigParameters& thisFeature = readerConfig(featureName);
-            m_featDims.push_back(input->sampleLayout->GetNumElements());
+            m_featDims.push_back(stream->sampleLayout->GetNumElements());
 
             wstring type = thisFeature(L"type", L"real");
             if (!_wcsicmp(type.c_str(), L"real"))
@@ -120,9 +120,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         foreach_index(i, labelNames)
         {
             const std::wstring& labelName = labelNames[i];
-            auto input = GetInputByName(labelName, m_inputs);
+            auto stream = GetStreamByName(labelName, m_streams);
 
-            m_labelDims.push_back(input->sampleLayout->GetNumElements());
+            m_labelDims.push_back(stream->sampleLayout->GetNumElements());
 
             const ConfigParameters& thisLabel = readerConfig(labelName);
             wstring type;
@@ -279,11 +279,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 std::vector<size_t> dimensions;
                 dimensions.push_back(dim);
 
-                InputPtr input = std::make_shared<Input>();
-                input->data = m_featuresBufferMultiIO[id].get();
-                input->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
-                input->layout = m_pMBLayout;
-                mb.minibatch[m_nameToId[name.first]] = input;
+                StreamPtr stream = std::make_shared<Stream>();
+                stream->data = m_featuresBufferMultiIO[id].get();
+                stream->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
+                stream->layout = m_pMBLayout;
+                mb.minibatch[m_nameToId[name.first]] = stream;
             }
             else if (m_nameToTypeMap[name.first] == InputOutputTypes::category)
             {
@@ -293,11 +293,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 std::vector<size_t> dimensions;
                 dimensions.push_back(dim);
 
-                InputPtr input = std::make_shared<Input>();
-                input->data = m_labelsBufferMultiIO[id].get();
-                input->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
-                input->layout = m_pMBLayout;
-                mb.minibatch[m_nameToId[name.first]] = input;
+                StreamPtr stream = std::make_shared<Stream>();
+                stream->data = m_labelsBufferMultiIO[id].get();
+                stream->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
+                stream->layout = m_pMBLayout;
+                mb.minibatch[m_nameToId[name.first]] = stream;
             }
         }
     }
@@ -394,7 +394,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return;
         }
 
-        const auto& inputs = m_inputs;
+        const auto& streams = m_streams;
         size_t numOfFea = m_featuresBufferMultiIO.size();
         size_t numOfLabel = m_labelsBufferMultiIO.size();
         size_t totalFeatNum = 0;
@@ -402,9 +402,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (auto it = m_featureNameToIdMap.begin(); it != m_featureNameToIdMap.end(); ++it)
         {
             size_t id = m_featureNameToIdMap[it->first];
-            size_t inputId = m_nameToId[it->first];
+            size_t streamId = m_nameToId[it->first];
 
-            size_t dim = inputs[inputId]->sampleLayout->GetNumElements();
+            size_t dim = streams[streamId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             m_featuresStartIndexMultiUtt[id + featureSequenceIndex] = totalFeatNum;
@@ -424,9 +424,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it)
         {
             size_t id = m_labelNameToIdMap[it->first];
-            size_t inputId = m_nameToId[it->first];
+            size_t streamId = m_nameToId[it->first];
 
-            size_t dim = inputs[inputId]->sampleLayout->GetNumElements();
+            size_t dim = streams[streamId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             m_labelsStartIndexMultiUtt[id + labelSequenceIndex] = totalLabelsNum;
@@ -448,9 +448,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (auto it = m_featureNameToIdMap.begin(); it != m_featureNameToIdMap.end(); ++it)
         {
             size_t id = m_featureNameToIdMap[it->first];
-            size_t inputId = m_nameToId[it->first];
+            size_t streamId = m_nameToId[it->first];
 
-            size_t fdim = inputs[inputId]->sampleLayout->GetNumElements();
+            size_t fdim = streams[streamId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             if (first)
@@ -470,7 +470,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (int k = 0; k < actualmbsizeOri; k++) // column major, so iterate columns
             {
-                const void* sequence = sequences[k][inputId].data;
+                const void* sequence = sequences[k][streamId].data;
 
                 // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
                 memcpy_s(&((char*)m_featuresBufferMultiUtt[parallelSequenceNumber].get())[(k*fdim + m_featuresStartIndexMultiUtt[id + featureSequenceIndex]) * m_elementSize], m_elementSize*fdim, sequence, m_elementSize*fdim);
@@ -480,9 +480,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (auto it = m_labelNameToIdMap.begin(); it != m_labelNameToIdMap.end(); ++it)
         {
             size_t id = m_labelNameToIdMap[it->first];
-            size_t inputId = m_nameToId[it->first];
+            size_t streamId = m_nameToId[it->first];
 
-            size_t fdim = inputs[inputId]->sampleLayout->GetNumElements();
+            size_t fdim = streams[streamId]->sampleLayout->GetNumElements();
             const size_t actualmbsizeOri = sequences.size();
 
             if (first)
@@ -502,7 +502,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (int k = 0; k < actualmbsizeOri; k++) // column major, so iterate columns
             {
-                const void* sequence = sequences[k][inputId].data;
+                const void* sequence = sequences[k][streamId].data;
 
                 // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
                 memcpy_s(&((char*)m_labelsBufferMultiUtt[parallelSequenceNumber].get())[(k*fdim + m_labelsStartIndexMultiUtt[id + labelSequenceIndex]) * m_elementSize], m_elementSize*fdim, sequence, m_elementSize*fdim);

@@ -27,8 +27,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         MBLayoutPtr m_layout;
 
-        std::map<std::wstring, size_t> m_nameToInputId;
-        std::vector<InputDescriptionPtr> m_inputs;
+        std::map<std::wstring, size_t> m_nameToStreamId;
+        std::vector<StreamDescriptionPtr> m_streams;
 
     public:
         explicit ReaderShim(ReaderFactory factory);

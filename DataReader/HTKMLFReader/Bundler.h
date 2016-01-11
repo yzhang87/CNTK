@@ -21,7 +21,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_totalframes; // total frames (same as classids.size() if we have labels)
         size_t m_chunksinram; // (for diagnostics messages)
 
-        std::vector<InputDescriptionPtr> m_inputs;
+        std::vector<StreamDescriptionPtr> m_streams;
         std::vector<DataDeserializerPtr> m_deserializers;
         DataDeserializerPtr m_driver;
 
@@ -32,7 +32,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
 
         virtual const Timeline& GetSequenceDescriptions() const override;
-        virtual std::vector<InputDescriptionPtr> GetInputs() const override;
+        virtual std::vector<StreamDescriptionPtr> GetStreams() const override;
         virtual std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) override;
         virtual bool RequireChunk(size_t chunkindex) override;
         virtual void ReleaseChunk(size_t chunkIndex) override;

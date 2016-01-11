@@ -37,10 +37,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_layout->Init(numSeqsPerMBForAllEpochs[0], 0, true);
 
         m_reader = m_factory(config);
-        m_inputs = m_reader->GetInputs();
-        for (auto i : m_inputs)
+        m_streams = m_reader->GetStreams();
+        for (auto i : m_streams)
         {
-            m_nameToInputId.insert(std::make_pair(i->name, i->id));
+            m_nameToStreamId.insert(std::make_pair(i->name, i->id));
         }
     }
 
@@ -78,7 +78,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         // Check that all matrices have the same device id.
-        // If not we should inject the IMemoryProvider per input.
+        // If not we should inject the IMemoryProvider per stream.
         int deviceId = matrices.begin()->second->GetDeviceId();
         for (auto mx : matrices)
         {
@@ -103,16 +103,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             // Copy returned minibatch to the matrices.
             for (const auto& mx : matrices)
             {
-                assert(m_nameToInputId.find(mx.first) != m_nameToInputId.end());
-                size_t inputId = m_nameToInputId[mx.first];
+                assert(m_nameToStreamId.find(mx.first) != m_nameToStreamId.end());
+                size_t streamId = m_nameToStreamId[mx.first];
 
-                const auto& input = m.minibatch[inputId];
-                m_layout = input->layout;
+                const auto& stream = m.minibatch[streamId];
+                m_layout = stream->layout;
 
                 size_t columnNumber = m_layout->GetNumCols();
-                size_t rowNumber = m_inputs[inputId]->sampleLayout->GetNumElements();
+                size_t rowNumber = m_streams[streamId]->sampleLayout->GetNumElements();
 
-                auto data = reinterpret_cast<const ElemType*>(input->data);
+                auto data = reinterpret_cast<const ElemType*>(stream->data);
                 mx.second->SetValue(rowNumber, columnNumber, mx.second->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);
             }
         }

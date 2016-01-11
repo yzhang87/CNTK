@@ -5,7 +5,7 @@
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     // Memory provider. It injected by CNTK into reader. 
-    // Should be used for allocating the input data provided by the reader.
+    // Should be used for allocating the stream data provided by the reader.
     class MemoryProvider
     {
     public:

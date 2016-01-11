@@ -19,12 +19,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const ConfigParameters& parameters,
             ElementType elementType);
 
-        std::vector<InputDescriptionPtr> GetInputs() override;
+        std::vector<StreamDescriptionPtr> GetStreams() override;
         void StartEpoch(const EpochConfiguration& config) override;
         Minibatch ReadMinibatch() override;
 
     private:
-        std::vector<InputDescriptionPtr> m_inputs;
+        std::vector<StreamDescriptionPtr> m_streams;
         TransformerPtr m_transformer;
         FrameModePackerPtr m_packer;
         MemoryProviderPtr m_provider;

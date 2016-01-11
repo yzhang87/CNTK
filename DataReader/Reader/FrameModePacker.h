@@ -20,7 +20,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             TransformerPtr transformer,
             size_t minibatchSize,
             size_t elementSize,
-            const std::vector<InputDescriptionPtr>& inputs);
+            const std::vector<StreamDescriptionPtr>& streams);
 
         Minibatch ReadMinibatch();
 
@@ -29,8 +29,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         MemoryProviderPtr m_memoryProvider;
         TransformerPtr m_transformer;
-        std::vector<InputDescriptionPtr> m_inputs;
-        std::vector<std::shared_ptr<void>> m_inputBuffers;
+        std::vector<StreamDescriptionPtr> m_streams;
+        std::vector<std::shared_ptr<void>> m_streamBuffers;
 
         MBLayoutPtr m_minibatchLayout;
         size_t m_mbSize;

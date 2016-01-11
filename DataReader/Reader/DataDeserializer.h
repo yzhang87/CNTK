@@ -11,7 +11,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         size_t id;                  // Sequence id
         size_t numberOfSamples;     // Number of samples in a sequence
-        size_t chunkId;             // Each sequence belongs to a I/O chunk, how chunk is defined is specific to the data deserializer.
+        size_t chunkId;             // Each sequence belongs to an I/O chunk, how chunk is defined is specific to the data deserializer.
         bool isValid;
     };
 
@@ -30,7 +30,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         // Describes streams the data deserializer produces.
-        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
+        virtual std::vector<StreamDescriptionPtr> GetStreams() const = 0;
 
         // Sets epoch configuration.
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
@@ -39,7 +39,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual const Timeline& GetSequenceDescriptions() const = 0;
 
         // Gets sequences by id.
-        // The return value can be used till the next call to GetSequencesById.
+        // The return value can be used until the next call to GetSequencesById.
         virtual std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) = 0;
 
         // Require chunk.

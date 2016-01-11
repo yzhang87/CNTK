@@ -21,7 +21,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         FrameModePackerPtr m_packer;
         MBLayoutPtr m_layout;
         MemoryProviderPtr m_memoryProvider;
-        std::vector<InputDescriptionPtr> m_inputs;
+        std::vector<StreamDescriptionPtr> m_streams;
 
     public:
         virtual void Init(const ConfigParameters & config) override;

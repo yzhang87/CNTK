@@ -21,21 +21,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     }
 
-    void BaseTransformer::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig)
+    void BaseTransformer::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
-        m_next = inputTransformer;
-        m_inputs = GetInputs();
+        m_next = next;
+        m_streams = GetStreams();
         m_seed = std::stoi(readerConfig(L"seed", "0"));
 
         ImageConfigHelper config(readerConfig);
 
         // Currently we only support a single stream.
-        m_featureStreamIds.push_back(config.GetFeatureInputIndex());
+        m_featureStreamIds.push_back(config.GetFeatureStreamId());
     }
 
-    std::vector<InputDescriptionPtr> BaseTransformer::GetInputs() const
+    std::vector<StreamDescriptionPtr> BaseTransformer::GetStreams() const
     {
-        return m_next->GetInputs();
+        return m_next->GetStreams();
     }
 
     void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& config)
@@ -57,29 +57,29 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // TODO parallelization like in the original image reader
         for (auto & sample : samples.m_data)
         {
-            assert(sample.size() == m_inputs.size());
+            assert(sample.size() == m_streams.size());
 
             for (auto id : m_featureStreamIds)
             {
-                sample[id] = Apply(sample[id], m_inputs[id]);
+                sample[id] = Apply(sample[id], m_streams[id]);
             }
         }
 
         return samples;
     }
 
-    SequenceData BaseTransformer::Apply(SequenceData& s, InputDescriptionPtr input)
+    SequenceData BaseTransformer::Apply(SequenceData& s, StreamDescriptionPtr stream)
     {
         int rows = static_cast<int>(s.layout->GetWidth());
         int columns = static_cast<int>(s.layout->GetHeight());
         int channels = static_cast<int>(s.layout->GetNumChannels());
 
         int typeId = 0;
-        if (input->elementType == ElementType::et_double)
+        if (stream->elementType == ElementType::et_double)
         {
             typeId = CV_64F;
         }
-        else if (input->elementType == ElementType::et_float)
+        else if (stream->elementType == ElementType::et_float)
         {
             typeId = CV_32F;
         }
@@ -100,7 +100,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    const std::vector<InputId>& BaseTransformer::GetFeatureStreamIds() const
+    const std::vector<StreamId>& BaseTransformer::GetFeatureStreamIds() const
     {
         return m_featureStreamIds;
     }
@@ -111,9 +111,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     }
 
-    void CropTransform::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig)
+    void CropTransform::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
-        BaseTransformer::Initialize(inputTransformer, readerConfig);
+        BaseTransformer::Initialize(next, readerConfig);
         auto featureStreamIds = GetFeatureStreamIds();
 
         if (featureStreamIds.size() != 1)
@@ -121,7 +121,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError("Only a single feature stream is supported.");
         }
 
-        InitFromConfig(readerConfig(m_inputs[featureStreamIds[0]]->name));
+        InitFromConfig(readerConfig(m_streams[featureStreamIds[0]]->name));
     }
 
     void CropTransform::InitFromConfig(const ConfigParameters & config)
@@ -258,9 +258,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     }
 
-    void ScaleTransform::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig)
+    void ScaleTransform::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
-        BaseTransformer::Initialize(inputTransformer, readerConfig);
+        BaseTransformer::Initialize(next, readerConfig);
         m_interpMap.emplace("nearest", cv::INTER_NEAREST);
         m_interpMap.emplace("linear", cv::INTER_LINEAR);
         m_interpMap.emplace("cubic", cv::INTER_CUBIC);
@@ -273,7 +273,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             RuntimeError("Only a single feature stream is supported.");
         }
 
-        const auto & feature = m_inputs[featureStreamIds[0]];
+        const auto & feature = m_streams[featureStreamIds[0]];
         m_dataType = feature->elementType == ElementType::et_float ? CV_32F : CV_64F;
 
         InitFromConfig(readerConfig(feature->name));
@@ -327,9 +327,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     }
 
-    void MeanTransform::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig)
+    void MeanTransform::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
-        BaseTransformer::Initialize(inputTransformer, readerConfig);
+        BaseTransformer::Initialize(next, readerConfig);
     }
 
     void MeanTransform::InitFromConfig(const ConfigParameters & config)

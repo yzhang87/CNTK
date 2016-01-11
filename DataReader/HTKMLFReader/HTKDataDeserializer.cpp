@@ -154,14 +154,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_sequences;
     }
 
-    std::vector<InputDescriptionPtr> HTKDataDeserializer::GetInputs() const
+    std::vector<StreamDescriptionPtr> HTKDataDeserializer::GetStreams() const
     {
-        InputDescriptionPtr input = std::make_shared<InputDescription>();
-        input->id = 0;
-        input->name = m_featureName;
-        input->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
-        input->elementType = m_elementSize == sizeof(float) ? ElementType::et_float : ElementType::et_double;
-        return std::vector<InputDescriptionPtr> { input };
+        StreamDescriptionPtr stream = std::make_shared<StreamDescription>();
+        stream->id = 0;
+        stream->name = m_featureName;
+        stream->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
+        stream->elementType = m_elementSize == sizeof(float) ? ElementType::et_float : ElementType::et_double;
+        return std::vector<StreamDescriptionPtr> { stream };
     }
 
     class matrixasvectorofvectors  // wrapper around a matrix that views it as a vector of column vectors

@@ -48,7 +48,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;
         m_layout->Init(numSeqsPerMBForAllEpochs[0], 0, true);
-        m_inputs = m_packer->GetInputs();
+        m_streams = m_packer->GetStreams();
     }
 
     template<class ElemType>
@@ -89,16 +89,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return false;
         }
 
-        auto inputs = m_packer->GetInputs();
+        auto streams = m_packer->GetStreams();
         std::map<size_t, wstring> idToName;
-        for (auto i: inputs)
+        for (auto i: streams)
         {
             idToName.insert(std::make_pair(i->id, i->name));
         }
 
         for (int i = 0; i < m.minibatch.size(); i++)
         {
-            const auto& input = m.minibatch[i];
+            const auto& stream = m.minibatch[i];
             const std::wstring& name = idToName[i];
             if (matrices.find(name) == matrices.end())
             {
@@ -106,11 +106,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             }
 
             // Current hack.
-            m_layout = input->layout;
+            m_layout = stream->layout;
             size_t columnNumber = m_layout->GetNumCols();
-            size_t rowNumber = m_inputs[i]->sampleLayout->GetNumElements();
+            size_t rowNumber = m_streams[i]->sampleLayout->GetNumElements();
 
-            auto data = reinterpret_cast<const ElemType*>(input->data);
+            auto data = reinterpret_cast<const ElemType*>(stream->data);
             matrices[name]->SetValue(rowNumber, columnNumber, matrices[name]->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);
         }
 

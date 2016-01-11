@@ -15,17 +15,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         TransformerPtr transformer,
         size_t minibatchSize,
         size_t elementSize,
-        const std::vector<InputDescriptionPtr>& inputs)
+        const std::vector<StreamDescriptionPtr>& streams)
         : m_transformer(transformer)
         , m_mbSize(minibatchSize)
         , m_elementSize(elementSize)
-        , m_inputs(inputs)
+        , m_streams(streams)
         , m_minibatchLayout(std::make_shared<MBLayout>())
         , m_memoryProvider(memoryProvider)
     {
-        for (const auto& input : inputs)
+        for (const auto& stream : streams)
         {
-            m_inputBuffers.push_back(AllocateBuffer(m_mbSize * input->sampleLayout->GetNumElements(), m_elementSize));
+            m_streamBuffers.push_back(AllocateBuffer(m_mbSize * stream->sampleLayout->GetNumElements(), m_elementSize));
         }
     }
 
@@ -45,14 +45,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         for (size_t i = 0; i < images.m_data.size(); i++)
         {
-            assert(m_inputBuffers.size() == images.m_data[i].size());
+            assert(m_streamBuffers.size() == images.m_data[i].size());
             for (int j = 0; j < images.m_data[i].size(); ++j)
             {
-                size_t dimensions = m_inputs[j]->sampleLayout->GetNumElements() * m_elementSize;
+                size_t dimensions = m_streams[j]->sampleLayout->GetNumElements() * m_elementSize;
                 std::copy(
                     reinterpret_cast<char*>(images.m_data[i][j].data),
                     reinterpret_cast<char*>(images.m_data[i][j].data) + dimensions,
-                    reinterpret_cast<char*>(m_inputBuffers[j].get()) + dimensions * i);
+                    reinterpret_cast<char*>(m_streamBuffers[j].get()) + dimensions * i);
             }
         }
 
@@ -62,11 +62,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         m_minibatchLayout->Init(images.m_data.size(), 1);
-        for (int i = 0; i < m_inputs.size(); ++i)
+        for (int i = 0; i < m_streams.size(); ++i)
         {
-            size_t dimensions = m_inputs[i]->sampleLayout->GetNumElements() * m_elementSize;
-            InputPtr stream = std::make_shared<Input>();
-            stream->data = m_inputBuffers[i].get();
+            size_t dimensions = m_streams[i]->sampleLayout->GetNumElements() * m_elementSize;
+            StreamPtr stream = std::make_shared<Stream>();
+            stream->data = m_streamBuffers[i].get();
             stream->dataSize = images.m_data.size() * dimensions;
             stream->layout = m_minibatchLayout;
 

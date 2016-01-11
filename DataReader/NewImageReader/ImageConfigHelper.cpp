@@ -41,20 +41,20 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t h = featSect.second("height");
         size_t c = featSect.second("channels");
 
-        auto features = std::make_shared<InputDescription>();
+        auto features = std::make_shared<StreamDescription>();
         features->id = 0;
         features->name = msra::strfun::utf16(featSect.first);
         features->sampleLayout = std::make_shared<ImageLayout>(ImageLayoutWHC(w, h, c));
-        m_inputs.push_back(features);
+        m_streams.push_back(features);
 
         SectionT labSect{ getter("labelDim") };
         size_t labelDimension = labSect.second("labelDim");
 
-        auto labels = std::make_shared<InputDescription>();
+        auto labels = std::make_shared<StreamDescription>();
         labels->id = 1;
         labels->name = msra::strfun::utf16(labSect.first);
         labels->sampleLayout = std::make_shared<ImageLayout>(ImageLayoutVector(labelDimension));
-        m_inputs.push_back(labels);
+        m_streams.push_back(labels);
 
         m_mapPath = config(L"file");
 
@@ -76,18 +76,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    std::vector<InputDescriptionPtr> ImageConfigHelper::GetInputs() const
+    std::vector<StreamDescriptionPtr> ImageConfigHelper::GetStreams() const
     {
-        return m_inputs;
+        return m_streams;
     }
 
-    size_t ImageConfigHelper::GetFeatureInputIndex() const
+    size_t ImageConfigHelper::GetFeatureStreamId() const
     {
         // Hard-wired.
         return 0;
     }
 
-    size_t ImageConfigHelper::GetLabelInputIndex() const
+    size_t ImageConfigHelper::GetLabelStreamId() const
     {
         // Hard-wired.
         return 1;
