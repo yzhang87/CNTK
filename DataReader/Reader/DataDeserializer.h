@@ -39,6 +39,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual const Timeline& GetSequenceDescriptions() const = 0;
 
         // Gets sequences by id.
+        // The return value can be used till the next call to GetSequencesById.
         virtual std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) = 0;
 
         // Require chunk.

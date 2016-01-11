@@ -13,7 +13,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Sequences() : m_endOfEpoch(false)
         {}
 
-        // Data per stream. Id in the vector corresponds to the stream id returned from GetInputs.
+        // Data per stream. Id in the outer vector have to corresponds to the stream id provided in the Initialize.
         std::vector<std::vector<SequenceData>> m_data;
 
         // End of epoch.
@@ -43,6 +43,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
         // Gets next sequences.
+        // The return value can be used till the next call to GetNextSequences.
         virtual Sequences GetNextSequences(size_t count) = 0;
 
         virtual ~Transformer() = 0 {}
