@@ -175,8 +175,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const_array_ref<float> operator[] (size_t j) const { return array_ref<float>(&m(0, j), m.rows()); }
     };
 
-    std::vector<Sequence> HTKDataDeserializer::GetSequenceById(size_t id)
+    std::vector<std::vector<Sequence>> HTKDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
     {
+        assert(ids.size() == 1); // TODO
+        auto id = ids[0];
+
         if (m_frameMode)
         {
             const auto& frame = m_frames[id];
@@ -229,12 +232,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
             r.data = buffer;
 
-            return std::vector<Sequence> { r };
+            std::vector<std::vector<Sequence>> result;
+            result.push_back(std::vector<Sequence> { r });
+            return result;
         }
         else
         {
             assert(false);
-            return std::vector<Sequence>();
+            return std::vector<std::vector<Sequence>>();
         }
     }
 

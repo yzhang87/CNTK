@@ -8,18 +8,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class ConfigParameters;
 
     // Defines a sequence.
-    struct SequenceData
+    struct SequencesData
     {
-        SequenceData() : m_endOfEpoch(false)
+        SequencesData() : m_endOfEpoch(false)
         {}
 
         // Data per stream. Id in the vector corresponds to the stream id returned from GetInputs.
-        std::vector<Sequence> m_data;
+        std::vector<std::vector<Sequence>> m_data;
 
         // End of epoch.
         bool m_endOfEpoch;
 
-        SequenceData(SequenceData&& other)
+        SequencesData(SequencesData&& other)
             : m_data(std::move(other.m_data))
             , m_endOfEpoch(std::move(other.m_endOfEpoch))
         {
@@ -42,8 +42,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Sets current epoch configuration.
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
 
-        // Gets next sequence.
-        virtual SequenceData GetNextSequence() = 0;
+        // Gets next sequences.
+        virtual SequencesData GetNextSequences(size_t count) = 0;
 
         virtual ~Transformer() = 0 {}
     };

@@ -41,20 +41,27 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_next->SetEpochConfiguration(config);
     }
 
-    SequenceData BaseTransformer::GetNextSequence()
+    SequencesData BaseTransformer::GetNextSequences(size_t count)
     {
         assert(m_next != nullptr);
-        SequenceData sample = m_next->GetNextSequence();
-        if (sample.m_endOfEpoch)
+        SequencesData samples = m_next->GetNextSequences(count);
+
+        assert(!samples.m_endOfEpoch || samples.m_data.size() == 0); // TODO for now, will change
+
+        if (samples.m_endOfEpoch)
         {
-            return sample;
+            return samples;
         }
 
-        for (auto id : m_featureStreamIds)
+        for (auto & sample : samples.m_data)
         {
-            sample.m_data[id] = Apply(sample.m_data[id], m_inputs[id]);
+            for (auto id : m_featureStreamIds)
+            {
+                sample[id] = Apply(sample[id], m_inputs[id]);
+            }
         }
-        return sample;
+
+        return samples;
     }
 
     Sequence BaseTransformer::Apply(Sequence& s, InputDescriptionPtr input)

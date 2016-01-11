@@ -72,7 +72,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // (SGD will ask before entering actual reading --TODO: This is hacky.)
         m_numSeqsPerMB = m_numSeqsPerMBForAllEpochs[0];
-        m_pMBLayout->Init(m_numSeqsPerMB, 0, true); 
+        m_pMBLayout->Init(m_numSeqsPerMB, 0, true);
         m_noData = false;
 
         if (readerConfig.Exists(L"legacyMode"))
@@ -150,7 +150,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_partialMinibatch = !_wcsicmp(minibatchMode.c_str(), L"partial");
     }
 
-    //StartMinibatchLoop - Startup a minibatch loop 
+    //StartMinibatchLoop - Startup a minibatch loop
     // requestedMBSize - [in] size of the minibatch (number of frames, etc.)
     // epoch - [in] epoch number for this loop
     // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
@@ -181,7 +181,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         if (!m_featuresBufferMultiIO.empty())
         {
-            if (m_featuresBufferMultiIO[0] != nullptr) // check first feature, if it isn't NULL, safe to assume all are not NULL? 
+            if (m_featuresBufferMultiIO[0] != nullptr) // check first feature, if it isn't NULL, safe to assume all are not NULL?
             {
                 foreach_index(i, m_featuresBufferMultiIO)
                 {
@@ -237,14 +237,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         do
         {
             m_mbNumTimeSteps = m_numFramesToProcess[0];
-            if (m_noData && m_mbNumTimeSteps == 0)    //no data left for the first channel of this minibatch, 
+            if (m_noData && m_mbNumTimeSteps == 0)    //no data left for the first channel of this minibatch,
             {
                 mb.atEndOfEpoch = true;
                 return mb;
             }
 
             // skip = (!m_partialMinibatch && (m_mbiter->requestedframes() != m_mbNumTimeSteps) && (m_frameSource->totalframes() > m_mbNumTimeSteps));
-            // false. Not clear why we would have this condition for the frame mode. 
+            // false. Not clear why we would have this condition for the frame mode.
             // if (skip)
             // {
                 //ReNewBufferForMultiIO(0);
@@ -339,7 +339,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
                     memcpy_s(
                         &((char*)m_featuresBufferMultiIO[id].get())[(k*m_numSeqsPerMB + channelIndex)*dim*m_elementSize],
-                        m_elementSize*dim, 
+                        m_elementSize*dim,
                         &((char*)m_featuresBufferMultiUtt[parallelSequenceNumber].get())[(j*dim + m_featuresStartIndexMultiUtt[id + parallelSequenceNumber*numOfFea])*m_elementSize],
                         m_elementSize*dim);
                 }
@@ -379,16 +379,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<std::vector<Sequence>> sequences;
         for (size_t currentIndex = 0; currentIndex < m_requestedMBSize; ++currentIndex)
         {
-            auto sequence = m_transformer->GetNextSequence();
+            auto sequence = m_transformer->GetNextSequences(1 /* TODO */);
             if (sequence.m_endOfEpoch)
             {
                 m_noData = true;
                 break;
             }
 
-            if (!sequence.m_data.empty())
+            assert(sequence.m_data.size() == 1); // TODO
+
+            if (!sequence.m_data[0].empty())
             {
-                sequences.push_back(sequence.m_data);
+                sequences.push_back(sequence.m_data[0]);
             }
         }
 

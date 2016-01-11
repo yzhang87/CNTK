@@ -15,7 +15,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<InputDescriptionPtr> GetInputs() const override;
         void SetEpochConfiguration(const EpochConfiguration& config) override;
         const Timeline& GetSequenceDescriptions() const override;
-        std::vector<Sequence> GetSequenceById(size_t id) override;
+        std::vector<std::vector<Sequence>> GetSequencesById(const std::vector<size_t> & ids) override;
         bool RequireChunk(size_t chunkIndex) override;
         void ReleaseChunk(size_t chunkIndex) override;
 
@@ -44,7 +44,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         LabelGeneratorPtr m_labelGenerator;
 
-        cv::Mat m_currentImage;
+        std::vector<cv::Mat> m_currentImages;
         ElementType m_featureElementType;
     };
 }}}

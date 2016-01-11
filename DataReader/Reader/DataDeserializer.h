@@ -30,7 +30,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         // Describes streams the data deserializer produces.
-        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0; // TODO will remove
+        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0; // TODO remove?
 
         // Sets epoch configuration.
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
@@ -38,8 +38,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Retrieve global timeline the data deserializer can produce.
         virtual const Timeline& GetSequenceDescriptions() const = 0;
 
-        // Gets a sequence by id.
-        virtual std::vector<Sequence> GetSequenceById(size_t id) = 0;
+        // Gets sequences by id.
+        virtual std::vector<std::vector<Sequence>> GetSequencesById(const std::vector<size_t> & ids) = 0;
 
         // Require chunk.
         virtual bool RequireChunk(size_t chunkIndex) = 0;
