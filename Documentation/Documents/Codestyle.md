@@ -1,16 +1,16 @@
 # CNTK Coding Style
 
 This page documents the conventions used in the source code of CNTK. Please adhere to these conventions 
-when writing new code. Follow common sens and break up functions exceeding a reasonable limit 
+when writing new code. Follow common sense and break up functions exceeding a reasonable limit 
 (a couple of screen pages), use meaningful names, comment well and keep comments and code in sync, etc.
 
 ## Basics: indentation, spacing and braces
 
 Code is consistently indented using four spaces. Tab characters are not allowed anywhere in the code. 
-The only exception is makefiles, other build system, or data files where tab characters are syntactically 
+The only exceptions are Makefiles, other build system, or data files where tab characters are syntactically 
 required.
 
-The following things are indented:
+The following code blocks are indented:
 
  * Bodies of control statements: for, if, while, switch, etc.
  * Free statement blocks, i.e. opening and closing braces which do not follow any control statement. These 
@@ -24,9 +24,17 @@ The following things are not indented:
 * Case labels
 * Access control specifiers.
 
-Code is written using Allman or BSD Unix style braces. This style puts the brace associated with a 
+Function declarations with long parameter lists may be split over multiple lines. The paramerter declaration
+on the split lines should be indented to the opening parenthesis of the function declaration. Calls to functions 
+with long parameter lists may be split over multiple lines, the split lines should be indented to the opening
+parenthesis of the associated function statement.
+
+Code is written using [Allman or BSD Unix style braces](https://en.wikipedia.org/wiki/Indent_style#Allman_style). This style puts the brace associated with a 
 control statement on the next line, indented to the same level as the control statement. 
-Statements within the braces are indented to the next level. 
+Statements within the braces are indented to the next level.
+
+
+
 
 Braces are mandatory and must not be omitted even when the body of the block has only a single line.
 
@@ -35,7 +43,6 @@ Spaces are present in the following places:
 * Between a keyword and parentheses
 * Between an identifier or keyword and a brace
 * After commas and semicolons that do not end a line
-* Between the template keyword and the template argument list
 
 Spaces are absent in the following places:
 * Before semicolons and commas
@@ -46,9 +53,8 @@ Spaces are absent in the following places:
 * Between a label and a colon
 * Around the scope operator ::
 
-Member initializer lists and base class lists that contain more than one class should be written using 
-Boost-style indentation: each member or class goes on a separate line and is preceded by the appropriate 
-punctuation and a space. This makes it very easy to spot errors.
+Member initializer lists and base class lists that contain more than one class should be written on a separate 
+line. This makes it very easy to spot errors.
 
 ```
 namespace Microsoft {
@@ -73,7 +79,7 @@ private:
 };
 
 template <typename Box>
-void Inspect(Box &container)
+void Inspect(Box & container)
 {
     switch (container)
     {
@@ -96,23 +102,21 @@ void Inspect(Box &container)
     return container;
 }
 
-} // namespace CNTK
-} // namespace MSR
-} // namespace Microsoft
+} } }
 ```
 
 ## Naming conventions
 
-* Class and namespace names use UpperCamelCase or PascalCase. 
-* Names (SQL, CNTK, ...) can stay in all upper cases. 
+* Class and namespace names use [UpperCamelCase aka PascalCase]([https://en.wikipedia.org/wiki/CamelCase). 
+* Names commonly spelled in all-caps (SQL, CNTK, ...) can stay in all upper cases. 
 * Global and public static functions, stack variables, and class members (class variables) use lowerCamelCase. 
 * Class member functions (methods) use UpperCamelCase. 
 * Macros and constants use UPPER_SNAKE_CASE. 
 * Template parameters which are types use UpperCamelCase. 
 * Type prefixes, Hungarian notation, etc. are disallowed. Use meaningful suffixes if you need to disambiguate, 
-e.g. matrixFloat and matrixDoubleNormalized.
+e.g. floatMatrix and normalizedDoubleMatrix.
 
-Name prefies
+Name prefixes
 * ```m_``` for member variables
 * ```s_``` for static varibales in any context
 * ```g_``` for global variables, which should be avoided in the first place (as much as possible)
@@ -127,14 +131,14 @@ C++ files should have the .cpp extension, while header files should have the .h 
 ```
 #define GOOD_MACRO(x) x
 void CallOut();
-unsigned const THE_ANSWER = 42;
+unsigned const g_theAnswer = 42;
 
 class SolveAllProblems 
 {
 public:
     void DoWhatWeNeed();
     static void SetBugsOff();
-    int countReasons;
+    int m_countReasons;
 protected:
     void NeverWorking();
     static void GetReason();
@@ -142,11 +146,11 @@ protected:
 private:
     void InternalNeeds();
     static void ShowReason();
-    int countShows;
+    int m_countShows;
 };
 
 template <typename TypeParam, int numberOfReasons>
-void callGlobal(boost::array<TypeParam, numberOfReasons> const &array);
+void CallGlobal(boost::array<TypeParam, numberOfReasons> const &array);
 ```
 
 ## Preprocessor
