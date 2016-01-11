@@ -154,7 +154,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void BlockRandomizer::Randomize()
     {
-        const auto & timeline = m_sequencer->GetSequenceDescriptions();
+        const auto & timeline = m_deserializer->GetSequenceDescriptions();
         RandomizeChunks();
 
         // Set up m_randomTimeline, shuffled by chunks.
@@ -254,17 +254,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Public methods
     //
 
-    BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr bundler)
+    BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr deserializer)
         : m_verbosity(verbosity)
         , m_randomizationRangeInSamples(randomizationRangeInSamples)
-        , m_sequencer(bundler)
+        , m_deserializer(deserializer)
         , m_sweep(SIZE_MAX)
         , m_sequencePositionInSweep(SIZE_MAX)
         , m_samplePositionInEpoch(SIZE_MAX)
         , m_epochSize(SIZE_MAX)
     {
-        assert(bundler != nullptr);
-        const Timeline& timeline = m_sequencer->GetSequenceDescriptions();
+        assert(deserializer != nullptr);
+        const Timeline& timeline = m_deserializer->GetSequenceDescriptions();
         assert(IsValid(timeline));
 
         m_numSequences = timeline.back()->id + 1;
@@ -308,7 +308,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
     {
-        m_sequencer->SetEpochConfiguration(config);
+        m_deserializer->SetEpochConfiguration(config);
 
         m_workerRank = config.workerRank;
         m_numberOfWorkers = config.numberOfWorkers;
@@ -384,7 +384,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return result;
         }
 
-        // Require and release chunks from the sequencer
+        // Require and release chunks from the data deserializer
         const size_t windowbegin = m_randomizedChunks[m_sequencePositionToChunkIndex[ids[0]]].windowbegin;
         const size_t windowend = m_randomizedChunks[m_sequencePositionToChunkIndex[ids.back()]].windowend;
 
@@ -394,11 +394,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             if (windowbegin <= chunkId && chunkId < windowend)
             {
-                m_sequencer->RequireChunk(originalChunkIndex);
+                m_deserializer->RequireChunk(originalChunkIndex);
             }
             else
             {
-                m_sequencer->ReleaseChunk(originalChunkIndex);
+                m_deserializer->ReleaseChunk(originalChunkIndex);
             }
         }
 
@@ -410,7 +410,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             originalIds.push_back(seqDesc.id);
         }
 
-        result.m_data = m_sequencer->GetSequencesById(originalIds);
+        result.m_data = m_deserializer->GetSequencesById(originalIds);
         return result;
     };
 
