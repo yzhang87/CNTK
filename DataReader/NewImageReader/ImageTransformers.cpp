@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <opencv2/opencv.hpp>
 #include <random>
+#include "ImageConfigHelper.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -26,13 +27,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_inputs = inputs;
         m_seed = std::stoi(readerConfig(L"seed", "0"));
 
-        for (const auto & input : inputs)
-        {
-            if (input->type == InputType::it_feature)
-            {
-                m_featureStreamIds.push_back(input->id);
-            }
-        }
+        ImageConfigHelper config(readerConfig);
+
+        // Currently we only support a single stream.
+        m_featureStreamIds.push_back(config.GetFeatureInputIndex());
     }
 
     void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& config)

@@ -43,7 +43,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto features = std::make_shared<InputDescription>();
         features->id = 0;
-        features->type = InputType::it_feature;
         features->name = msra::strfun::utf16(featSect.first);
         features->sampleLayout = std::make_shared<ImageLayout>(ImageLayoutWHC(w, h, c));
         m_inputs.push_back(features);
@@ -53,7 +52,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto labels = std::make_shared<InputDescription>();
         labels->id = 1;
-        labels->type = InputType::it_label;
         labels->name = msra::strfun::utf16(labSect.first);
         labels->sampleLayout = std::make_shared<ImageLayout>(ImageLayoutVector(labelDimension));
         m_inputs.push_back(labels);

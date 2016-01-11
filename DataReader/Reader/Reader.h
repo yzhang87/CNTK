@@ -38,16 +38,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         st_dense, // dense
     };
 
-    // Type of streams.
-    // TODO: should be deleted. This should be part of BS config.
-    enum class InputType
-    {
-        it_feature,     // feature stream
-        it_label,       // label stream
-        it_opaque       // opaque stream
-    };
-
-
     typedef size_t InputId;
 
     // This class describes a particular input: its name, elements, storage, etc.
@@ -55,7 +45,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
         std::wstring name;              // Name of the input
         InputId id;                     // Id of the input
-        InputType type;                 // Input type
         StorageType storageType;        // Storage type
         ElementType elementType;        // Element type
         TensorShapePtr sampleLayout;    // Layout of the sample for the input
