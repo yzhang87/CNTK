@@ -51,20 +51,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     };
     typedef std::shared_ptr<InputDescription> InputDescriptionPtr;
 
-    // Describes minibatch layout.
-    struct Layout
-    {
-        MBLayoutPtr columns;
-    };
-    typedef std::shared_ptr<Layout> LayoutPtr;
-
     // Input data.
     // TODO: change it to Stream - because it will be more network alligned
     struct Input
     {
         void* data;
         size_t dataSize;
-        LayoutPtr layout;           // Layout out of the data.
+        MBLayoutPtr layout;           // Layout out of the data.
     };
     typedef std::shared_ptr<Input> InputPtr;
 

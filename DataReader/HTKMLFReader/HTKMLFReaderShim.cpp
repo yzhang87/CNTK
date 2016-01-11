@@ -105,12 +105,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 continue;
             }
 
-            auto layout = input->layout;
-            size_t columnNumber = layout->columns->GetNumCols();
-            size_t rowNumber = m_inputs[i]->sampleLayout->GetNumElements();
-
             // Current hack.
-            m_layout = layout->columns;
+            m_layout = input->layout;
+            size_t columnNumber = m_layout->GetNumCols();
+            size_t rowNumber = m_inputs[i]->sampleLayout->GetNumElements();
 
             auto data = reinterpret_cast<const ElemType*>(input->data);
             matrices[name]->SetValue(rowNumber, columnNumber, matrices[name]->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);

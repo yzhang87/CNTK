@@ -107,10 +107,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 size_t inputId = m_nameToInputId[mx.first];
 
                 const auto& input = m.minibatch[inputId];
-                LayoutPtr layout = input->layout;
-                m_layout = layout->columns;
+                m_layout = input->layout;
 
-                size_t columnNumber = layout->columns->GetNumCols();
+                size_t columnNumber = m_layout->GetNumCols();
                 size_t rowNumber = m_inputs[inputId]->sampleLayout->GetNumElements();
 
                 auto data = reinterpret_cast<const ElemType*>(input->data);

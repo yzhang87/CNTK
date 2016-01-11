@@ -276,16 +276,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 size_t id = m_featureNameToIdMap[name.first];
                 size_t dim = m_featureNameToDimMap[name.first];
 
-                auto layout = std::make_shared<Layout>();
-                layout->columns = m_pMBLayout;
-
                 std::vector<size_t> dimensions;
                 dimensions.push_back(dim);
 
                 InputPtr input = std::make_shared<Input>();
                 input->data = m_featuresBufferMultiIO[id].get();
                 input->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
-                input->layout = layout;
+                input->layout = m_pMBLayout;
                 mb.minibatch[m_nameToId[name.first]] = input;
             }
             else if (m_nameToTypeMap[name.first] == InputOutputTypes::category)
@@ -293,16 +290,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 size_t id = m_labelNameToIdMap[name.first];
                 size_t dim = m_labelNameToDimMap[name.first];
 
-                auto layout = std::make_shared<Layout>();
-                layout->columns = m_pMBLayout;
-
                 std::vector<size_t> dimensions;
                 dimensions.push_back(dim);
 
                 InputPtr input = std::make_shared<Input>();
                 input->data = m_labelsBufferMultiIO[id].get();
                 input->dataSize = dim * m_mbNumTimeSteps * m_numSeqsPerMB * m_elementSize;
-                input->layout = layout;
+                input->layout = m_pMBLayout;
                 mb.minibatch[m_nameToId[name.first]] = input;
             }
         }
