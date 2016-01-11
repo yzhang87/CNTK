@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include "commandArgUtil.h"
-#include "InnerInterfaces.h"
+#include "Reader.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

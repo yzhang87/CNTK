@@ -1,8 +1,8 @@
 #pragma once
 
-#include "InnerInterfaces.h"
 #include "commandArgUtil.h"
 #include <opencv2/core/mat.hpp>
+#include "DataDeserializer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

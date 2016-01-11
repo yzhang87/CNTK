@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "InnerInterfaces.h"
+#include "DataDeserializer.h"
 #include "HTKDataDeserializer.h"
 #include "biggrowablevectors.h"
 

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "ReaderInterfaces.h"
+#include "Reader.h"
 #include "ImageTransformers.h"
 #include "FrameModePacker.h"
 

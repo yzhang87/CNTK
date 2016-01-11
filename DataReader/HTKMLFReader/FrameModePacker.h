@@ -3,8 +3,9 @@
 #include <vector>
 #include <memory>
 
-#include "ReaderInterfaces.h"
-#include <InnerInterfaces.h>
+#include "Reader.h"
+#include "MemoryProvider.h"
+#include "Transform.h"
 #include "commandArgUtil.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {

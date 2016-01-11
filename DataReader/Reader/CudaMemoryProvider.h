@@ -3,7 +3,7 @@
 #include <memory>
 #include <CUDAPageLockedMemAllocator.h>
 
-#include "ReaderInterfaces.h"
+#include "MemoryProvider.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

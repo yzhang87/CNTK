@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "InnerInterfaces.h"
+#include "DataDeserializer.h"
 #include "commandArgUtil.h" // for ConfigParameters
 #include "htkfeatio.h" // for htkfeatreader
 #include "minibatchiterator.h"

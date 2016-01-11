@@ -43,7 +43,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto features = std::make_shared<InputDescription>();
         features->id = 0;
-        features->type = it_feature;
+        features->type = InputType::it_feature;
         features->name = msra::strfun::utf16(featSect.first);
         features->sampleLayout = std::make_shared<ImageLayout>(ImageLayoutWHC(w, h, c));
         m_inputs.push_back(features);
@@ -53,7 +53,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto labels = std::make_shared<InputDescription>();
         labels->id = 1;
-        labels->type = it_label;
+        labels->type = InputType::it_label;
         labels->name = msra::strfun::utf16(labSect.first);
         labels->sampleLayout = std::make_shared<ImageLayout>(ImageLayoutVector(labelDimension));
         m_inputs.push_back(labels);
@@ -64,13 +64,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         string precision = config.Find("precision", "");
         if (AreEqual(precision, "float"))
         {
-            features->elementType = et_float;
-            labels->elementType = et_float;
+            features->elementType = ElementType::et_float;
+            labels->elementType = ElementType::et_float;
         }
         else if (AreEqual(precision, "double"))
         {
-            features->elementType = et_double;
-            labels->elementType = et_double;
+            features->elementType = ElementType::et_double;
+            labels->elementType = ElementType::et_double;
         }
         else
         {

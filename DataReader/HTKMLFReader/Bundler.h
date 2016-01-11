@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "InnerInterfaces.h"
+#include "DataDeserializer.h"
 #include "commandArgUtil.h" // for ConfigParameters
 
 namespace Microsoft { namespace MSR { namespace CNTK {

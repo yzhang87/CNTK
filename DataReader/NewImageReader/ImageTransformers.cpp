@@ -28,7 +28,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         for (const auto & input : inputs)
         {
-            if (input->type == it_feature)
+            if (input->type == InputType::it_feature)
             {
                 m_featureStreamIds.push_back(input->id);
             }
@@ -64,11 +64,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int channels = static_cast<int>(s.layout->GetNumChannels());
 
         int typeId = 0;
-        if (input->elementType == et_double)
+        if (input->elementType == ElementType::et_double)
         {
             typeId = CV_64F;
         }
-        else if (input->elementType == et_float)
+        else if (input->elementType == ElementType::et_float)
         {
             typeId = CV_32F;
         }
@@ -263,7 +263,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         const auto & feature = inputs[featureStreamIds[0]];
-        m_dataType = feature->elementType == et_float ? CV_32F : CV_64F;
+        m_dataType = feature->elementType == ElementType::et_float ? CV_32F : CV_64F;
 
         InitFromConfig(readerConfig(feature->name));
     }

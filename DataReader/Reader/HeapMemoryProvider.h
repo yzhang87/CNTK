@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReaderInterfaces.h"
+#include "MemoryProvider.h"
 #include <memory>
 #include <algorithm>
 

@@ -13,17 +13,23 @@
     <ClInclude Include="HeapMemoryProvider.h">
       <Filter>MemoryProviders</Filter>
     </ClInclude>
-    <ClInclude Include="InnerInterfaces.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="ReaderInterfaces.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="ReaderShim.h">
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="SubstitutingMemoryProvider.h">
       <Filter>MemoryProviders</Filter>
+    </ClInclude>
+    <ClInclude Include="Transform.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Reader.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="DataDeserializer.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryProvider.h">
+      <Filter>Interfaces</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -119,7 +119,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(m_currentImage.isContinuous());
 
         // Convert element type.
-        int dataType = m_featureElementType == et_float ? CV_32F : CV_64F;
+        int dataType = m_featureElementType == ElementType::et_float ? CV_32F : CV_64F;
         if (m_currentImage.type() != CV_MAKETYPE(dataType, m_currentImage.channels()))
         {
             m_currentImage.convertTo(m_currentImage, dataType);

@@ -54,7 +54,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_provider,
             m_transformer,
             config.minibatchSize,
-            m_elementType == et_float ? sizeof(float) : sizeof(double),
+            m_elementType == ElementType::et_float ? sizeof(float) : sizeof(double),
             m_inputs);
     }
 

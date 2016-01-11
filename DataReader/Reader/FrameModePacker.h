@@ -6,8 +6,9 @@
 
 #pragma once
 
-#include "ReaderInterfaces.h"
-#include "InnerInterfaces.h"
+#include "Reader.h"
+#include "MemoryProvider.h"
+#include "Transform.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

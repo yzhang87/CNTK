@@ -22,7 +22,7 @@ extern "C" DATAREADER_API void GetReaderF(IDataReader<float>** preader)
 {
     auto factory = [](const ConfigParameters& parameters) -> ReaderPtr 
     {
-        return std::make_shared<ImageReader>(std::make_shared<HeapMemoryProvider>(), parameters, et_float);
+        return std::make_shared<ImageReader>(std::make_shared<HeapMemoryProvider>(), parameters, ElementType::et_float);
     };
     *preader = new ReaderShim<float>(factory);
 }
@@ -31,7 +31,7 @@ extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
 {
     auto factory = [](const ConfigParameters& parameters) -> ReaderPtr
     {
-        return std::make_shared<ImageReader>(std::make_shared<HeapMemoryProvider>(), parameters, et_double);
+        return std::make_shared<ImageReader>(std::make_shared<HeapMemoryProvider>(), parameters, ElementType::et_double);
     };
     *preader = new ReaderShim<double>(factory);
 }

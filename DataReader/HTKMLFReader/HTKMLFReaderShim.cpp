@@ -116,7 +116,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             matrices[name]->SetValue(rowNumber, columnNumber, matrices[name]->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);
         }
 
-        return m;
+        return !m.atEndOfEpoch;
     }
 
     template<class ElemType>

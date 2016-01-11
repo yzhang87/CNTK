@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReaderInterfaces.h"
+#include "MemoryProvider.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

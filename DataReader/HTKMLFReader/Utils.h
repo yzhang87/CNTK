@@ -3,7 +3,6 @@
 #include <vector>
 #include <memory>
 
-#include "ReaderInterfaces.h"
 #include "commandArgUtil.h"
 
 #include "biggrowablevectors.h"
