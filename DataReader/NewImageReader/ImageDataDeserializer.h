@@ -15,7 +15,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<InputDescriptionPtr> GetInputs() const override;
         void SetEpochConfiguration(const EpochConfiguration& config) override;
         const Timeline& GetSequenceDescriptions() const override;
-        std::vector<std::vector<Sequence>> GetSequencesById(const std::vector<size_t> & ids) override;
+        std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) override;
         bool RequireChunk(size_t chunkIndex) override;
         void ReleaseChunk(size_t chunkIndex) override;
 

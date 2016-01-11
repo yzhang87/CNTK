@@ -19,13 +19,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs);
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
-        virtual SequencesData GetNextSequences(size_t count) override;
+        virtual Sequences GetNextSequences(size_t count) override;
 
     protected:
         using UniRealT = std::uniform_real_distribution<double>;
         using UniIntT = std::uniform_int_distribution<int>;
 
-        Sequence Apply(Sequence& mat, InputDescriptionPtr input);
+        SequenceData Apply(SequenceData& mat, InputDescriptionPtr input);
         virtual void Apply(cv::Mat& mat) = 0;
         unsigned int GetSeed() const
         {

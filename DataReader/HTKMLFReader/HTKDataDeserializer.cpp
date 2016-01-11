@@ -174,7 +174,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const_array_ref<float> operator[] (size_t j) const { return array_ref<float>(&m(0, j), m.rows()); }
     };
 
-    std::vector<std::vector<Sequence>> HTKDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
+    std::vector<std::vector<SequenceData>> HTKDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
     {
         assert(ids.size() == 1); // TODO
         auto id = ids[0];
@@ -209,7 +209,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             msra::dbn::augmentneighbors(uttframevectors, noboundaryflags, frame.frameIndexInUtterance, leftextent, rightextent, feat, 0);
 
-            Sequence r;
+            SequenceData r;
             r.numberOfSamples = utterance.numberOfSamples;
 
             const msra::dbn::matrixstripe featOri = msra::dbn::matrixstripe(feat, 0, feat.cols());
@@ -231,14 +231,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             memcpy_s(buffer, m_elementSize * dimensions, tmp, m_elementSize * dimensions);
             r.data = buffer;
 
-            std::vector<std::vector<Sequence>> result;
-            result.push_back(std::vector<Sequence> { r });
+            std::vector<std::vector<SequenceData>> result;
+            result.push_back(std::vector<SequenceData> { r });
             return result;
         }
         else
         {
             assert(false);
-            return std::vector<std::vector<Sequence>>();
+            return std::vector<std::vector<SequenceData>>();
         }
     }
 
