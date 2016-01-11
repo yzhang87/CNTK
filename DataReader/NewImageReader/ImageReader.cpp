@@ -33,9 +33,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         TransformerPtr scaler = std::make_shared<ScaleTransform>();
         TransformerPtr mean = std::make_shared<MeanTransform>();
 
-        cropper->Initialize(randomizer, config, m_inputs);
-        scaler->Initialize(cropper, config, m_inputs);
-        mean->Initialize(scaler, config, m_inputs);
+        cropper->Initialize(randomizer, config);
+        scaler->Initialize(cropper, config);
+        mean->Initialize(scaler, config);
         m_transformer = mean;
     }
 

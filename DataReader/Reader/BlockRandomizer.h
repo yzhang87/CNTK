@@ -19,9 +19,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr deserializer);
         virtual ~BlockRandomizer() { }
 
-        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs) override;
+        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig) override;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
         virtual Sequences GetNextSequences(size_t count) override;
+        virtual std::vector<InputDescriptionPtr> GetInputs() const override { return m_deserializer->GetInputs(); }
 
     private:
         // Structure for per-chunk information

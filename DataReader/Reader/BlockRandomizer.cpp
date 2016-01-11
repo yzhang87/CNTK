@@ -298,12 +298,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_frameMode = (maxNumberOfSamples == 1);
     }
 
-    void BlockRandomizer::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs)
+    void BlockRandomizer::Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig)
     {
         // Not used for the block randomizer.
         UNREFERENCED_PARAMETER(inputTransformer);
         UNREFERENCED_PARAMETER(readerConfig);
-        UNREFERENCED_PARAMETER(inputs);
     }
 
     void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)

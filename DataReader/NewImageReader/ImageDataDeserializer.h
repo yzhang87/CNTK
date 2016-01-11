@@ -46,5 +46,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::vector<cv::Mat> m_currentImages;
         ElementType m_featureElementType;
+        std::vector<InputDescriptionPtr> m_inputs;
     };
 }}}

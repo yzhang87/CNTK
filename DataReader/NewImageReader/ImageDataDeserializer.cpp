@@ -28,10 +28,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config)
     {
         auto configHelper = ImageConfigHelper(config);
-        auto inputs = configHelper.GetInputs();
-        assert(inputs.size() == 2);
-        const auto & label = inputs[configHelper.GetLabelInputIndex()];
-        const auto & feature = inputs[configHelper.GetFeatureInputIndex()];
+        m_inputs = configHelper.GetInputs();
+        assert(m_inputs.size() == 2);
+        const auto & label = m_inputs[configHelper.GetLabelInputIndex()];
+        const auto & feature = m_inputs[configHelper.GetFeatureInputIndex()];
 
         m_featureElementType = feature->elementType;
         m_labelSampleLayout = label->sampleLayout;
@@ -94,8 +94,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     std::vector<InputDescriptionPtr> ImageDataDeserializer::GetInputs() const
     {
-        assert(false);
-        throw std::runtime_error("Not supported");
+        return m_inputs;
     }
 
     void ImageDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /* config */)

@@ -20,9 +20,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Defines sequence data and its layout.
     struct SequenceData
     {
-        TensorShapePtr layout;
-        size_t numberOfSamples;
-        void* data;
+        void* data;                 // Data
+        size_t numberOfSamples;     // Number of samples in the sequence
+        TensorShapePtr layout;      // Possible layout of data if layout is different per sequence.
     };
 
     // Interface for reading data from several streams.
@@ -30,7 +30,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {
     public:
         // Describes streams the data deserializer produces.
-        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0; // TODO remove?
+        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
 
         // Sets epoch configuration.
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;

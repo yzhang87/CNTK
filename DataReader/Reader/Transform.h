@@ -36,8 +36,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Initialization.
         virtual void Initialize(
             TransformerPtr inputTransformer,
-            const ConfigParameters& readerConfig,
-            const std::vector<InputDescriptionPtr>& inputs) = 0;
+            const ConfigParameters& readerConfig) = 0;
+
+        // Describes streams the transorm produces.
+        virtual std::vector<InputDescriptionPtr> GetInputs() const = 0;
 
         // Sets current epoch configuration.
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
