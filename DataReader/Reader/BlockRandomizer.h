@@ -16,7 +16,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class BlockRandomizer : public Transformer
     {
     public:
-        BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr bundler);
+        BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr deserializer);
         virtual ~BlockRandomizer() { }
 
         virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs) override;
@@ -47,8 +47,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int m_verbosity;
         size_t m_randomizationRangeInSamples; // full window
 
-        // Sequencer and information on the original timeline
-        DataDeserializerPtr m_sequencer;
+        // Deserializer and information on the original timeline
+        DataDeserializerPtr m_deserializer;
         size_t m_numSequences;
         size_t m_numChunks;
         size_t m_numSamples;
