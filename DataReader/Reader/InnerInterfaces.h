@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <vector>
 #include "ReaderInterfaces.h"
 #include "commandArgUtil.h"
@@ -79,7 +78,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class Transformer
     {
     public:
-        virtual void Initialize(TransformerPtr inputTransformer, const ConfigParameters& readerConfig, const std::vector<InputDescriptionPtr>& inputs) = 0;
+        virtual void Initialize(
+            TransformerPtr inputTransformer,
+            const ConfigParameters& readerConfig,
+            const std::vector<InputDescriptionPtr>& inputs) = 0;
         virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
         virtual ~Transformer() = 0 {}
         virtual SequenceData GetNextSequence() = 0;

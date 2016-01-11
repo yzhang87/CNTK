@@ -107,13 +107,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             for (const auto& mx : matrices)
             {
                 assert(m_nameToInputId.find(mx.first) != m_nameToInputId.end());
+                size_t inputId = m_nameToInputId[mx.first];
 
-                const auto& input = m.minibatch[m_nameToInputId[mx.first]];
+                const auto& input = m.minibatch[inputId];
                 LayoutPtr layout = input->layout;
                 m_layout = layout->columns;
 
                 size_t columnNumber = layout->columns->GetNumCols();
-                size_t rowNumber = layout->rows->GetNumElements();
+                size_t rowNumber = m_inputs[inputId]->sampleLayout->GetNumElements();
 
                 auto data = reinterpret_cast<const ElemType*>(input->data);
                 mx.second->SetValue(rowNumber, columnNumber, mx.second->GetDeviceId(), const_cast<ElemType*>(data), matrixFlagNormal);

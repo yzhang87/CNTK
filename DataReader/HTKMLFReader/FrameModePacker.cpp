@@ -281,7 +281,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 std::vector<size_t> dimensions;
                 dimensions.push_back(dim);
-                layout->rows = std::make_shared<ImageLayout>(dimensions);
 
                 InputPtr input = std::make_shared<Input>();
                 input->data = m_featuresBufferMultiIO[id].get();
@@ -299,7 +298,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
                 std::vector<size_t> dimensions;
                 dimensions.push_back(dim);
-                layout->rows = std::make_shared<ImageLayout>(dimensions);
 
                 InputPtr input = std::make_shared<Input>();
                 input->data = m_labelsBufferMultiIO[id].get();

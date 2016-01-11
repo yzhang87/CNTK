@@ -48,6 +48,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         auto numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;
         m_layout->Init(numSeqsPerMBForAllEpochs[0], 0, true);
+        m_inputs = m_packer->GetInputs();
     }
 
     template<class ElemType>
@@ -106,7 +107,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             auto layout = input->layout;
             size_t columnNumber = layout->columns->GetNumCols();
-            size_t rowNumber = layout->rows->GetNumElements();
+            size_t rowNumber = m_inputs[i]->sampleLayout->GetNumElements();
 
             // Current hack.
             m_layout = layout->columns;

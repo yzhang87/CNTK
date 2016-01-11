@@ -42,7 +42,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     enum StorageType
     {
         st_dense,
-        st_sparse_csc,
+        //st_sparse_csc,
     };
 
     // Input description.
@@ -64,7 +64,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     struct Layout
     {
         MBLayoutPtr columns;
-        TensorShapePtr rows;
     };
     typedef std::shared_ptr<Layout> LayoutPtr;
 
