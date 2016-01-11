@@ -113,19 +113,20 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         std::vector<std::vector<Sequence>> result;
 
-        // Remove old images
-        m_currentImages.clear();
+        m_currentImages.resize(ids.size());
+        result.resize(ids.size());
 
-        for (auto id : ids)
+#pragma omp parallel for ordered schedule(dynamic)
+        for (int i = 0; i < ids.size(); ++i)
         {
-            assert(id < m_imageSequences.size());
-            const auto & imageSequence = m_imageSequences[id];
+            assert(ids[i] < m_imageSequences.size());
+            const auto& imageSequence = m_imageSequences[ids[i]];
 
             // Construct image
             Sequence image;
 
-            cv::Mat cvImage;
-            cvImage = cv::imread(imageSequence.path, cv::IMREAD_COLOR);
+            m_currentImages[i] = std::move(cv::imread(imageSequence.path, cv::IMREAD_COLOR));
+            cv::Mat& cvImage = m_currentImages[i];
             assert(cvImage.isContinuous());
 
             // Convert element type.
@@ -139,14 +140,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             image.layout = std::make_shared<ImageLayout>(ImageLayoutWHC(cvImage.cols, cvImage.rows, cvImage.channels()));;
             image.numberOfSamples = imageSequence.numberOfSamples;
 
-            m_currentImages.push_back(std::move(cvImage));
-
             // Construct label
             Sequence label;
             label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
             label.layout = m_labelSampleLayout;
             label.numberOfSamples = imageSequence.numberOfSamples;
-            result.push_back(std::vector<Sequence> { image, label });
+            result[i] = std::move(std::vector<Sequence> { image, label });
         }
 
         return result;
