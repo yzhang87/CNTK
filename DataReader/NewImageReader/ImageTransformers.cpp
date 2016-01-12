@@ -70,9 +70,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     SequenceData BaseTransformer::Apply(SequenceData& s, StreamDescriptionPtr stream)
     {
-        int rows = static_cast<int>(s.layout->GetWidth());
-        int columns = static_cast<int>(s.layout->GetHeight());
-        int channels = static_cast<int>(s.layout->GetNumChannels());
+        int rows = static_cast<int>(s.layouts[0]->GetWidth());
+        int columns = static_cast<int>(s.layouts[0]->GetHeight());
+        int channels = static_cast<int>(s.layouts[0]->GetNumChannels());
 
         int typeId = 0;
         if (stream->elementType == ElementType::et_double)
@@ -93,9 +93,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         this->Apply(m_buffer);
 
         SequenceData result;
-        result.layout = std::make_shared<ImageLayout>(
-            ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels()));
-        result.numberOfSamples = result.numberOfSamples;
+        result.layouts.push_back(std::make_shared<ImageLayout>(
+            ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels())));
+        result.numberOfSamples = s.numberOfSamples;
         result.data = m_buffer.ptr();
         return result;
     }

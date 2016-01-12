@@ -6,9 +6,9 @@ for %%f in (%*) do set a_%%f=1
 @REM optionally do clean ?
 
 set ACML_FMA=0
-set CYGWIN_BIN=c:\cygwin64\bin
+set CYGWIN_BIN=F:\cygwin64\bin
 if not exist %CYGWIN_BIN% (
-    set CYGWIN_BIN=c:\cygwin\bin
+    set CYGWIN_BIN=F:\cygwin\bin
     if not exist %CYGWIN_BIN% (
         echo Can't find Cygwin, is it installed?
         exit /b 1

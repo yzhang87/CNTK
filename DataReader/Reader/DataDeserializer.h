@@ -20,9 +20,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Defines sequence data and its layout.
     struct SequenceData
     {
-        void* data;                 // Data
-        size_t numberOfSamples;     // Number of samples in the sequence
-        TensorShapePtr layout;      // Possible layout of data if layout is different per sequence.
+        SequenceData() : data(nullptr), numberOfSamples(0) {}
+
+        void* data;
+        std::vector<TensorShapePtr> layouts;              // layouts of samples
+        size_t numberOfSamples;               // Number of samples in the sequence
     };
 
     // Interface for reading data from several streams.

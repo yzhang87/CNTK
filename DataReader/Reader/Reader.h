@@ -36,6 +36,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     enum class StorageType
     {
         st_dense, // dense
+        st_sparse_csc,
     };
 
     typedef size_t StreamId;

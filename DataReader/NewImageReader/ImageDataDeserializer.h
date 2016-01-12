@@ -29,7 +29,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         class LabelGenerator
         {
         public:
-            virtual void* GetLabelDataFor(size_t classId) = 0;
+            virtual void ReadLabelDataFor(SequenceData& data, size_t classId) = 0;
             virtual ~LabelGenerator() {}
         };
 
@@ -38,14 +38,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         void CreateSequenceDescriptions(std::string mapPath, size_t labelDimension);
 
         std::vector<ImageSequenceDescription> m_imageSequences;
-        Timeline m_sequences;
-
-        TensorShapePtr m_labelSampleLayout;
-
+        std::vector<SequenceData> m_labels;
         LabelGeneratorPtr m_labelGenerator;
-
         std::vector<cv::Mat> m_currentImages;
-        ElementType m_featureElementType;
         std::vector<StreamDescriptionPtr> m_streams;
+
+        Timeline m_sequences;
+        ElementType m_featureElementType;
     };
 }}}

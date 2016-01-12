@@ -25,12 +25,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Minibatch ReadMinibatch();
 
     private:
-        std::shared_ptr<void> AllocateBuffer(size_t numElements, size_t elementSize);
+        std::shared_ptr<char> AllocateBuffer(size_t numElements, size_t elementSize);
 
         MemoryProviderPtr m_memoryProvider;
         TransformerPtr m_transformer;
-        std::vector<StreamDescriptionPtr> m_streams;
-        std::vector<std::shared_ptr<void>> m_streamBuffers;
+        std::vector<StreamDescriptionPtr> m_outputStreams;
+        std::vector<StreamDescriptionPtr> m_inputStreams;
+        std::vector<std::shared_ptr<char>> m_streamBuffers;
 
         MBLayoutPtr m_minibatchLayout;
         size_t m_mbSize;

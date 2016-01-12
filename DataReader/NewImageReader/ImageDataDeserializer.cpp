@@ -2,6 +2,7 @@
 #include "ImageDataDeserializer.h"
 #include "ImageConfigHelper.h"
 #include <opencv2/opencv.hpp>
+#include "CPUSparseMatrix.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -9,20 +10,28 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     class TypedLabelGenerator : public ImageDataDeserializer::LabelGenerator
     {
     public:
-        TypedLabelGenerator(size_t dimensions)
+        TypedLabelGenerator()
+            : m_labelSampleLayout(std::make_shared<ImageLayout>(std::vector<size_t> { 1 }))
         {
-            m_labelData.resize(dimensions, 0);
         }
 
-        virtual void* GetLabelDataFor(size_t classId) override
+        virtual void ReadLabelDataFor(SequenceData& data, size_t classId) override
         {
-            std::fill(m_labelData.begin(), m_labelData.end(), static_cast<TElement>(0));
-            m_labelData[classId] = 1;
-            return &m_labelData[0];
+            data.numberOfSamples = 1;
+            data.layouts.resize(1);
+            data.layouts[0] = m_labelSampleLayout;
+
+            if (data.data == nullptr)
+            {
+                data.data = new char*[sizeof(size_t) + sizeof(TElement)];
+            }
+
+            *reinterpret_cast<size_t*>(data.data) = classId;
+            *reinterpret_cast<TElement*>(reinterpret_cast<char*>(data.data) + sizeof(size_t)) = 1;
         }
 
     private:
-        std::vector<TElement> m_labelData;
+        TensorShapePtr m_labelSampleLayout;
     };
 
     ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config)
@@ -30,20 +39,22 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         auto configHelper = ImageConfigHelper(config);
         m_streams = configHelper.GetStreams();
         assert(m_streams.size() == 2);
-        const auto & label = m_streams[configHelper.GetLabelStreamId()];
-        const auto & feature = m_streams[configHelper.GetFeatureStreamId()];
+        const auto& label = m_streams[configHelper.GetLabelStreamId()];
+        const auto& feature = m_streams[configHelper.GetFeatureStreamId()];
+
+        label->storageType = StorageType::st_sparse_csc;
+        feature->storageType = StorageType::st_dense;
 
         m_featureElementType = feature->elementType;
-        m_labelSampleLayout = label->sampleLayout;
-        size_t labelDimension = m_labelSampleLayout->GetHeight();
+        size_t labelDimension = label->sampleLayout->GetHeight();
 
         if (label->elementType == ElementType::et_float)
         {
-            m_labelGenerator = std::make_shared<TypedLabelGenerator<float>>(labelDimension);
+            m_labelGenerator = std::make_shared<TypedLabelGenerator<float>>();
         }
         else if (label->elementType == ElementType::et_double)
         {
-            m_labelGenerator = std::make_shared<TypedLabelGenerator<double>>(labelDimension);
+            m_labelGenerator = std::make_shared<TypedLabelGenerator<double>>();
         }
         else
         {
@@ -113,6 +124,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         std::vector<std::vector<SequenceData>> result;
 
         m_currentImages.resize(ids.size());
+        m_labels.resize(ids.size());
         result.resize(ids.size());
 
 #pragma omp parallel for ordered schedule(dynamic)
@@ -122,8 +134,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             const auto& imageSequence = m_imageSequences[ids[i]];
 
             // Construct image
-            SequenceData image;
-
             m_currentImages[i] = std::move(cv::imread(imageSequence.path, cv::IMREAD_COLOR));
             cv::Mat& cvImage = m_currentImages[i];
             assert(cvImage.isContinuous());
@@ -136,17 +146,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 cvImage.convertTo(cvImage, dataType);
             }
 
+            SequenceData image;
             image.data = cvImage.ptr();
-            image.layout = std::make_shared<ImageLayout>(ImageLayoutWHC(cvImage.cols, cvImage.rows, cvImage.channels()));;
-            image.numberOfSamples = imageSequence.numberOfSamples;
+            image.layouts.push_back(std::make_shared<ImageLayout>(ImageLayoutWHC(cvImage.cols, cvImage.rows, cvImage.channels())));
+            image.numberOfSamples = 1;
+            assert(imageSequence.numberOfSamples == image.numberOfSamples);
 
             // Construct label
-            SequenceData label;
-            label.data = m_labelGenerator->GetLabelDataFor(imageSequence.classId);
-            label.layout = m_labelSampleLayout;
-            label.numberOfSamples = imageSequence.numberOfSamples;
+            m_labelGenerator->ReadLabelDataFor(m_labels[i], imageSequence.classId);
 
-            result[i] = std::move(std::vector<SequenceData> { image, label });
+            result[i] = std::move(std::vector<SequenceData> { image, m_labels[i] });
         }
 
         return result;
