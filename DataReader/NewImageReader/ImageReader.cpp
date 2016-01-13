@@ -17,11 +17,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageReader::ImageReader(
         MemoryProviderPtr provider,
-        const ConfigParameters& config,
-        ElementType elementType)
+        const ConfigParameters& config)
         : m_provider(provider)
         , m_seed(0)
-        , m_elementType(elementType)
     {
         // In the future, deserializers and transformers will be dynamically loaded 
         // from external libraries based on the configuration/brain script.
@@ -34,9 +32,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config);
         TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
 
-        TransformerPtr cropper = std::make_shared<CropTransform>();
-        TransformerPtr scaler = std::make_shared<ScaleTransform>();
-        TransformerPtr mean = std::make_shared<MeanTransform>();
+        TransformerPtr cropper = std::make_shared<CropTransformer>();
+        TransformerPtr scaler = std::make_shared<ScaleTransformer>();
+        TransformerPtr mean = std::make_shared<MeanTransformer>();
 
         cropper->Initialize(randomizer, config);
         scaler->Initialize(cropper, config);
@@ -55,12 +53,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.minibatchSize > 0);
         assert(config.totalSize > 0);
 
-        m_transformer->SetEpochConfiguration(config);
+        m_transformer->StartEpoch(config);
         m_packer = std::make_shared<FrameModePacker>(
             m_provider,
             m_transformer,
             config.minibatchSize,
-            m_elementType == ElementType::et_float ? sizeof(float) : sizeof(double),
             m_streams);
     }
 

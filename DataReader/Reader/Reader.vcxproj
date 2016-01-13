@@ -79,11 +79,13 @@
     <ClInclude Include="BlockRandomizer.h" />
     <ClInclude Include="CudaMemoryProvider.h" />
     <ClInclude Include="DataDeserializer.h" />
+    <ClInclude Include="ElementTypeUtils.h" />
     <ClInclude Include="FrameModePacker.h" />
     <ClInclude Include="HeapMemoryProvider.h" />
     <ClInclude Include="MemoryProvider.h" />
     <ClInclude Include="Reader.h" />
     <ClInclude Include="ReaderShim.h" />
+    <ClInclude Include="StringUtils.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
     <ClInclude Include="Transformer.h" />
   </ItemGroup>

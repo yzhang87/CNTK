@@ -50,7 +50,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual std::vector<StreamDescriptionPtr> GetStreams() const = 0;
 
         // Sets current epoch configuration.
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
+        virtual void StartEpoch(const EpochConfiguration& config) = 0;
 
         // Gets next sequences.
         // The return value can be used until the next call to GetNextSequences.

@@ -144,7 +144,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void HTKDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /*config*/)
+    void HTKDataDeserializer::StartEpoch(const EpochConfiguration& /*config*/)
     {
         throw std::logic_error("The method or operation is not implemented.");
     }
@@ -160,7 +160,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         stream->id = 0;
         stream->name = m_featureName;
         stream->sampleLayout = std::make_shared<ImageLayout>(std::move(std::vector<size_t>{ m_dimension }));
-        stream->elementType = m_elementSize == sizeof(float) ? ElementType::et_float : ElementType::et_double;
+        stream->elementType = m_elementSize == sizeof(float) ? ElementType::tfloat : ElementType::tdouble;
         return std::vector<StreamDescriptionPtr> { stream };
     }
 

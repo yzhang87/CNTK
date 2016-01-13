@@ -20,7 +20,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual ~BlockRandomizer() { }
 
         virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
+        virtual void StartEpoch(const EpochConfiguration& config) override;
         virtual Sequences GetNextSequences(size_t count) override;
         virtual std::vector<StreamDescriptionPtr> GetStreams() const override { return m_deserializer->GetStreams(); }
 

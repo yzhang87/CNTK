@@ -29,7 +29,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         Bundler(const ConfigParameters& readerConfig, bool framemode, int verbosity,
             DataDeserializerPtr driver, std::vector<DataDeserializerPtr> deserializers);
 
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
+        virtual void StartEpoch(const EpochConfiguration& config) override;
 
         virtual const Timeline& GetSequenceDescriptions() const override;
         virtual std::vector<StreamDescriptionPtr> GetStreams() const override;

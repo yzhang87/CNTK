@@ -11,42 +11,50 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    // Defines properties of a sequence.
-    // Randomization is based on this data structure.
+    // Defines main properties of a sequence. This data structure is used
+    // to define the global timeline of all input data.
     struct SequenceDescription
     {
-        size_t id;                  // Sequence id
-        size_t numberOfSamples;     // Number of samples in a sequence
-        size_t chunkId;             // Each sequence belongs to an I/O chunk, how chunk is defined is specific to the data deserializer.
+        size_t id;                  // Sequence id, uniquely identifies the sequence.
+        size_t numberOfSamples;     // Number of samples in a sequence.
+        size_t chunkId;             // Each sequence belongs to an I/O chunk, how chunk is defined is specific to a particular data deserializer.
         bool isValid;
     };
-
     typedef std::vector<const SequenceDescription*> Timeline;
 
     // Defines sequence data and its layout.
+    // We support dense and sparse sequences.
+    // The storageType in the corresponding stream description defines what type of SequenceData
+    // data deserializer or transformer provides.
     struct SequenceData
     {
         SequenceData() : data(nullptr) {}
-        void* data;
-    };
 
+        void* data; 
+    };
     typedef std::shared_ptr<SequenceData> SequenceDataPtr;
 
+    // Dense sequence. Corresponds to the StorageType::dense of the stream.
+    // All samples are store in the 'data' member as a continuous array.
+    // The layout of samples are described in the sampleLayout.
+    // All samples in the sequence should have the same layout.
     struct DenseSequenceData : SequenceData
     {
         DenseSequenceData() : numberOfSamples(0) {}
 
-        TensorShapePtr sampleLayout;
-        size_t numberOfSamples; // Number of samples in the sequence
+        TensorShapePtr sampleLayout;// Sample layout
+        size_t numberOfSamples;     // Number of samples in the sequence
     };
-
     typedef std::shared_ptr<DenseSequenceData> DenseSequenceDataPtr;
 
+    // Dense sequence. Corresponds to the StorageType::css_sparse of the stream.
+    // All non zero values are store in the 'data' member as a continuous array.
+    // The corresponding row indices are stored in 'indices'.
+    // All samples in the sequence should have the same layout.
     struct SparseSequenceData : SequenceData
     {
         std::vector<std::vector<size_t>> indices;
     };
-
     typedef std::shared_ptr<SparseSequenceData> SparseSequenceDataPtr;
 
     // Interface for reading data from several streams.
@@ -57,7 +65,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual std::vector<StreamDescriptionPtr> GetStreams() const = 0;
 
         // Sets epoch configuration.
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) = 0;
+        virtual void StartEpoch(const EpochConfiguration& config) = 0;
 
         // Retrieve global timeline the data deserializer can produce.
         virtual const Timeline& GetSequenceDescriptions() const = 0;

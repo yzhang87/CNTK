@@ -14,13 +14,9 @@
 #include <opencv2/opencv.hpp>
 #include <random>
 #include "ImageConfigHelper.h"
+#include "StringUtils.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-
-    static bool AreEqual(const std::string& s1, const std::string& s2)
-    {
-        return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
-    };
 
     BaseTransformer::BaseTransformer()
         : m_next(nullptr)
@@ -44,10 +40,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_next->GetStreams();
     }
 
-    void BaseTransformer::SetEpochConfiguration(const EpochConfiguration& config)
+    void BaseTransformer::StartEpoch(const EpochConfiguration& config)
     {
         assert(m_next != nullptr);
-        m_next->SetEpochConfiguration(config);
+        m_next->StartEpoch(config);
     }
 
     Sequences BaseTransformer::GetNextSequences(size_t count)
@@ -67,7 +63,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (auto id : m_featureStreamIds)
             {
-                assert(m_streams[id]->storageType == StorageType::st_dense);
+                assert(m_streams[id]->storageType == StorageType::dense);
                 const DenseSequenceData& sequence = reinterpret_cast<DenseSequenceData&>(*sample[id]);
 
                 sample[id] = Apply(sequence, m_streams[id]);
@@ -84,11 +80,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         int channels = static_cast<int>(sequence.sampleLayout->GetNumChannels());
 
         int typeId = 0;
-        if (stream->elementType == ElementType::et_double)
+        if (stream->elementType == ElementType::tdouble)
         {
             typeId = CV_64F;
         }
-        else if (stream->elementType == ElementType::et_float)
+        else if (stream->elementType == ElementType::tfloat)
         {
             typeId = CV_32F;
         }
@@ -116,11 +112,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    CropTransform::CropTransform()
+    CropTransformer::CropTransformer()
     {
     }
 
-    void CropTransform::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
+    void CropTransformer::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
         BaseTransformer::Initialize(next, readerConfig);
         auto featureStreamIds = GetFeatureStreamIds();
@@ -133,7 +129,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         InitFromConfig(readerConfig(m_streams[featureStreamIds[0]]->name));
     }
 
-    void CropTransform::InitFromConfig(const ConfigParameters & config)
+    void CropTransformer::InitFromConfig(const ConfigParameters & config)
     {
         m_cropType = ParseCropType(config(L"cropType", ""));
 
@@ -160,7 +156,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void CropTransform::Apply(cv::Mat& mat)
+    void CropTransformer::Apply(cv::Mat& mat)
     {
         auto seed = GetSeed();
         auto rng = m_rngs.pop_or_create([seed]() { return std::make_unique<std::mt19937>(seed); });
@@ -193,14 +189,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_rngs.push(std::move(rng));
     }
 
-    CropTransform::CropType CropTransform::ParseCropType(const std::string& src)
+    CropTransformer::CropType CropTransformer::ParseCropType(const std::string& src)
     {
-        if (src.empty() || AreEqual(src, "center"))
+        if (src.empty() || AreEqualIgnoreCase(src, "center"))
         {
             return CropType::Center;
         }
 
-        if (AreEqual(src, "random"))
+        if (AreEqualIgnoreCase(src, "random"))
         {
             return CropType::Random;
         }
@@ -208,24 +204,24 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         RuntimeError("Invalid crop type: %s.", src.c_str());
     }
 
-    CropTransform::RatioJitterType CropTransform::ParseJitterType(const std::string& src)
+    CropTransformer::RatioJitterType CropTransformer::ParseJitterType(const std::string& src)
     {
-        if (src.empty() || AreEqual(src, "none"))
+        if (src.empty() || AreEqualIgnoreCase(src, "none"))
         {
             return RatioJitterType::None;
         }
 
-        if (AreEqual(src, "uniratio"))
+        if (AreEqualIgnoreCase(src, "uniratio"))
         {
             return RatioJitterType::UniRatio;
         }
 
-        if (AreEqual(src, "unilength"))
+        if (AreEqualIgnoreCase(src, "unilength"))
         {
             return RatioJitterType::UniLength;
         }
 
-        if (AreEqual(src, "uniarea"))
+        if (AreEqualIgnoreCase(src, "uniarea"))
         {
             return RatioJitterType::UniArea;
         }
@@ -233,7 +229,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         RuntimeError("Invalid jitter type: %s.", src.c_str());
     }
 
-    cv::Rect CropTransform::GetCropRect(CropType type, int crow, int ccol, double cropRatio, std::mt19937& rng)
+    cv::Rect CropTransformer::GetCropRect(CropType type, int crow, int ccol, double cropRatio, std::mt19937& rng)
     {
         assert(crow > 0);
         assert(ccol > 0);
@@ -263,11 +259,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    ScaleTransform::ScaleTransform()
+    ScaleTransformer::ScaleTransformer()
     {
     }
 
-    void ScaleTransform::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
+    void ScaleTransformer::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
         BaseTransformer::Initialize(next, readerConfig);
         m_interpMap.emplace("nearest", cv::INTER_NEAREST);
@@ -283,12 +279,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         const auto & feature = m_streams[featureStreamIds[0]];
-        m_dataType = feature->elementType == ElementType::et_float ? CV_32F : CV_64F;
+        m_dataType = feature->elementType == ElementType::tfloat ? CV_32F : CV_64F;
 
         InitFromConfig(readerConfig(feature->name));
     }
 
-    void ScaleTransform::InitFromConfig(const ConfigParameters& config)
+    void ScaleTransformer::InitFromConfig(const ConfigParameters& config)
     {
         m_imgWidth = config(L"width");
         m_imgHeight = config(L"height");
@@ -313,7 +309,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             m_interp.push_back(cv::INTER_LINEAR);
     }
 
-    void ScaleTransform::Apply(cv::Mat& mat)
+    void ScaleTransformer::Apply(cv::Mat& mat)
     {
         // If matrix has not been converted to the right type, do it now as rescaling requires floating point type.
         //
@@ -332,16 +328,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    MeanTransform::MeanTransform()
+    MeanTransformer::MeanTransformer()
     {
     }
 
-    void MeanTransform::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
+    void MeanTransformer::Initialize(TransformerPtr next, const ConfigParameters& readerConfig)
     {
         BaseTransformer::Initialize(next, readerConfig);
     }
 
-    void MeanTransform::InitFromConfig(const ConfigParameters & config)
+    void MeanTransformer::InitFromConfig(const ConfigParameters & config)
     {
         std::wstring meanFile = config(L"meanFile", L"");
         if (meanFile.empty())
@@ -367,7 +363,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    void MeanTransform::Apply(cv::Mat& mat)
+    void MeanTransformer::Apply(cv::Mat& mat)
     {
         assert(m_meanImg.size() == cv::Size(0, 0) || (m_meanImg.size() == mat.size() && m_meanImg.channels() == mat.channels()));
 

@@ -19,7 +19,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual ~BaseDataDeserializer() {}
 
         // Sets configuration for the current epoch.
-        void SetEpochConfiguration(const EpochConfiguration& /*config*/) override {};
+        void StartEpoch(const EpochConfiguration& /*config*/) override {};
 
         // Gets descriptions of all sequences the deserializer can produce.
         const Timeline& GetSequenceDescriptions() const override

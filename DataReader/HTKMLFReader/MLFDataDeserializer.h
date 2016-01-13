@@ -46,7 +46,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         MLFDataDeserializer(const ConfigParameters& label, size_t elementSize, const HTKDataDeserializer* featureDeserializer, bool framMode, const std::wstring& featureName);
 
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
+        virtual void StartEpoch(const EpochConfiguration& config) override;
 
         virtual const Timeline& GetSequenceDescriptions() const override;
 

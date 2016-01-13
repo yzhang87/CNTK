@@ -176,7 +176,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         HTKDataDeserializer(const ConfigParameters& feature, size_t elementSize, bool frameMode, const std::wstring& featureName);
 
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
+        virtual void StartEpoch(const EpochConfiguration& config) override;
 
         virtual const Timeline& GetSequenceDescriptions() const override;
 

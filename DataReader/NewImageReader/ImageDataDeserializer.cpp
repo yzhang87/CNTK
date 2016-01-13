@@ -46,17 +46,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         const auto& label = m_streams[configHelper.GetLabelStreamId()];
         const auto& feature = m_streams[configHelper.GetFeatureStreamId()];
 
-        label->storageType = StorageType::st_sparse_csc;
-        feature->storageType = StorageType::st_dense;
+        label->storageType = StorageType::sparse_csc;
+        feature->storageType = StorageType::dense;
 
         m_featureElementType = feature->elementType;
         size_t labelDimension = label->sampleLayout->GetHeight();
 
-        if (label->elementType == ElementType::et_float)
+        if (label->elementType == ElementType::tfloat)
         {
             m_labelGenerator = std::make_shared<TypedLabelGenerator<float>>();
         }
-        else if (label->elementType == ElementType::et_double)
+        else if (label->elementType == ElementType::tdouble)
         {
             m_labelGenerator = std::make_shared<TypedLabelGenerator<double>>();
         }
@@ -130,7 +130,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             // Convert element type.
             // TODO in original image reader, this conversion happened later. Should we support all native CV element types to be able to match this behavior?
-            int dataType = m_featureElementType == ElementType::et_float ? CV_32F : CV_64F;
+            int dataType = m_featureElementType == ElementType::tfloat ? CV_32F : CV_64F;
             if (cvImage.type() != CV_MAKETYPE(dataType, cvImage.channels()))
             {
                 cvImage.convertTo(cvImage, dataType);

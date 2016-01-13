@@ -34,6 +34,12 @@
     <ClInclude Include="BaseDataDeserializer.h">
       <Filter>Deserializers</Filter>
     </ClInclude>
+    <ClInclude Include="ElementTypeUtils.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="StringUtils.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BlockRandomizer.cpp">

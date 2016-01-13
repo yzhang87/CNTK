@@ -47,7 +47,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         typedef std::shared_ptr<LabelGenerator> LabelGeneratorPtr;
         LabelGeneratorPtr m_labelGenerator;
 
-        // Sequence descriptions of all data.
+        // Sequence descriptions for all input data.
         std::vector<ImageSequenceDescription> m_imageSequences;
 
         // Buffer to store label data.

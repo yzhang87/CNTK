@@ -42,7 +42,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         assert(config.workerRank < config.numberOfWorkers);
 
         // TODO: what to do with partial minibatches? Is it important to propagate this information to lower layers?
-        m_transformer->SetEpochConfiguration(config);
+        m_transformer->StartEpoch(config);
 
         StartDistributedMinibatchLoop(config.minibatchSize, config.index, config.workerRank, config.numberOfWorkers, config.totalSize);
     }

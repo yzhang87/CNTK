@@ -8,6 +8,7 @@
 #define _SCL_SECURE_NO_WARNINGS
 
 #include "FrameModePacker.h"
+#include "ElementTypeUtils.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -15,11 +16,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         MemoryProviderPtr memoryProvider,
         TransformerPtr transformer,
         size_t minibatchSize,
-        size_t elementSize,
         const std::vector<StreamDescriptionPtr>& streams)
         : m_transformer(transformer)
         , m_mbSize(minibatchSize)
-        , m_elementSize(elementSize)
         , m_outputStreams(streams)
         , m_minibatchLayout(std::make_shared<MBLayout>())
         , m_memoryProvider(memoryProvider)
@@ -30,11 +29,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             std::find_if(
                 m_outputStreams.begin(),
                 m_outputStreams.end(), 
-                [](const StreamDescriptionPtr& s) { return s->storageType == StorageType::st_sparse_csc; }) == m_outputStreams.end());
+                [](const StreamDescriptionPtr& s) { return s->storageType == StorageType::sparse_csc; }) == m_outputStreams.end());
 
         for (const auto& stream : streams)
         {
-            m_streamBuffers.push_back(AllocateBuffer(m_mbSize * stream->sampleLayout->GetNumElements(), m_elementSize));
+            assert(stream->elementType == ElementType::tfloat || stream->elementType == ElementType::tdouble);
+            m_streamBuffers.push_back(
+                AllocateBuffer(m_mbSize * stream->sampleLayout->GetNumElements(), GetSizeByType(stream->elementType)));
         }
     }
 
@@ -57,9 +58,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             assert(m_streamBuffers.size() == images.m_data[i].size());
             for (int j = 0; j < images.m_data[i].size(); ++j)
             {
-                size_t dimensions = m_inputStreams[j]->sampleLayout->GetNumElements() * m_elementSize;
+                size_t elementSize = GetSizeByType(m_inputStreams[j]->elementType);
+                size_t dimensions = m_inputStreams[j]->sampleLayout->GetNumElements() * elementSize;
                 const char* source = reinterpret_cast<char*>(images.m_data[i][j]->data);
-                if (m_inputStreams[j]->storageType == StorageType::st_dense)
+                if (m_inputStreams[j]->storageType == StorageType::dense)
                 {
                     DenseSequenceData& data = reinterpret_cast<DenseSequenceData&>(*images.m_data[i][j]);
                     assert(data.numberOfSamples == 1);
@@ -69,7 +71,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                         source + dimensions,
                         m_streamBuffers[j].get() + dimensions * i);
                 }
-                else if (m_inputStreams[j]->storageType == StorageType::st_sparse_csc)
+                else if (m_inputStreams[j]->storageType == StorageType::sparse_csc)
                 {
                     SparseSequenceData& data = reinterpret_cast<SparseSequenceData&>(*images.m_data[i][j]);
                     assert(data.indices.size() == 1);
@@ -79,8 +81,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     for (size_t nonZeroIndex = 0; nonZeroIndex < nonZeroCount; ++nonZeroIndex)
                     {
                         size_t rowIndex = data.indices[0][nonZeroIndex];
-                        char* destination = m_streamBuffers[j].get() + dimensions * i + rowIndex * m_elementSize;
-                        std::copy(source + rowIndex * m_elementSize, source + (rowIndex + 1) * m_elementSize, destination);
+                        char* destination = m_streamBuffers[j].get() + dimensions * i + rowIndex * elementSize;
+                        std::copy(source + rowIndex * elementSize, source + (rowIndex + 1) * elementSize, destination);
                     }
                 }
                 else
@@ -98,7 +100,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_minibatchLayout->Init(images.m_data.size(), 1);
         for (int i = 0; i < m_outputStreams.size(); ++i)
         {
-            size_t dimensions = m_outputStreams[i]->sampleLayout->GetNumElements() * m_elementSize;
+            size_t dimensions = m_outputStreams[i]->sampleLayout->GetNumElements() * GetSizeByType(m_outputStreams[i]->elementType);
             StreamPtr stream = std::make_shared<Stream>();
             stream->data = m_streamBuffers[i].get();
             stream->dataSize = images.m_data.size() * dimensions;

@@ -161,7 +161,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    void Bundler::SetEpochConfiguration(const EpochConfiguration& /*config*/)
+    void Bundler::StartEpoch(const EpochConfiguration& /*config*/)
     {
         // TODO do we keep SetEpochConfiguration(), now empty?
     }

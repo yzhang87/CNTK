@@ -18,41 +18,52 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     class ConfigParameters;
 
+    // Base class for image transformations based on OpenCV.
+    // Currently supports only dense data format.
     class BaseTransformer : public Transformer
     {
     public:
         BaseTransformer();
 
+        // Initializes the transformer.
         virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
-        virtual void SetEpochConfiguration(const EpochConfiguration& config) override;
-        virtual Sequences GetNextSequences(size_t count) override;
+
+        // Description of streams that the transformer provides.
         virtual std::vector<StreamDescriptionPtr> GetStreams() const override;
+
+        // Gets next "count" sequences. Sequences contains data for all streams.
+        virtual Sequences GetNextSequences(size_t count) override;
+
+        // Sets configuration for the current epoch.
+        virtual void StartEpoch(const EpochConfiguration& config) override;
 
     protected:
         using UniRealT = std::uniform_real_distribution<double>;
         using UniIntT = std::uniform_int_distribution<int>;
 
-        SequenceDataPtr Apply(const DenseSequenceData& mat, StreamDescriptionPtr stream);
+        // Applies transformation to the image.
         virtual void Apply(cv::Mat& mat) = 0;
-        unsigned int GetSeed() const
-        {
-            return m_seed;
-        }
 
-        const std::vector<StreamId> & GetFeatureStreamIds() const;
+        // Seed  getter.
+        unsigned int GetSeed() const { return m_seed;}
+
+        const std::vector<StreamId>& GetFeatureStreamIds() const;
         std::vector<StreamDescriptionPtr> m_streams;
 
     private:
+        // Applies transformation to the sequence.
+        SequenceDataPtr Apply(const DenseSequenceData& mat, StreamDescriptionPtr stream);
+
         std::vector<StreamId> m_featureStreamIds;
         TransformerPtr m_next;
         unsigned int m_seed;
         cv::Mat m_buffer;
     };
 
-    class CropTransform : public BaseTransformer
+    class CropTransformer : public BaseTransformer
     {
     public:
-        CropTransform();
+        CropTransformer();
         virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
 
     protected:
@@ -81,10 +92,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         bool m_hFlip;
     };
 
-    class ScaleTransform : public BaseTransformer
+    class ScaleTransformer : public BaseTransformer
     {
     public:
-        ScaleTransform();
+        ScaleTransformer();
         virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
 
     private:
@@ -102,10 +113,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         size_t m_imgChannels;
     };
 
-    class MeanTransform : public BaseTransformer
+    class MeanTransformer : public BaseTransformer
     {
     public:
-        MeanTransform();
+        MeanTransformer();
         virtual void Initialize(TransformerPtr next, const ConfigParameters& readerConfig) override;
 
     private:

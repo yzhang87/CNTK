@@ -6,14 +6,9 @@
 
 #include "stdafx.h"
 #include "ImageConfigHelper.h"
-#include <algorithm>
+#include "StringUtils.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
-
-    static bool AreEqualIgnoreCase(const std::string& s1, const std::string& s2)
-    {
-        return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
-    }
 
     ImageConfigHelper::ImageConfigHelper(const ConfigParameters& config)
     {
@@ -70,13 +65,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         string precision = config.Find("precision", "");
         if (AreEqualIgnoreCase(precision, "float"))
         {
-            features->elementType = ElementType::et_float;
-            labels->elementType = ElementType::et_float;
+            features->elementType = ElementType::tfloat;
+            labels->elementType = ElementType::tfloat;
         }
         else if (AreEqualIgnoreCase(precision, "double"))
         {
-            features->elementType = ElementType::et_double;
-            labels->elementType = ElementType::et_double;
+            features->elementType = ElementType::tdouble;
+            labels->elementType = ElementType::tdouble;
         }
         else
         {

@@ -19,7 +19,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             MemoryProviderPtr memoryProvider,
             TransformerPtr transformer,
             size_t minibatchSize,
-            size_t elementSize,
             const std::vector<StreamDescriptionPtr>& streams);
 
         Minibatch ReadMinibatch();
@@ -35,7 +34,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         MBLayoutPtr m_minibatchLayout;
         size_t m_mbSize;
-        size_t m_elementSize;
     };
 
     typedef std::shared_ptr<FrameModePacker> FrameModePackerPtr;

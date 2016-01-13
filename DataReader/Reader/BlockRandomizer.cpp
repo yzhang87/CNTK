@@ -305,9 +305,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         UNREFERENCED_PARAMETER(readerConfig);
     }
 
-    void BlockRandomizer::SetEpochConfiguration(const EpochConfiguration& config)
+    void BlockRandomizer::StartEpoch(const EpochConfiguration& config)
     {
-        m_deserializer->SetEpochConfiguration(config);
+        m_deserializer->StartEpoch(config);
 
         m_workerRank = config.workerRank;
         m_numberOfWorkers = config.numberOfWorkers;
