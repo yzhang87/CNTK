@@ -8,7 +8,7 @@
 
 #include "Reader.h"
 #include "MemoryProvider.h"
-#include "Transform.h"
+#include "Transformer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

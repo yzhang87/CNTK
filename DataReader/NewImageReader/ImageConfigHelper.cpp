@@ -10,7 +10,7 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    static bool AreEqual(const std::string& s1, const std::string& s2)
+    static bool AreEqualIgnoreCase(const std::string& s1, const std::string& s2)
     {
         return std::equal(s1.begin(), s1.end(), s2.begin(), [](const char& a, const char& b) { return std::tolower(a) == std::tolower(b); });
     }
@@ -21,11 +21,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         using SectionT = std::pair<std::string, ConfigParameters>;
         auto getter = [&](const std::string& paramName) -> SectionT
         {
-            auto sect = std::find_if(config.begin(), config.end(),
+            auto sect = std::find_if(
+                config.begin(),
+                config.end(),
                 [&](const std::pair<std::string, ConfigValue>& p)
-            {
-                return ConfigParameters(p.second).ExistsCurrent(paramName);
-            });
+                {
+                    return ConfigParameters(p.second).ExistsCurrent(paramName);
+                });
 
             if (sect == config.end())
             {
@@ -35,9 +37,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         };
 
         std::string rand = config(L"randomize", "auto");
-        if (!AreEqual(rand, "auto"))
+        if (!AreEqualIgnoreCase(rand, "auto"))
         {
-            RuntimeError("Only Auto is currently supported.");
+            RuntimeError("'randomize' parameter currently supports only 'auto' value.");
         }
 
         // REVIEW alexeyk: currently support only one feature and label section.
@@ -66,12 +68,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Identify precision
         string precision = config.Find("precision", "");
-        if (AreEqual(precision, "float"))
+        if (AreEqualIgnoreCase(precision, "float"))
         {
             features->elementType = ElementType::et_float;
             labels->elementType = ElementType::et_float;
         }
-        else if (AreEqual(precision, "double"))
+        else if (AreEqualIgnoreCase(precision, "double"))
         {
             features->elementType = ElementType::et_double;
             labels->elementType = ElementType::et_double;

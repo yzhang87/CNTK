@@ -5,7 +5,7 @@
 
 #include "Reader.h"
 #include "MemoryProvider.h"
-#include "Transform.h"
+#include "Transformer.h"
 #include "commandArgUtil.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {

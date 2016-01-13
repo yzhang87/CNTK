@@ -19,9 +19,6 @@
     <ClInclude Include="SubstitutingMemoryProvider.h">
       <Filter>MemoryProviders</Filter>
     </ClInclude>
-    <ClInclude Include="Transform.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="Reader.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
@@ -29,6 +26,9 @@
       <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="MemoryProvider.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Transformer.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
   </ItemGroup>

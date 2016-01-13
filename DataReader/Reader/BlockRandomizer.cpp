@@ -15,6 +15,8 @@
 namespace Microsoft { namespace MSR { namespace CNTK {
 
     // Shuffle a vector into random order by randomly swapping elements
+    // TODO: This functionality will be changed to std::shuffle - this work will be done during merging to master,
+    // and based on the work Alexey(R) has already done.
     template<typename TVector>
     static void BlockRandomizer::randomShuffle(TVector& v, size_t randomseed)
     {
@@ -41,7 +43,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     static inline size_t rand(const size_t begin, const size_t end)
     {
-        // eldak: this has already been changed by Alexey
+        // eldak: this has already been changed by Alexey(alrezni)
         // still only covers 32-bit range
         const size_t randno = ::rand() * RAND_MAX + ::rand();
         return begin + randno % (end - begin);

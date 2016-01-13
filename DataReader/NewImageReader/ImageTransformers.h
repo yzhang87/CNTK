@@ -11,7 +11,7 @@
 #include <random>
 #include <opencv2/opencv.hpp>
 
-#include "Transform.h"
+#include "Transformer.h"
 #include "ConcStack.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {

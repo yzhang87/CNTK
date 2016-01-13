@@ -84,7 +84,7 @@
     <ClInclude Include="Reader.h" />
     <ClInclude Include="ReaderShim.h" />
     <ClInclude Include="SubstitutingMemoryProvider.h" />
-    <ClInclude Include="Transform.h" />
+    <ClInclude Include="Transformer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BlockRandomizer.cpp" />

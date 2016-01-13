@@ -23,6 +23,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         , m_seed(0)
         , m_elementType(elementType)
     {
+        // In the future, deserializers and transformers will be dynamically loaded 
+        // from external libraries based on the configuration/brain script.
+        // We will provide ability to implement the transformer and 
+        // deserializer interface not only in C++ but in scripting languages as well.
+
         auto configHelper = ImageConfigHelper(config);
         m_streams = configHelper.GetStreams();
         assert(m_streams.size() == 2);
@@ -41,6 +46,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     std::vector<StreamDescriptionPtr> ImageReader::GetStreams()
     {
+        assert(!m_streams.empty());
         return m_streams;
     }
 
@@ -60,7 +66,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     Minibatch ImageReader::ReadMinibatch()
     {
+        assert(m_packer != nullptr);
         return m_packer->ReadMinibatch();
     }
-
 }}}

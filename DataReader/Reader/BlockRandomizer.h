@@ -8,7 +8,7 @@
 
 #include <vector>
 
-#include "Transform.h"
+#include "Transformer.h"
 #include "DataDeserializer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
