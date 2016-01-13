@@ -151,11 +151,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_streams;
     }
 
-    std::vector<std::vector<SequenceData>> Bundler::GetSequencesById(const std::vector<size_t> & ids)
+    std::vector<std::vector<SequenceDataPtr>> Bundler::GetSequencesById(const std::vector<size_t> & ids)
     {
         assert(ids.size() == 1); // TODO
-        std::vector<std::vector<SequenceData>> result;
-        result.push_back(std::vector<SequenceData> { });
+        std::vector<std::vector<SequenceDataPtr>> result;
+        result.push_back(std::vector<SequenceDataPtr> { });
         for (auto& d : m_deserializers)
         {
             auto r = d->GetSequencesById(ids);

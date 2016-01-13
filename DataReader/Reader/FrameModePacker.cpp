@@ -19,10 +19,18 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         : m_transformer(transformer)
         , m_mbSize(minibatchSize)
         , m_elementSize(elementSize)
-        , m_streams(streams)
+        , m_outputStreams(streams)
         , m_minibatchLayout(std::make_shared<MBLayout>())
         , m_memoryProvider(memoryProvider)
     {
+        m_inputStreams = m_transformer->GetStreams();
+        assert(m_inputStreams.size() == m_outputStreams.size());
+        assert(
+            std::find_if(
+                m_outputStreams.begin(),
+                m_outputStreams.end(), 
+                [](const StreamDescriptionPtr& s) { return s->storageType == StorageType::st_sparse_csc; }) == m_outputStreams.end());
+
         for (const auto& stream : streams)
         {
             m_streamBuffers.push_back(AllocateBuffer(m_mbSize * stream->sampleLayout->GetNumElements(), m_elementSize));
@@ -48,11 +56,36 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             assert(m_streamBuffers.size() == images.m_data[i].size());
             for (int j = 0; j < images.m_data[i].size(); ++j)
             {
-                size_t dimensions = m_streams[j]->sampleLayout->GetNumElements() * m_elementSize;
-                std::copy(
-                    reinterpret_cast<char*>(images.m_data[i][j].data),
-                    reinterpret_cast<char*>(images.m_data[i][j].data) + dimensions,
-                    reinterpret_cast<char*>(m_streamBuffers[j].get()) + dimensions * i);
+                size_t dimensions = m_inputStreams[j]->sampleLayout->GetNumElements() * m_elementSize;
+                const char* source = reinterpret_cast<char*>(images.m_data[i][j]->data);
+                if (m_inputStreams[j]->storageType == StorageType::st_dense)
+                {
+                    DenseSequenceData& data = reinterpret_cast<DenseSequenceData&>(*images.m_data[i][j]);
+                    assert(data.numberOfSamples == 1);
+
+                    std::copy(
+                        source,
+                        source + dimensions,
+                        m_streamBuffers[j].get() + dimensions * i);
+                }
+                else if (m_inputStreams[j]->storageType == StorageType::st_sparse_csc)
+                {
+                    SparseSequenceData& data = reinterpret_cast<SparseSequenceData&>(*images.m_data[i][j]);
+                    assert(data.indices.size() == 1);
+
+                    std::fill(m_streamBuffers[j].get() + i * dimensions, m_streamBuffers[j].get() + (i + 1) * dimensions, 0);
+                    size_t nonZeroCount = data.indices[0].size();
+                    for (size_t nonZeroIndex = 0; nonZeroIndex < nonZeroCount; ++nonZeroIndex)
+                    {
+                        size_t rowIndex = data.indices[0][nonZeroIndex];
+                        char* destination = m_streamBuffers[j].get() + dimensions * i + rowIndex * m_elementSize;
+                        std::copy(source + rowIndex * m_elementSize, source + (rowIndex + 1) * m_elementSize, destination);
+                    }
+                }
+                else
+                {
+                    RuntimeError("Storage type %d is not supported.", m_inputStreams[j]->storageType);
+                }
             }
         }
 
@@ -62,9 +95,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         m_minibatchLayout->Init(images.m_data.size(), 1);
-        for (int i = 0; i < m_streams.size(); ++i)
+        for (int i = 0; i < m_outputStreams.size(); ++i)
         {
-            size_t dimensions = m_streams[i]->sampleLayout->GetNumElements() * m_elementSize;
+            size_t dimensions = m_outputStreams[i]->sampleLayout->GetNumElements() * m_elementSize;
             StreamPtr stream = std::make_shared<Stream>();
             stream->data = m_streamBuffers[i].get();
             stream->dataSize = images.m_data.size() * dimensions;
@@ -76,10 +109,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m;
     }
 
-    std::shared_ptr<void> FrameModePacker::AllocateBuffer(size_t numElements, size_t elementSize)
+    std::shared_ptr<char> FrameModePacker::AllocateBuffer(size_t numElements, size_t elementSize)
     {
-        return std::shared_ptr<void>(
-            m_memoryProvider->Alloc(elementSize, numElements),
-            [this](void* p) { m_memoryProvider->Free(p); });
+        return std::shared_ptr<char>(
+            reinterpret_cast<char*>(m_memoryProvider->Alloc(elementSize, numElements)),
+            [this](char* p) { m_memoryProvider->Free(p); });
     }
 }}}

@@ -152,33 +152,33 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return std::vector<StreamDescriptionPtr> { stream };
     }
 
-    std::vector<std::vector<SequenceData>> MLFDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
+    std::vector<std::vector<SequenceDataPtr>> MLFDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
     {
         assert(m_frameMode);
         assert(ids.size() == 1);
         auto id = ids[0];
 
         size_t label = m_classIds[m_frames[id].index];
-        SequenceData r;
+        DenseSequenceDataPtr r = std::make_shared<DenseSequenceData>();
         if (m_elementSize == sizeof(float))
         {
             float* tmp = new float[m_dimension];
             memset(tmp, 0, m_elementSize * m_dimension);
             tmp[label] = 1;
-            r.data = tmp;
+            r->data = tmp;
         }
         else
         {
             double* tmp = new double[m_dimension];
             memset(tmp, 0, m_elementSize * m_dimension);
             tmp[label] = 1;
-            r.data = tmp;
+            r->data = tmp;
         }
 
-        r.numberOfSamples = m_sequences[id]->numberOfSamples;
+        r->numberOfSamples = m_sequences[id]->numberOfSamples;
 
-        std::vector<std::vector<SequenceData>> result;
-        result.push_back(std::vector<SequenceData> { r });
+        std::vector<std::vector<SequenceDataPtr>> result;
+        result.push_back(std::vector<SequenceDataPtr> { r });
         return result;
     }
 

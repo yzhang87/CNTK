@@ -52,7 +52,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual std::vector<StreamDescriptionPtr> GetStreams() const override;
 
-        virtual std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) override;
+        virtual std::vector<std::vector<SequenceDataPtr>> GetSequencesById(const std::vector<size_t> & ids) override;
 
         virtual bool RequireChunk(size_t chunkIndex) override;
 

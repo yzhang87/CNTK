@@ -61,18 +61,21 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (auto id : m_featureStreamIds)
             {
-                sample[id] = Apply(sample[id], m_streams[id]);
+                assert(m_streams[id]->storageType == StorageType::st_dense);
+                const DenseSequenceData& sequence = reinterpret_cast<DenseSequenceData&>(*sample[id]);
+
+                sample[id] = Apply(sequence, m_streams[id]);
             }
         }
 
         return samples;
     }
 
-    SequenceData BaseTransformer::Apply(SequenceData& s, StreamDescriptionPtr stream)
+    SequenceDataPtr BaseTransformer::Apply(const DenseSequenceData& sequence, StreamDescriptionPtr stream)
     {
-        int rows = static_cast<int>(s.layout->GetWidth());
-        int columns = static_cast<int>(s.layout->GetHeight());
-        int channels = static_cast<int>(s.layout->GetNumChannels());
+        int rows = static_cast<int>(sequence.sampleLayout->GetWidth());
+        int columns = static_cast<int>(sequence.sampleLayout->GetHeight());
+        int channels = static_cast<int>(sequence.sampleLayout->GetNumChannels());
 
         int typeId = 0;
         if (stream->elementType == ElementType::et_double)
@@ -89,14 +92,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         int type = CV_MAKETYPE(typeId, channels);
-        m_buffer = cv::Mat(rows, columns, type, s.data);
+        m_buffer = cv::Mat(rows, columns, type, sequence.data);
         this->Apply(m_buffer);
 
-        SequenceData result;
-        result.layout = std::make_shared<ImageLayout>(
+        DenseSequenceDataPtr result = std::make_shared<DenseSequenceData>();
+        result->sampleLayout = std::make_shared<ImageLayout>(
             ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels()));
-        result.numberOfSamples = result.numberOfSamples;
-        result.data = m_buffer.ptr();
+        result->numberOfSamples = sequence.numberOfSamples;
+        result->data = m_buffer.ptr();
         return result;
     }
 

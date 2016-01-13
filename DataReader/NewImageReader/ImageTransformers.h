@@ -26,7 +26,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         using UniRealT = std::uniform_real_distribution<double>;
         using UniIntT = std::uniform_int_distribution<int>;
 
-        SequenceData Apply(SequenceData& mat, StreamDescriptionPtr stream);
+        SequenceDataPtr Apply(const DenseSequenceData& mat, StreamDescriptionPtr stream);
         virtual void Apply(cv::Mat& mat) = 0;
         unsigned int GetSeed() const
         {

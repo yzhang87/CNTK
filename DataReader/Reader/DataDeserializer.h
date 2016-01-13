@@ -20,10 +20,28 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     // Defines sequence data and its layout.
     struct SequenceData
     {
-        void* data;                 // Data
-        size_t numberOfSamples;     // Number of samples in the sequence
-        TensorShapePtr layout;      // Possible layout of data if layout is different per sequence.
+        SequenceData() : data(nullptr) {}
+        void* data;
     };
+
+    typedef std::shared_ptr<SequenceData> SequenceDataPtr;
+
+    struct DenseSequenceData : SequenceData
+    {
+        DenseSequenceData() : numberOfSamples(0) {}
+
+        TensorShapePtr sampleLayout;
+        size_t numberOfSamples; // Number of samples in the sequence
+    };
+
+    typedef std::shared_ptr<DenseSequenceData> DenseSequenceDataPtr;
+
+    struct SparseSequenceData : SequenceData
+    {
+        std::vector<std::vector<size_t>> indices;
+    };
+
+    typedef std::shared_ptr<SparseSequenceData> SparseSequenceDataPtr;
 
     // Interface for reading data from several streams.
     class DataDeserializer
@@ -40,7 +58,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         // Gets sequences by id.
         // The return value can be used until the next call to GetSequencesById.
-        virtual std::vector<std::vector<SequenceData>> GetSequencesById(const std::vector<size_t> & ids) = 0;
+        virtual std::vector<std::vector<SequenceDataPtr>> GetSequencesById(const std::vector<size_t> & ids) = 0;
 
         // Require chunk.
         virtual bool RequireChunk(size_t chunkIndex) = 0;

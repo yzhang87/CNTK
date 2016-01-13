@@ -370,7 +370,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return;
         }
 
-        std::vector<std::vector<SequenceData>> sequences;
+        std::vector<std::vector<SequenceDataPtr>> sequences;
         for (size_t currentIndex = 0; currentIndex < m_requestedMBSize; ++currentIndex)
         {
             auto sequence = m_transformer->GetNextSequences(1 /* TODO */);
@@ -470,7 +470,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (int k = 0; k < actualmbsizeOri; k++) // column major, so iterate columns
             {
-                const void* sequence = sequences[k][streamId].data;
+                const void* sequence = sequences[k][streamId]->data;
 
                 // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
                 memcpy_s(&((char*)m_featuresBufferMultiUtt[parallelSequenceNumber].get())[(k*fdim + m_featuresStartIndexMultiUtt[id + featureSequenceIndex]) * m_elementSize], m_elementSize*fdim, sequence, m_elementSize*fdim);
@@ -502,7 +502,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
             for (int k = 0; k < actualmbsizeOri; k++) // column major, so iterate columns
             {
-                const void* sequence = sequences[k][streamId].data;
+                const void* sequence = sequences[k][streamId]->data;
 
                 // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
                 memcpy_s(&((char*)m_labelsBufferMultiUtt[parallelSequenceNumber].get())[(k*fdim + m_labelsStartIndexMultiUtt[id + labelSequenceIndex]) * m_elementSize], m_elementSize*fdim, sequence, m_elementSize*fdim);
@@ -513,7 +513,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         {
             for(const auto& i : s)
             {
-                delete[] i.data;
+                delete[] i->data;
             }
         }
     }

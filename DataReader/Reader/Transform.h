@@ -16,7 +16,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // Data for up to a requested number of sequences.
         // Indices in the inner vector have to correspond to the stream IDs
         // given by GetStream().
-        std::vector<std::vector<SequenceData>> m_data;
+        std::vector<std::vector<SequenceDataPtr>> m_data;
 
         // Indicates whether the epoch ends with the data returned.
         bool m_endOfEpoch;
