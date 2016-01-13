@@ -67,7 +67,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual std::vector<std::vector<SequenceDataPtr>> GetSequencesById(const std::vector<size_t> & ids) = 0;
 
         // Require chunk.
-        virtual bool RequireChunk(size_t chunkIndex) = 0;
+        virtual void RequireChunk(size_t chunkIndex) = 0;
 
         // Release chunk.
         virtual void ReleaseChunk(size_t chunkIndex) = 0;

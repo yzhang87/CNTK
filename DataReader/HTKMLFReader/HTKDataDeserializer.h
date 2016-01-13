@@ -184,7 +184,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         virtual std::vector<std::vector<SequenceDataPtr>> GetSequencesById(const std::vector<size_t> & ids) override;
 
-        virtual bool RequireChunk(size_t chunkIndex) override;
+        virtual void RequireChunk(size_t chunkIndex) override;
 
         virtual void ReleaseChunk(size_t chunkIndex) override;
 

@@ -100,25 +100,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             assert(description.classId < labelDimension);
             m_imageSequences.push_back(description);
         }
-
-        for (const auto& sequence : m_imageSequences)
-        {
-            m_sequences.push_back(&sequence);
-        }
     }
 
     std::vector<StreamDescriptionPtr> ImageDataDeserializer::GetStreams() const
     {
         return m_streams;
-    }
-
-    void ImageDataDeserializer::SetEpochConfiguration(const EpochConfiguration& /* config */)
-    {
-    }
-
-    const Timeline& ImageDataDeserializer::GetSequenceDescriptions() const
-    {
-        return m_sequences;
     }
 
     std::vector<std::vector<SequenceDataPtr>> ImageDataDeserializer::GetSequencesById(const std::vector<size_t> & ids)
@@ -169,13 +155,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    // TODO RequireChunk: re-ahead here (in cooperation with randomizer requesting images)
-    bool ImageDataDeserializer::RequireChunk(size_t /* chunkIndex */)
+    void ImageDataDeserializer::FillSequenceDescriptions(Timeline& timeline) const
     {
-        return true;
-    }
-
-    void ImageDataDeserializer::ReleaseChunk(size_t /* chunkIndex */)
-    {
+        timeline.resize(m_imageSequences.size());
+        std::transform(m_imageSequences.begin(), m_imageSequences.end(), timeline.begin(), [](const ImageSequenceDescription& desc) { return &desc; });
     }
 }}}

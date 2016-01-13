@@ -242,12 +242,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
     }
 
-    bool HTKDataDeserializer::RequireChunk(size_t chunkIndex)
+    void HTKDataDeserializer::RequireChunk(size_t chunkIndex)
     {
         auto & chunkdata = m_chunks[chunkIndex];
         if (chunkdata.isinram())
         {
-            return false;
+            return;
         }
 
         msra::util::attempt(5, [&]()   // (reading from network)
@@ -260,7 +260,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         });
 
         m_chunksinram++;
-        return true;
     }
 
     void HTKDataDeserializer::ReleaseChunk(size_t chunkIndex)

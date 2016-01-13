@@ -34,7 +34,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         virtual const Timeline& GetSequenceDescriptions() const override;
         virtual std::vector<StreamDescriptionPtr> GetStreams() const override;
         virtual std::vector<std::vector<SequenceDataPtr>> GetSequencesById(const std::vector<size_t> & ids) override;
-        virtual bool RequireChunk(size_t chunkindex) override;
+        virtual void RequireChunk(size_t chunkindex) override;
         virtual void ReleaseChunk(size_t chunkIndex) override;
     };
 

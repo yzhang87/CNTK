@@ -117,17 +117,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         m_streams = streams;
     }
 
-    bool Bundler::RequireChunk(size_t chunkindex)
+    void Bundler::RequireChunk(size_t chunkindex)
     {
         // currently simply redirect
         // todo: we should have a mapping per deserializer actually.
-        bool result = false;
         for (const auto& d: m_deserializers)
         {
-            result |= d->RequireChunk(chunkindex);
+            d->RequireChunk(chunkindex);
         }
-
-        return result;
     }
 
     void Bundler::ReleaseChunk(size_t chunkIndex)

@@ -182,9 +182,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return result;
     }
 
-    bool MLFDataDeserializer::RequireChunk(size_t /*chunkIndex*/)
+    void MLFDataDeserializer::RequireChunk(size_t /*chunkIndex*/)
     {
-        return false;
     }
 
     void MLFDataDeserializer::ReleaseChunk(size_t /*chunkIndex*/)
