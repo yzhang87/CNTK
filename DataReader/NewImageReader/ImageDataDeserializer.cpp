@@ -11,6 +11,13 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+    class ImageDataDeserializer::LabelGenerator
+    {
+    public:
+        virtual void ReadLabelDataFor(SparseSequenceData& data, size_t classId) = 0;
+        virtual ~LabelGenerator() {}
+    };
+
     template<class TElement>
     class TypedLabelGenerator : public ImageDataDeserializer::LabelGenerator
     {
@@ -33,7 +40,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     ImageDataDeserializer::ImageDataDeserializer(const ConfigParameters& config)
     {
-        auto configHelper = ImageConfigHelper(config);
+        ImageConfigHelper configHelper(config);
         m_streams = configHelper.GetStreams();
         assert(m_streams.size() == 2);
         const auto& label = m_streams[configHelper.GetLabelStreamId()];

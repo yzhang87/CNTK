@@ -28,7 +28,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         // We will provide ability to implement the transformer and 
         // deserializer interface not only in C++ but in scripting languages as well.
 
-        auto configHelper = ImageConfigHelper(config);
+        ImageConfigHelper configHelper(config);
         m_streams = configHelper.GetStreams();
         assert(m_streams.size() == 2);
         DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config);

@@ -91,13 +91,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     size_t ImageConfigHelper::GetFeatureStreamId() const
     {
-        // Hard-wired.
+        // Currently we only support a single feature/label stream, so the index is hard-wired.
         return 0;
     }
 
     size_t ImageConfigHelper::GetLabelStreamId() const
     {
-        // Hard-wired.
+        // Currently we only support a single feature/label stream, so the index is hard-wired.
         return 1;
     }
 
