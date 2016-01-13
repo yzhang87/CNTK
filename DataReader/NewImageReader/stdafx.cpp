@@ -1,3 +1,9 @@
+//
+// <copyright company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+
 // stdafx.cpp : source file that includes just the standard includes
 // ParseNumber.pch will be the pre-compiled header
 // stdafx.obj will contain the pre-compiled type information

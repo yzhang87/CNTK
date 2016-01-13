@@ -1,3 +1,9 @@
+//
+// <copyright company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+
 #include "stdafx.h"
 #include "ImageConfigHelper.h"
 #include <algorithm>
