@@ -26,16 +26,19 @@ namespace Microsoft { namespace MSR { namespace CNTK
     public:
         IEvaluateModelManaged(String^ funcName)
         {
+            /*
             pin_ptr<const WCHAR> dllname = PtrToStringChars("evaldll.dll");
             auto hModule = LoadLibrary(dllname);
 
             msclr::interop::marshal_context context;
             const std::string func = context.marshal_as<std::string>(funcName);
             auto procAddress = GetProcAddress(hModule, func.c_str());
+            //auto getEvalProc = (GetEvalProc<ElemType>)procAddress;
+            //getEvalProc(p_eval);
+            */
 
-            auto getEvalProc = (GetEvalProc<ElemType>)procAddress;
             pin_ptr <IEvaluateModel<ElemType>*> p_eval = &m_eval;
-            getEvalProc(p_eval);
+            GetEvalF(p_eval);
         }
 
         void Init(String^ config)
@@ -73,9 +76,10 @@ namespace Microsoft { namespace MSR { namespace CNTK
             {
                 pin_ptr<const WCHAR> key = PtrToStringChars(item.Key);
                 auto stdOutput = new std::pair<std::wstring, std::vector<ElemType>*>(key, CopyList(item.Value->ToArray()));
-                stdInputs.insert(*stdOutput);
+                stdOutputs.insert(*stdOutput);
             }
 
+            m_eval->StartEvaluateMinibatchLoop(L"HLast");
             m_eval->Evaluate(stdInputs, stdOutputs);
         }
 
@@ -85,14 +89,10 @@ namespace Microsoft { namespace MSR { namespace CNTK
 
         std::vector<ElemType>* CopyList(array<ElemType>^ list)
         {
-            std::vector<ElemType>* lower = new std::vector<ElemType>(list->Length);
+            std::vector<ElemType>* lower = new std::vector<ElemType>();
+            for each (auto item in list)
             {
-                pin_ptr<ElemType> pin(&list[0]);
-                std::copy(
-                    static_cast<ElemType*>(pin),
-                    static_cast<ElemType*>(pin + list->Length),
-                    lower->begin()
-                    );
+                lower->push_back(item);
             }
 
             return lower;
@@ -107,7 +107,7 @@ namespace Microsoft { namespace MSR { namespace CNTK
         {
         }
     };
-
+    /*
     public ref class IEvaluateModelManagedD : IEvaluateModelManaged<double>
     {
     public:
@@ -116,7 +116,7 @@ namespace Microsoft { namespace MSR { namespace CNTK
         {
         }
     };
-
+    */
     void emit()
     {
         // This method tricks the compiler into emitting the methods of the classes
@@ -128,10 +128,14 @@ namespace Microsoft { namespace MSR { namespace CNTK
         f.LoadModel("");
         f.Destroy();
         
+        /*
         IEvaluateModelManagedD d;
         d.Init("");
         d.Evaluate(nullptr, nullptr);
         d.LoadModel("");
         d.Destroy();
+        */
     }
+
+
 }}}
