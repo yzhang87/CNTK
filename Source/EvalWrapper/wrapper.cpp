@@ -79,8 +79,20 @@ namespace Microsoft { namespace MSR { namespace CNTK
                 stdOutputs.insert(*stdOutput);
             }
 
-            m_eval->StartEvaluateMinibatchLoop(L"HLast");
+            //m_eval->StartEvaluateMinibatchLoop(L"HLast");
             m_eval->Evaluate(stdInputs, stdOutputs);
+
+            std::vector<ElemType>* vector = stdOutputs.begin()->second;
+            std::vector<ElemType> refVector = (*vector);
+            int index = 0;
+            auto enumerator = outputs->Keys->GetEnumerator();
+            enumerator.MoveNext();
+            String^ key = enumerator.Current;
+
+            for (std::vector<ElemType>::iterator ii = refVector.begin(), e = refVector.end(); ii != e; ii++)
+            {
+                outputs[key][index++] = *ii;
+            }
         }
 
 
