@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net.Configuration;
-using System.Text;
-using System.Threading.Tasks;
+using System.IO;
 using Microsoft.MSR.CNTK;
 
 namespace CSEvalClient
@@ -14,20 +11,24 @@ namespace CSEvalClient
         {
             Console.WriteLine("Creating Model Evaluator...");
             string config = GetConfig();
-            
+
             var model = new IEvaluateModelManagedF();
-            
+
             Console.WriteLine("Initializing Model Evaluator...");
             model.Init(config);
-            
+
             Console.WriteLine("Loading Model...");
-            model.LoadModel("E:\\VSO\\Source\\Repos\\CNTK_CUDA70\\Examples\\Other\\Simple2d\\Output\\Models\\simple.dnn");
+
+            string modelFilePath = Path.Combine(Environment.CurrentDirectory,
+                @"..\..\Examples\Other\Simple2d\Output\Models\simple.dnn");
+            Console.WriteLine("Current Directory: '{0}'", Environment.CurrentDirectory);
+            model.LoadModel(modelFilePath);
             var inputs = GetInputs();
-            var outputs = GetOutputs();
-            
+            Dictionary<string, List<float>> outputs = new Dictionary<string, List<float>>() { { "", new List<float>() { 0, 0 } } };
+
             Console.WriteLine("Evaluating Model...");
             model.Evaluate(inputs, outputs);
-            
+
             Console.WriteLine("Destroying Model...");
             model.Destroy();
 
@@ -37,10 +38,10 @@ namespace CSEvalClient
 
         static Dictionary<string, List<float>> GetInputs()
         {
-            string key1 = "key1";
-            var inputs = new List<float>() {1, 0};
+            string key1 = "features";
+            var inputs = new List<float>() { 1, 0 };
 
-            return new Dictionary<string, List<float>>() {{ key1, inputs }};
+            return new Dictionary<string, List<float>>() { { key1, inputs } };
         }
 
         static Dictionary<string, List<float>> GetOutputs()
