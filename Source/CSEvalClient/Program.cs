@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.MSR.CNTK;
 
 namespace CSEvalClient
@@ -9,6 +11,9 @@ namespace CSEvalClient
     {
         static void Main(string[] args)
         {
+            Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, @"..\..\Examples\Image\MNIST\Data\");
+            Console.WriteLine("Current Directory: {0}", Environment.CurrentDirectory);
+
             Console.WriteLine("Creating Model Evaluator...");
             string config = GetConfig();
 
@@ -20,11 +25,12 @@ namespace CSEvalClient
             Console.WriteLine("Loading Model...");
 
             string modelFilePath = Path.Combine(Environment.CurrentDirectory,
-                @"..\..\Examples\Other\Simple2d\Output\Models\simple.dnn");
-            Console.WriteLine("Current Directory: '{0}'", Environment.CurrentDirectory);
+                @"..\Output\Models\01_OneHidden");
+
             model.LoadModel(modelFilePath);
-            var inputs = GetInputs();
-            Dictionary<string, List<float>> outputs = new Dictionary<string, List<float>>() { { "", new List<float>() { 0, 0 } } };
+
+            var inputs = GetDictionary("features", 28 * 28, 255);
+            var outputs = GetDictionary("ol.z", 10, 100);
 
             Console.WriteLine("Evaluating Model...");
             model.Evaluate(inputs, outputs);
@@ -32,30 +38,33 @@ namespace CSEvalClient
             Console.WriteLine("Destroying Model...");
             model.Destroy();
 
+            foreach (var item in outputs.First().Value)
+            {
+                Console.WriteLine(item);
+            }
+
             Console.WriteLine("Press <Enter> to terminate.");
             Console.ReadLine();
         }
 
-        static Dictionary<string, List<float>> GetInputs()
+        static Dictionary<string, List<float>> GetDictionary(string key, int size, int maxValue)
         {
-            string key1 = "features";
-            var inputs = new List<float>() { 1, 0 };
-
-            return new Dictionary<string, List<float>>() { { key1, inputs } };
-        }
-
-        static Dictionary<string, List<float>> GetOutputs()
-        {
-            string key1 = "key1";
-            var outputs = new List<float>() { 1, 0 };
-
-            return new Dictionary<string, List<float>>() { { key1, outputs } };
+            return new Dictionary<string, List<float>>() { { key, GetFloatArray(size, maxValue) } };
         }
 
         static string GetConfig()
         {
-            var lines = System.IO.File.ReadAllLines(@"E:\VSO\Source\Repos\CNTK_CUDA70\Examples\Other\Simple2d\Config\Simple.config");
-            return string.Join("", lines);
+            string configFilePath = Path.Combine(Environment.CurrentDirectory,
+                    @"..\Config\01_OneHidden.config");
+
+            var lines = System.IO.File.ReadAllLines(configFilePath);
+            return string.Join("\n", lines);
+        }
+
+        static List<float> GetFloatArray(int size, int maxValue)
+        {
+            Random rnd = new Random();
+            return Enumerable.Range(1, size).Select(i => (float)rnd.Next(maxValue)).ToList();
         }
     }
 }
