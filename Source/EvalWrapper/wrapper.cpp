@@ -117,7 +117,7 @@ namespace Microsoft { namespace MSR { namespace CNTK
         }
     };
 
-    int main()
+    void emit()
     {
         // This method tricks the compiler into emitting the methods of the classes
         // Refer to https://msdn.microsoft.com/en-us/library/ms177213.aspx for an
@@ -133,6 +133,5 @@ namespace Microsoft { namespace MSR { namespace CNTK
         d.Evaluate(nullptr, nullptr);
         d.LoadModel("");
         d.Destroy();
-        return 0;
     }
 }}}
