@@ -29,12 +29,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         ImageConfigHelper configHelper(config);
         m_streams = configHelper.GetStreams();
         assert(m_streams.size() == 2);
-        DataDeserializerPtr deserializer = std::make_shared<ImageDataDeserializer>(config);
-        TransformerPtr randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
+        auto deserializer = std::make_shared<ImageDataDeserializer>(config);
+        auto randomizer = std::make_shared<BlockRandomizer>(0, SIZE_MAX, deserializer);
 
-        TransformerPtr cropper = std::make_shared<CropTransformer>();
-        TransformerPtr scaler = std::make_shared<ScaleTransformer>();
-        TransformerPtr mean = std::make_shared<MeanTransformer>();
+        auto cropper = std::make_shared<CropTransformer>();
+        auto scaler = std::make_shared<ScaleTransformer>();
+        auto mean = std::make_shared<MeanTransformer>();
 
         cropper->Initialize(randomizer, config);
         scaler->Initialize(cropper, config);

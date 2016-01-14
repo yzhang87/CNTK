@@ -56,24 +56,28 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             return samples;
         }
 
-        // TODO parallelization like in the original image reader
-        for (auto & sample : samples.m_data)
+        m_buffer.resize(samples.m_data.size());
+
+#pragma omp parallel for ordered schedule(dynamic)
+        for (int i = 0; i < samples.m_data.size(); ++i)
         {
+            auto& sample = samples.m_data[i];
             assert(sample.size() == m_streams.size());
 
-            for (auto id : m_featureStreamIds)
+            m_buffer[i].resize(m_featureStreamIds.size());
+            for (int j = 0; j < m_featureStreamIds.size(); ++j)
             {
+                size_t id = m_featureStreamIds[j];
                 assert(m_streams[id]->storageType == StorageType::dense);
                 const DenseSequenceData& sequence = reinterpret_cast<DenseSequenceData&>(*sample[id]);
-
-                sample[id] = Apply(sequence, m_streams[id]);
+                sample[id] = Apply(sequence, m_streams[id], m_buffer[i][j]);
             }
         }
 
         return samples;
     }
 
-    SequenceDataPtr BaseTransformer::Apply(const DenseSequenceData& sequence, StreamDescriptionPtr stream)
+    SequenceDataPtr BaseTransformer::Apply(const DenseSequenceData& sequence, StreamDescriptionPtr stream, cv::Mat& buffer)
     {
         int rows = static_cast<int>(sequence.sampleLayout->GetWidth());
         int columns = static_cast<int>(sequence.sampleLayout->GetHeight());
@@ -94,14 +98,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
 
         int type = CV_MAKETYPE(typeId, channels);
-        m_buffer = cv::Mat(rows, columns, type, sequence.data);
-        this->Apply(m_buffer);
+        buffer = cv::Mat(rows, columns, type, sequence.data);
+        this->Apply(buffer);
 
-        DenseSequenceDataPtr result = std::make_shared<DenseSequenceData>();
+        auto result = std::make_shared<DenseSequenceData>();
         result->sampleLayout = std::make_shared<ImageLayout>(
-            ImageLayoutWHC(m_buffer.cols, m_buffer.rows, m_buffer.channels()));
+            ImageLayoutWHC(buffer.cols, buffer.rows, buffer.channels()));
         result->numberOfSamples = sequence.numberOfSamples;
-        result->data = m_buffer.ptr();
+        result->data = buffer.ptr();
         return result;
     }
 

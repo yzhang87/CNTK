@@ -136,7 +136,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                 cvImage.convertTo(cvImage, dataType);
             }
 
-            DenseSequenceDataPtr image = std::make_shared<DenseSequenceData>();
+            auto image = std::make_shared<DenseSequenceData>();
             image->data = cvImage.ptr();
             image->sampleLayout = std::make_shared<ImageLayout>(ImageLayoutWHC(cvImage.cols, cvImage.rows, cvImage.channels()));
             image->numberOfSamples = 1;

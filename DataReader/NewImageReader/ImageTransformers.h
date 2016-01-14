@@ -42,7 +42,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         using UniIntT = std::uniform_int_distribution<int>;
 
         // Applies transformation to the image.
-        virtual void Apply(cv::Mat& mat) = 0;
+        virtual void Apply(cv::Mat& from) = 0;
 
         // Seed  getter.
         unsigned int GetSeed() const { return m_seed;}
@@ -52,12 +52,12 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
     private:
         // Applies transformation to the sequence.
-        SequenceDataPtr Apply(const DenseSequenceData& mat, StreamDescriptionPtr stream);
+        SequenceDataPtr Apply(const DenseSequenceData& sequence, StreamDescriptionPtr stream, cv::Mat& buffer);
 
         std::vector<StreamId> m_featureStreamIds;
         TransformerPtr m_next;
         unsigned int m_seed;
-        cv::Mat m_buffer;
+        std::vector<std::vector<cv::Mat>> m_buffer;
     };
 
     class CropTransformer : public BaseTransformer

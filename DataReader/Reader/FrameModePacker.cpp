@@ -101,7 +101,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         for (int i = 0; i < m_outputStreams.size(); ++i)
         {
             size_t dimensions = m_outputStreams[i]->sampleLayout->GetNumElements() * GetSizeByType(m_outputStreams[i]->elementType);
-            StreamPtr stream = std::make_shared<Stream>();
+            auto stream = std::make_shared<Stream>();
             stream->data = m_streamBuffers[i].get();
             stream->dataSize = images.m_data.size() * dimensions;
             stream->layout = m_minibatchLayout;
