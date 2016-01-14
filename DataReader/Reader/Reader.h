@@ -84,6 +84,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     };
 
     // Main Reader interface. The border interface between the CNTK and Reader.
+    // TODO: possibly except the matrices in the ReadMinibatch.
     class Reader
     {
     public:

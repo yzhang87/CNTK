@@ -57,7 +57,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     };
     typedef std::shared_ptr<SparseSequenceData> SparseSequenceDataPtr;
 
-    // Interface for reading data from several streams.
+    // Data deserializers are intimately familiar with a particular input formats and responsbille for reading the serialized data 
+    // into sequences in memory. Very often data for different streams (i.e. features/lattices) reside in the same physical storage (file),
+    // so the data deserializer can expose not a single but several streams. Examples of data include image data deserializer 
+    // or htkmlf data deserializer .
     class DataDeserializer
     {
     public:

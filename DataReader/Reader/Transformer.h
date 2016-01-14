@@ -38,6 +38,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     typedef std::shared_ptr<Transformer> TransformerPtr;
 
     // Defines a data transformation interface.
+    // Transformers are responsible for doing custom transformation of sequences.
+    // For example for images, there could be scale, crop, or median transformation.
+    // Transformations can be chained together and 
     class Transformer
     {
     public:
