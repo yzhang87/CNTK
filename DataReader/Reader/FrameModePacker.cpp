@@ -82,7 +82,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
                     {
                         size_t rowIndex = data.indices[0][nonZeroIndex];
                         char* destination = m_streamBuffers[j].get() + dimensions * i + rowIndex * elementSize;
-                        std::copy(source + rowIndex * elementSize, source + (rowIndex + 1) * elementSize, destination);
+                        std::copy(source + nonZeroIndex * elementSize, source + (nonZeroIndex + 1) * elementSize, destination);
                     }
                 }
                 else
