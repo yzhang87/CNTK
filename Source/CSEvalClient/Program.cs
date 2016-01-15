@@ -1,44 +1,53 @@
-﻿using System;
+﻿//
+// <copyright file="Program.cs" company="Microsoft">
+//     Copyright (c) Microsoft Corporation.  All rights reserved.
+// </copyright>
+//
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using Microsoft.MSR.CNTK;
 
 namespace CSEvalClient
 {
     class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, @"..\..\Examples\Image\MNIST\Data\");
             Console.WriteLine("Current Directory: {0}", Environment.CurrentDirectory);
 
             Console.WriteLine("Creating Model Evaluator...");
-            string config = GetConfig();
-
             var model = new IEvaluateModelManagedF();
 
             Console.WriteLine("Initializing Model Evaluator...");
+            string config = GetConfig();
             model.Init(config);
 
             Console.WriteLine("Loading Model...");
-
-            string modelFilePath = Path.Combine(Environment.CurrentDirectory,
-                @"..\Output\Models\01_OneHidden");
-
+            string modelFilePath = Path.Combine(Environment.CurrentDirectory, @"..\Output\Models\01_OneHidden");
             model.LoadModel(modelFilePath);
 
             var inputs = GetDictionary("features", 28 * 28, 255);
             var outputs = GetDictionary("ol.z", 10, 100);
 
-            Console.WriteLine("Evaluating Model...");
-            model.Evaluate(inputs, outputs);
+            Console.WriteLine("Press <Enter> to begin evaluating.");
+            Console.ReadLine();
+
+            List<float> outputList = null;
+            for (int i = 0; i < 10; i++)
+            {
+                Console.WriteLine("Evaluating Model...");
+                outputList = model.Evaluate(inputs, "ol.z", 10);  // return results
+                model.Evaluate(inputs, outputs);                    // Pass result structure
+            }
 
             Console.WriteLine("Destroying Model...");
             model.Destroy();
 
-            foreach (var item in outputs.First().Value)
+            Console.WriteLine("Output contents:");
+            foreach (var item in outputs)
             {
                 Console.WriteLine(item);
             }
