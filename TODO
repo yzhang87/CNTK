@@ -1,9 +1,0 @@
-Changes
-    Dropped these modifications:
-        modified:   DataReader/ImageReader/Exports.cpp
-        modified:   DataReader/ImageReader/ImageReader.cpp
-    We used them to make the baselines with the original reader (bugfix from master).
-
-To do
-- reader-proto-check.bat: needs to run NewHTKMLFReader for QuickE2E and ReaderTests
-

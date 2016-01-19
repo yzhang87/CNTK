@@ -1,7 +1,6 @@
 //
-// <copyright company="Microsoft">
-//     Copyright (c) Microsoft Corporation.  All rights reserved.
-// </copyright>
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 //
 
 #pragma once
@@ -13,31 +12,30 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-    class CudaMemoryProvider : public MemoryProvider
+class CudaMemoryProvider : public MemoryProvider
+{
+    std::unique_ptr<CUDAPageLockedMemAllocator> m_allocator;
+
+public:
+    CudaMemoryProvider(int deviceId)
     {
-        std::unique_ptr<CUDAPageLockedMemAllocator> m_allocator;
+        m_allocator = std::make_unique<CUDAPageLockedMemAllocator>(deviceId);
+    }
 
-    public:
-        CudaMemoryProvider(int deviceId)
+    virtual void* Alloc(size_t elementSize, size_t numberOfElements) override
+    {
+        size_t totalSize = elementSize * numberOfElements;
+        return m_allocator->Malloc(totalSize);
+    }
+
+    virtual void Free(void* p) override
+    {
+        if (!p)
         {
-            m_allocator = std::make_unique<CUDAPageLockedMemAllocator>(deviceId);
+            return;
         }
 
-        virtual void* Alloc(size_t elementSize, size_t numberOfElements) override
-        {
-            size_t totalSize = elementSize * numberOfElements;
-            return m_allocator->Malloc(totalSize);
-        }
-
-        virtual void Free(void* p) override
-        {
-            if (!p)
-            {
-                return;
-            }
-
-            m_allocator->Free(reinterpret_cast<char*>(p));
-        }
-    };
-
-}}}
+        m_allocator->Free(reinterpret_cast<char*>(p));
+    }
+};
+} } }
