@@ -16,7 +16,8 @@ makeMode=false
 
 Simple_Test = [
     reader=[
-      readerType=HTKMLFReader
+      # TODO don't merge:
+      readerType=NewHTKMLFReader
       readMethod=blockRandomize
       miniBatchMode=Partial
       randomize=Auto

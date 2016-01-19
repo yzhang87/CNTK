@@ -184,3 +184,8 @@ MachineLearning/CNTK/buildinfo.h$$
 
 
 *.lyx#
+
+ImageTest/Data
+ImageTest/_out
+
+Tests/UnitTests/ReaderTests/Data/HTKMLFReaderSimpleDataLoop_Data.txt
