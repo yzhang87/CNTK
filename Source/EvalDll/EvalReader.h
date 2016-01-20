@@ -25,8 +25,20 @@ private:
     size_t m_mbSize;
     vector<size_t> m_switchFrame;
     size_t m_oldSig;
+    size_t m_lastRead;
 
+    bool m_singleFrameMode;
 public:
+    void SetSingleFrameMode(bool onlySingleFrames)
+    {
+        m_singleFrameMode = onlySingleFrames;
+    }
+
+    bool IsSingleFrameMode()
+    {
+        return m_singleFrameMode;
+    }
+
     // Method to setup the data for the reader
     void SetData(std::map<std::wstring, std::vector<ElemType>*>* inputs, std::map<std::wstring, size_t>* dimensions)
     {
@@ -34,12 +46,21 @@ public:
         m_dimensions = dimensions;
         m_currentRecord = 0;
         m_recordCount = 0;
+        m_lastRead = 0;
+
         for (auto iter = inputs->begin(); iter != inputs->end(); ++iter)
         {
             // figure out the dimension of the data
             const std::wstring& val = iter->first;
             size_t count = (*inputs)[val]->size();
-            size_t rows = (*dimensions)[val];
+            auto r = dimensions->find(val);
+
+            if (r == dimensions->end())
+            {
+                LogicError("Expected entry in dimensions map for input with name '%ls', but couldn't find it.", val.c_str());
+            }
+
+            size_t rows = r->second;
             size_t recordCount = count / rows;
 
             if (m_recordCount != 0)
@@ -110,7 +131,8 @@ public:
     // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
     virtual void StartMinibatchLoop(size_t mbSize, size_t /*epoch*/, size_t /*requestedEpochSamples=requestDataSize*/)
     {
-        m_mbSize = min(mbSize, m_recordCount);
+        m_mbSize = min(mbSize,m_recordCount);
+        m_currentRecord = 0;
     }
 
     // GetMinibatch - Get the next minibatch (features and labels)
@@ -120,7 +142,7 @@ public:
     virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>& matrices)
     {
         // how many records are we reading this time
-        size_t recordCount = min(m_mbSize, m_recordCount - m_currentRecord);
+        size_t recordCount = m_lastRead = min(m_mbSize, m_recordCount - m_currentRecord);
 
         // check to see if we are out of records in this current dataset
         if (m_currentRecord >= m_recordCount)
@@ -183,41 +205,46 @@ public:
     }
     void CopyMBLayoutTo(MBLayoutPtr pMBLayout)
     {
-        assert(m_switchFrame.size() == 1);
-        pMBLayout->Init(1, m_mbSize);
+        assert(m_switchFrame.size() == 1);        
+        pMBLayout->Init(1, m_lastRead);
 
-        // BUGBUG: The following code is somewhat broken in that the structure of this module only keeps track of new sentence starts,
-        //         but not of ends. But end markers are now required by the MBLayout. So we must fake the end markers.
-        //         That will fail if the previous sentence end fell on the boundary; then we will miss the end flag.
-        //         This still works for a left-to-right model since for eval we only really look at the start flag.
-        //         So we get lucky, sort of. Not nice.
-        //         The correct solution is to rewrite this entire module to be more direct; no Reader needed, we can call ForwardProp() directly.
-        // BUGBUG: The module also does not keep track of the actual start in the past. So we fake the start, too.
-        //         There are boundary cases where this will be incorrect for models with a delay of >1 step.
-        if (m_switchFrame[0] < m_mbSize) /* there is a switch frame within the minibatch */
+        if (m_singleFrameMode)
         {
-            // finish the current sequence
-            if (m_switchFrame[0] > 0) // BUGBUG: gonna miss the previous end flag if starting on frame [0], see above.
-                pMBLayout->AddSequence(0, 0, -1, m_switchFrame[0] - 1);
-            // start the new sequence
-            // We use a fake end of 1 frame beyond the actual end of the minibatch.
-            pMBLayout->AddSequence(0, 0, m_switchFrame[0], m_mbSize + 1);
-            //pMBLayout->Set(0, m_switchFrame[0], MinibatchPackingFlags::SequenceStart);
-            //if (m_switchFrame[0] > 0)
-            //    pMBLayout->Set(0, m_switchFrame[0] - 1, MinibatchPackingFlags::SequenceEnd);   // TODO: can't we use Set()?
+            pMBLayout->InitAsFrameMode(m_lastRead);
         }
-        else // all frames in this MB belong to the same utterance
+        else
         {
-            // no boundary inide the MB: fake a sequence that spans 1 frame on each side.  BUGBUG: That's wrong for delays of > 1 step, see above.
-            pMBLayout->AddSequence(0, 0, -1, m_mbSize + 1); // BUGBUG: gonna miss the end flag if it ends at end of this MB, see above
+            // BUGBUG: The following code is somewhat broken in that the structure of this module only keeps track of new sentence starts,
+            //         but not of ends. But end markers are now required by the MBLayout. So we must fake the end markers.
+            //         That will fail if the previous sentence end fell on the boundary; then we will miss the end flag.
+            //         This still works for a left-to-right model since for eval we only really look at the start flag.
+            //         So we get lucky, sort of. Not nice.
+            //         The correct solution is to rewrite this entire module to be more direct; no Reader needed, we can call ForwardProp() directly.
+            // BUGBUG: The module also does not keep track of the actual start in the past. So we fake the start, too.
+            //         There are boundary cases where this will be incorrect for models with a delay of >1 step.
+            if (m_switchFrame[0] < m_lastRead)    /* there is a switch frame within the minibatch */
+            {
+                // finish the current sequence
+                if (m_switchFrame[0] > 0)       // BUGBUG: gonna miss the previous end flag if starting on frame [0], see above.
+                    pMBLayout->AddSequence(0, 0, -1, m_switchFrame[0] - 1);
+                // start the new sequence
+                // We use a fake end of 1 frame beyond the actual end of the minibatch.
+                pMBLayout->AddSequence(0, 0, m_switchFrame[0], m_lastRead + 1);
+                //pMBLayout->Set(0, m_switchFrame[0], MinibatchPackingFlags::SequenceStart);
+                //if (m_switchFrame[0] > 0)
+                //    pMBLayout->Set(0, m_switchFrame[0] - 1, MinibatchPackingFlags::SequenceEnd);   // TODO: can't we use Set()?
+            }
+            else                                // all frames in this MB belong to the same utterance
+            {
+                // no boundary inside the MB: fake a sequence that spans 1 frame on each side.  BUGBUG: That's wrong for delays of > 1 step, see above.
+                pMBLayout->AddSequence(0, 0, -1, m_lastRead + 1); // BUGBUG: gonna miss the end flag if it ends at end of this MB, see above
+            }
         }
     }
 
-    void GetSentenceBoundary(std::vector<size_t> boundaryInfo)
+    void SetSentenceBoundary(const std::vector<size_t>& boundaryInfo)
     {
-        m_switchFrame.resize(boundaryInfo.size());
-        for (size_t i = 0; i < m_switchFrame.size(); i++)
-            m_switchFrame[i] = boundaryInfo[i];
+        m_switchFrame = boundaryInfo;
     }
 
     void SetRandomSeed(int)

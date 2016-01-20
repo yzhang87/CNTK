@@ -75,7 +75,7 @@ void ComputationNodeBase::ValidateBinaryZip(bool isFinalValidationPass, bool all
                                    (allowMultiples && (rows0 == 1 || rows1 == 1) && (Input(0)->GetMBLayout() == Input(1)->GetMBLayout() || cols0 == cols1)) ||                                 // one is row vec
                                    (allowMultiples && ((!HasMBLayout() && cols0 > cols1 && cols0 % cols1 == 0) || (cols0 == 1 && rows1 % rows0 == 0) || (cols1 == 1 && rows0 % rows1 == 0))))) // TODO: ^^ I don't understand the asymmetry of this last one
     {
-        LogicError("The Matrix dimensions in the %ls %ls operation do not match.", NodeName().c_str(), OperationName().c_str());
+        LogicError("The Matrix dimensions in the %ls %ls operation do not match. Input 0: [%d,%d], Input 1: [%d,%d]", NodeName().c_str(), OperationName().c_str(), rows0, cols0, rows1, cols1);
     }
 #else
     rows0;
@@ -125,7 +125,7 @@ void ComputationNodeBase::ValidateBinaryReduce(bool isFinalValidationPass)
     if (isFinalValidationPass &&
         !(Input(0)->GetNumRows() == Input(1)->GetNumRows() &&
           (Input(0)->HasMBLayout() || (Input(0)->GetNumCols() == Input(1)->GetNumCols()))))
-        LogicError("The Matrix dimensions in the %ls %ls operation do not match.", NodeName().c_str(), OperationName().c_str());
+        LogicError("The Matrix dimensions in the %ls %ls operation do not match. Input 0: [%d,%d], Input 1:[%d,%d]", NodeName().c_str(), OperationName().c_str(), Input(0)->GetNumRows(), Input(0)->GetNumCols(), Input(1)->GetNumRows(), Input(1)->GetNumCols());
     SetDims(TensorShape(1), 1);
 }
 // helper function for validation

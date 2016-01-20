@@ -56,9 +56,12 @@ public:
                 const auto& node = m_net->GetNodeFromName(evalNodeNames[i]);
                 if (!criteriaLogged.insert(node).second)
                     continue;
-                //m_net->BuildAndValidateSubNetwork(node);
                 if (node->GetNumRows() != 1 || node->GetNumCols() != 1)
-                    InvalidArgument("Criterion nodes to evaluate must have dimension 1x1.");
+                    InvalidArgument("All criterion nodes to evaluate must have dimension [1,1], "
+                                    "but '%ls' node has dimension [%lu,%lu].",
+                                    node->GetName().c_str(),
+                                    static_cast<unsigned long>(node->GetNumRows()),
+                                    static_cast<unsigned long>(node->GetNumCols()));
                 evalNodes.push_back(node);
             }
         }

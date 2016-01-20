@@ -1,4 +1,4 @@
-// SGD.cpp -- implements SGD with all bells and whistles, parallelization, randomizatiom, etc.
+﻿// SGD.cpp -- implements SGD with all bells and whistles, parallelization, randomizatiom, etc.
 
 #define _CRT_SECURE_NO_WARNINGS // "secure" CRT not available on all platforms  --add this at the top of all CPP files that give "function or variable may be unsafe" warnings
 
@@ -1669,9 +1669,9 @@ size_t SGD<ElemType>::AdaptiveMinibatchSizing(ComputationNetworkPtr net,
     if (epochNumber < 2 && m_prevChosenMinibatchSize != 0)
     {
         // newly started training: any previous MB size stored in the model is to be ignored
-        fprintf(stderr, "before epoch .2, previous minibatchSize %zd is "
+        fprintf(stderr, "before epoch .2, previous minibatchSize %lu is "
                         "considered invalid -> resetting\n",
-                m_prevChosenMinibatchSize);
+                static_cast<unsigned long>(m_prevChosenMinibatchSize));
         m_prevChosenMinibatchSize = 0;
     }
 
@@ -1681,8 +1681,8 @@ size_t SGD<ElemType>::AdaptiveMinibatchSizing(ComputationNetworkPtr net,
         (epochNumber + 1) % m_minibatchSizeTuningFrequency != 0)
     {
         fprintf(stderr, "AdaptiveMinibatchSearch: Search for a better minibatchSize "
-                        "in epoch %d skipped, keeping minibatchSize of %zd\n",
-                epochNumber + 1, m_prevChosenMinibatchSize);
+                        "in epoch %d skipped, keeping minibatchSize of %lu\n",
+                epochNumber + 1, static_cast<unsigned long>(m_prevChosenMinibatchSize));
         chosenMinibatchSize = m_prevChosenMinibatchSize;
     }
     else
@@ -1706,8 +1706,8 @@ size_t SGD<ElemType>::AdaptiveMinibatchSizing(ComputationNetworkPtr net,
             assert(m_prevChosenMinibatchSize >= chosenMinibatchSize);
 
             fprintf(stderr, "AdaptiveMinibatchSearch: Limiting maxMinibatchSize to "
-                            "previous minibatchSize %zd*2\n",
-                    m_prevChosenMinibatchSize);
+                            "previous minibatchSize %lu*2\n",
+                    static_cast<unsigned long>(m_prevChosenMinibatchSize));
             maxMinibatchSize = min(maxMinibatchSize, m_prevChosenMinibatchSize * 2);
         }
 
@@ -1774,8 +1774,10 @@ size_t SGD<ElemType>::SearchForBestMinibatchSize(ComputationNetworkPtr net,
         // round mbsize to something meaningful
         trialMinibatchSize = RoundToMultipleOf64(trialMinibatchSizeFloat);
 
-        fprintf(stderr, "\nAdaptiveMinibatchSearch: Evaluating trial minibatchSize=%zd out of range %zd..%zd ...\n\n",
-                trialMinibatchSize, RoundToMultipleOf64(minMinibatchSize), RoundToMultipleOf64(maxMinibatchSize));
+        fprintf(stderr, "\nAdaptiveMinibatchSearch: Evaluating trial minibatchSize=%lu out of range %lu..%lu ...\n\n",
+                static_cast<unsigned long>(trialMinibatchSize), 
+                static_cast<unsigned long>(RoundToMultipleOf64(minMinibatchSize)), 
+                static_cast<unsigned long>(RoundToMultipleOf64(maxMinibatchSize)));
 
         size_t totalSamplesSeen;
         std::vector<double> epochEvalErrors(evaluationNodes.size(), std::numeric_limits<double>::infinity());

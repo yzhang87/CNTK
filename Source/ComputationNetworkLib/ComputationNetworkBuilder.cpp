@@ -21,6 +21,7 @@
 #include "CompositeComputationNodes.h"
 #include "EvaluationCriterionNodes.h"
 #include "EsotericNodes.h"
+#include "InstrumentationNodes.h"
 
 #include <string>
 
@@ -162,6 +163,8 @@ static shared_ptr<ComputationNode<ElemType>> CreateStandardNode(const std::wstri
         return New<TimeReverseNode<ElemType>>(forward<_Types>(_Args)...);
     else if (nodeType == OperationNameOf(TimesNode))
         return New<TimesNode<ElemType>>(forward<_Types>(_Args)...);
+    else if (nodeType == OperationNameOf(TraceNode))
+        return New<TraceNode<ElemType>>(forward<_Types>(_Args)...);
     else if (nodeType == OperationNameOf(TransposeNode))
         return New<TransposeNode<ElemType>>(forward<_Types>(_Args)...);
     else if (nodeType == OperationNameOf(TransposeTimesNode))
@@ -588,6 +591,11 @@ shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::Scale
     return net.AddNodeToNetAndAttachInputs(New<ScaleNode<ElemType>>(net.GetDeviceId(), nodeName), scalar, matrix);
 }
 #endif
+
+template<class ElemType> shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::Trace(const ComputationNodePtr input, const std::wstring nodeName)
+{
+    return net.AddNodeToNetAndAttachInputs(New<TraceNode<ElemType>>(net.GetDeviceId(), nodeName), input);
+}
 
 template <class ElemType>
 shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::Transpose(const ComputationNodePtr matrix, const std::wstring nodeName)
