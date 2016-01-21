@@ -110,7 +110,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>EVALDLL;WIN32;_DEBUG;_WINDOWS;_USRDLL;UCIREADER_EXPORTS;CPUONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CPUONLY;EVALDLL;WIN32;_DEBUG;_WINDOWS;_USRDLL;UCIREADER_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\Common\include;..\Math\Math;"c:\Program Files\NVIDIA Corporation\GDK\gdk_win7_amd64_release\nvml\include"</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -119,7 +119,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>ComputationNetworkLib.lib; Math.lib; kernel32.lib; user32.lib; shell32.lib; SequenceTrainingLib.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ComputationNetworkLib.lib;Math.lib;kernel32.lib;user32.lib;shell32.lib;SequenceTrainingLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)$(Platform)\$(Configuration)\; "c:\Program Files\NVIDIA Corporation\GDK\gdk_win7_amd64_release\nvml\lib"</AdditionalLibraryDirectories>
       <DelayLoadDLLs>Math.dll; nvml.dll; cudart64_70.dll</DelayLoadDLLs>
     </Link>
