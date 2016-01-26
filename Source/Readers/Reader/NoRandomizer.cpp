@@ -23,7 +23,8 @@ NoRandomizer::NoRandomizer(DataDeserializerPtr deserializer)
     {
         if (s->m_numberOfSamples != 1)
         {
-            RuntimeError("Currently, no randomizer supports only frame mode. Received a sequence with %d number of samples.", s->m_numberOfSamples);
+            RuntimeError("Currently, no randomizer supports only frame mode. Received a sequence with %d number of samples.",
+                         static_cast<int>(s->m_numberOfSamples));
         }
     }
 }
