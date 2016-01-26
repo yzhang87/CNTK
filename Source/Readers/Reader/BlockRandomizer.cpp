@@ -251,7 +251,7 @@ void BlockRandomizer::RandomizeForGlobalSamplePosition(const size_t samplePositi
 BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr deserializer)
     : m_verbosity(verbosity),
       m_randomizationRangeInSamples(randomizationRangeInSamples),
-      m_distributionMode(DistributionMode::chunk_modulus),
+      m_distributionMode(DistributionMode::sequences_strides),
       m_deserializer(deserializer),
       m_sweep(SIZE_MAX),
       m_sequencePositionInSweep(SIZE_MAX),
@@ -364,7 +364,7 @@ bool BlockRandomizer::GetNextSequenceIds(size_t sampleCount, std::vector<size_t>
             size_t strideBegin = distributedSampleCount * m_workerRank / m_numberOfWorkers;
             size_t strideEnd = distributedSampleCount * (m_workerRank + 1) / m_numberOfWorkers;
 
-            for (size_t i = 0; i < distributedSampleCount; ++m_samplePositionInEpoch, ++m_sequencePositionInSweep)
+            for (size_t i = 0; i < distributedSampleCount; ++i, ++m_samplePositionInEpoch, ++m_sequencePositionInSweep)
             {
                 RandomizeIfNewSweepIsEntered();
                 if (strideBegin <= i && i < strideEnd)
