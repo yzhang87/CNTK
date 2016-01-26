@@ -114,7 +114,7 @@ void BlockRandomizer::RandomizeChunks()
         }
         while (chunk.m_info.m_samplePositionStart - m_randomizedChunks[chunk.m_windowBegin].m_info.m_samplePositionStart > halfWindowRange)
             chunk.m_windowBegin++; // too early
-        // TODO m_randomizedChunks[chunk.windowend + 1].info.samplePositionStart - m_randomizedChunks[chunk.windowbegin].info.samplePositionStart < m_randomizationRangeInSamples 
+        // TODO m_randomizedChunks[chunk.windowend + 1].info.samplePositionStart - m_randomizedChunks[chunk.windowbegin].info.samplePositionStart < m_randomizationRangeInSamples
         while (chunk.m_windowEnd < m_numChunks &&
                m_randomizedChunks[chunk.m_windowEnd + 1].m_info.m_samplePositionStart - chunk.m_info.m_samplePositionStart < halfWindowRange)
             chunk.m_windowEnd++; // got more space
@@ -370,21 +370,24 @@ Sequences BlockRandomizer::GetNextSequences(size_t sampleCount)
         return result;
     }
 
-    // Require and release chunks from the data deserializer
+    // Require and release chunks from the data deserializer, but only fo this worker
     const size_t windowBegin = m_randomizedChunks[m_sequencePositionToChunkIndex[ids[0]]].m_windowBegin;
     const size_t windowEnd = m_randomizedChunks[m_sequencePositionToChunkIndex[ids.back()]].m_windowEnd;
 
     for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
     {
-        auto originalChunkIndex = m_randomizedChunks[chunkId].m_originalChunkIndex;
+        if ((chunkId % m_numberOfWorkers) == m_workerRank)
+        {
+            auto originalChunkIndex = m_randomizedChunks[chunkId].m_originalChunkIndex;
 
-        if (windowBegin <= chunkId && chunkId < windowEnd)
-        {
-            m_deserializer->RequireChunk(originalChunkIndex);
-        }
-        else
-        {
-            m_deserializer->ReleaseChunk(originalChunkIndex);
+            if (windowBegin <= chunkId && chunkId < windowEnd)
+            {
+                m_deserializer->RequireChunk(originalChunkIndex);
+            }
+            else
+            {
+                m_deserializer->ReleaseChunk(originalChunkIndex);
+            }
         }
     }
 
