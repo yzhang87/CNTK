@@ -215,6 +215,9 @@ void BlockRandomizer::Randomize()
 
 void BlockRandomizer::RandomizeIfNewSweepIsEntered()
 {
+    // Check that StartEpoch() was called
+    assert(m_sequencePositionInSweep != SIZE_MAX);
+
     if (m_sequencePositionInSweep >= m_numSequences)
     {
         if (m_verbosity > 0)
@@ -223,7 +226,8 @@ void BlockRandomizer::RandomizeIfNewSweepIsEntered()
         m_sweep++;
         m_sweepStartInSamples += m_numSamples;
         Randomize();
-        m_sequencePositionInSweep = 0;
+        m_sequencePositionInSweep -= m_numSequences;
+        assert(m_sequencePositionInSweep < m_numSequences); // cannot jump ahead more than a sweep
     };
 }
 
@@ -237,7 +241,7 @@ void BlockRandomizer::RandomizeForGlobalSamplePosition(const size_t samplePositi
         m_sweepStartInSamples = sweep * m_numSamples;
         Randomize();
     }
-    m_sequencePositionInSweep = samplePosition % m_numSamples;
+    m_sequencePositionInSweep = samplePosition % m_numSamples; // TODO only for m_frameMode
 };
 
 //
@@ -245,7 +249,14 @@ void BlockRandomizer::RandomizeForGlobalSamplePosition(const size_t samplePositi
 //
 
 BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSamples, DataDeserializerPtr deserializer)
-    : m_verbosity(verbosity), m_randomizationRangeInSamples(randomizationRangeInSamples), m_deserializer(deserializer), m_sweep(SIZE_MAX), m_sequencePositionInSweep(SIZE_MAX), m_samplePositionInEpoch(SIZE_MAX), m_epochSize(SIZE_MAX)
+    : m_verbosity(verbosity),
+      m_randomizationRangeInSamples(randomizationRangeInSamples),
+      m_distributionMode(DistributionMode::chunk_modulus),
+      m_deserializer(deserializer),
+      m_sweep(SIZE_MAX),
+      m_sequencePositionInSweep(SIZE_MAX),
+      m_samplePositionInEpoch(SIZE_MAX),
+      m_epochSize(SIZE_MAX)
 {
     assert(deserializer != nullptr);
     const SequenceDescriptions& timeline = m_deserializer->GetSequenceDescriptions();
@@ -316,22 +327,54 @@ void BlockRandomizer::StartEpoch(const EpochConfiguration& config)
     RandomizeForGlobalSamplePosition(timeframe);
 };
 
-bool BlockRandomizer::AdvanceToNextPositionForThisWorker()
+bool BlockRandomizer::GetNextSequenceIds(size_t sampleCount, std::vector<size_t>& originalIds)
 {
-    while (m_samplePositionInEpoch < m_epochSize)
+    assert(m_frameMode); // TODO !m_frameMode not implemented yet
+    assert(originalIds.size() == 0);
+    assert(sampleCount < m_numSamples);
+
+    if (m_samplePositionInEpoch < m_epochSize)
     {
-        RandomizeIfNewSweepIsEntered();
-
-        const auto& seqDesc = m_randomTimeline[m_sequencePositionInSweep];
-
-        if ((seqDesc.m_chunkId % m_numberOfWorkers) == m_workerRank)
+        if (m_distributionMode == DistributionMode::chunk_modulus)
         {
-            // Got one
-            break;
-        }
+            assert(m_numberOfWorkers == 1); // TODO needs implementation
 
-        m_samplePositionInEpoch += seqDesc.m_numberOfSamples;
-        m_sequencePositionInSweep++;
+            while ((m_samplePositionInEpoch < m_epochSize) &&
+                   (originalIds.size() < sampleCount))
+            {
+                RandomizeIfNewSweepIsEntered();
+
+                const auto& seqDesc = m_randomTimeline[m_sequencePositionInSweep];
+                if ((seqDesc.m_chunkId % m_numberOfWorkers) == m_workerRank)
+                {
+                    // Got one, collect it
+                    originalIds.push_back(seqDesc.m_id);
+                }
+
+                m_samplePositionInEpoch += seqDesc.m_numberOfSamples;
+                m_sequencePositionInSweep++;
+            }
+        }
+        else
+        {
+            assert(m_distributionMode == DistributionMode::sequences_strides);
+
+            size_t nextSamplePositionInEpoch = std::min(m_epochSize, m_samplePositionInEpoch + sampleCount);
+            size_t distributedSampleCount = nextSamplePositionInEpoch - m_samplePositionInEpoch;
+            size_t strideBegin = distributedSampleCount * m_workerRank / m_numberOfWorkers;
+            size_t strideEnd = distributedSampleCount * (m_workerRank + 1) / m_numberOfWorkers;
+
+            for (size_t i = 0; i < distributedSampleCount; ++m_samplePositionInEpoch, ++m_sequencePositionInSweep)
+            {
+                RandomizeIfNewSweepIsEntered();
+                if (strideBegin <= i && i < strideEnd)
+                {
+                    const auto& seqDesc = m_randomTimeline[m_sequencePositionInSweep];
+                    originalIds.push_back(seqDesc.m_id);
+                }
+            }
+            assert(m_samplePositionInEpoch == nextSamplePositionInEpoch);
+        }
     }
 
     return m_epochSize <= m_samplePositionInEpoch;
@@ -341,65 +384,23 @@ Sequences BlockRandomizer::GetNextSequences(size_t sampleCount)
 {
     assert(m_samplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
 
-    std::vector<size_t> ids;
-    bool endOfEpoch = false;
+    std::vector<size_t> originalIds;
     Sequences result;
 
-    assert(m_frameMode); // TODO needs fixes
-    while (ids.size() < sampleCount)
-    {
-        endOfEpoch = AdvanceToNextPositionForThisWorker();
-        if (endOfEpoch)
-        {
-            break;
-        }
-        else
-        {
-            assert(m_sequencePositionInSweep < m_numSequences);
-            ids.push_back(m_sequencePositionInSweep);
-            const auto& seqDesc = m_randomTimeline[m_sequencePositionInSweep];
-            m_samplePositionInEpoch += seqDesc.m_numberOfSamples;
-            m_sequencePositionInSweep++;
-        }
-    };
+    assert(m_frameMode); // TODO sequence mode not implemented yet
 
-    result.m_endOfEpoch = endOfEpoch;
+    result.m_endOfEpoch = GetNextSequenceIds(sampleCount, originalIds);
 
-    if (ids.size() == 0)
+    if (originalIds.size() == 0)
     {
         return result;
     }
 
-    // Require and release chunks from the data deserializer, but only fo this worker
-    const size_t windowBegin = m_randomizedChunks[m_sequencePositionToChunkIndex[ids[0]]].m_windowBegin;
-    const size_t windowEnd = m_randomizedChunks[m_sequencePositionToChunkIndex[ids.back()]].m_windowEnd;
-
-    for (size_t chunkId = 0; chunkId < m_numChunks; chunkId++)
-    {
-        if ((chunkId % m_numberOfWorkers) == m_workerRank)
-        {
-            auto originalChunkIndex = m_randomizedChunks[chunkId].m_originalChunkIndex;
-
-            if (windowBegin <= chunkId && chunkId < windowEnd)
-            {
-                m_deserializer->RequireChunk(originalChunkIndex);
-            }
-            else
-            {
-                m_deserializer->ReleaseChunk(originalChunkIndex);
-            }
-        }
-    }
-
-    // Construct vector of original IDs and request data
-    std::vector<size_t> originalIds;
-    for (auto id : ids)
-    {
-        const auto& seqDesc = m_randomTimeline[id];
-        originalIds.push_back(seqDesc.m_id);
-    }
+    // TODO implement require and release chunks from the data deserializer, but only fo this worker
+    //   (probably in GetNextSequenceIds())
 
     result.m_data = m_deserializer->GetSequencesById(originalIds);
     return result;
 };
+
 } } }

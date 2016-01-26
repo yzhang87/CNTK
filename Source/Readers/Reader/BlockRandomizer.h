@@ -33,6 +33,12 @@ public:
     }
 
 private:
+    enum class DistributionMode {
+        // TODO better names, description
+        chunk_modulus,
+        sequences_strides
+    };
+
     // Structure for per-chunk information
     struct ChunkInformation
     {
@@ -55,6 +61,7 @@ private:
     // General configuration
     int m_verbosity;
     size_t m_randomizationRangeInSamples; // full window
+    DistributionMode m_distributionMode;
 
     // Deserializer and information on the original timeline
     DataDeserializerPtr m_deserializer;
@@ -92,6 +99,6 @@ private:
 
     void RandomizeIfNewSweepIsEntered();
 
-    bool AdvanceToNextPositionForThisWorker();
+    bool GetNextSequenceIds(size_t sampleCount, std::vector<size_t>& ids);
 };
 } } }
