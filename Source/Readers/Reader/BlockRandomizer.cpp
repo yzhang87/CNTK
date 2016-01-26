@@ -246,9 +246,17 @@ BlockRandomizer::BlockRandomizer(int verbosity, size_t randomizationRangeInSampl
     const SequenceDescriptions& timeline = m_deserializer->GetSequenceDescriptions();
     assert(TimelineIsValidForRandomization(timeline));
 
-    // TODO let timeline keep this info?
-    m_numSequences = timeline.back()->m_id + 1;
-    m_numChunks = timeline.back()->m_chunkId + 1;
+    if (timeline.size() == 0)
+    {
+        m_numSequences = 0;
+        m_numChunks = 0;
+    }
+    else
+    {
+        // TODO let timeline keep this info?
+        m_numSequences = timeline.back()->m_id + 1;
+        m_numChunks = timeline.back()->m_chunkId + 1;
+    }
 
     // Generate additional information about physical chunks
     assert(m_chunkInformation.size() == 0);
