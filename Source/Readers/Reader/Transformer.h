@@ -50,9 +50,9 @@ public:
     // Sets current epoch configuration.
     virtual void StartEpoch(const EpochConfiguration& config) = 0;
 
-    // Gets next sequences.
+    // Gets next sequences up to a maximum count of samples.
     // The return value can be used until the next call to GetNextSequences.
-    virtual Sequences GetNextSequences(size_t count) = 0;
+    virtual Sequences GetNextSequences(size_t sampleCount) = 0;
 
     virtual ~Transformer()
     {

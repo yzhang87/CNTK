@@ -54,13 +54,13 @@ void NoRandomizer::StartEpoch(const EpochConfiguration& config)
     m_sequencePosition = timeframe % m_totalNumberOfSamples;
 };
 
-Sequences NoRandomizer::GetNextSequences(size_t count)
+Sequences NoRandomizer::GetNextSequences(size_t sampleCount)
 {
     assert(m_samplePositionInEpoch != SIZE_MAX);
 
     bool endOfEpoch = false;
     std::vector<size_t> originalIds;
-    while (originalIds.size() < count)
+    while (originalIds.size() < sampleCount) // TODO fix
     {
         endOfEpoch = AdvanceToNextPositionForThisWorker();
         if (endOfEpoch)

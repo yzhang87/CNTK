@@ -38,11 +38,12 @@ public:
         return this->GetOutputStreams();
     }
 
-    // Gets next "count" sequences. Sequences contains data for all streams.
-    virtual Sequences GetNextSequences(size_t count) override
+    // Gets next sequences up to a maximum count of samples.
+    // Sequences contains data for all streams.
+    virtual Sequences GetNextSequences(size_t sampleCount) override
     {
         assert(m_next != nullptr);
-        Sequences samples = m_next->GetNextSequences(count);
+        Sequences samples = m_next->GetNextSequences(sampleCount);
 
         if (samples.m_endOfEpoch)
         {

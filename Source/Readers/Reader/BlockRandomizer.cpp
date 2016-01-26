@@ -311,7 +311,7 @@ void BlockRandomizer::StartEpoch(const EpochConfiguration& config)
     // TODO add some asserts on EpochConfiguration
     m_samplePositionInEpoch = 0;
     size_t timeframe = m_epochSize * config.m_epochIndex;
-    assert(m_frameMode);           // TODO not (tested) yet
+    assert(m_frameMode); // TODO !m_frameMode needs fixes
     assert(timeframe != SIZE_MAX); // used as special value for init
     RandomizeForGlobalSamplePosition(timeframe);
 };
@@ -337,7 +337,7 @@ bool BlockRandomizer::AdvanceToNextPositionForThisWorker()
     return m_epochSize <= m_samplePositionInEpoch;
 }
 
-Sequences BlockRandomizer::GetNextSequences(size_t count)
+Sequences BlockRandomizer::GetNextSequences(size_t sampleCount)
 {
     assert(m_samplePositionInEpoch != SIZE_MAX); // SetEpochConfiguration() must be called first
 
@@ -345,7 +345,8 @@ Sequences BlockRandomizer::GetNextSequences(size_t count)
     bool endOfEpoch = false;
     Sequences result;
 
-    while (ids.size() < count)
+    assert(m_frameMode); // TODO needs fixes
+    while (ids.size() < sampleCount)
     {
         endOfEpoch = AdvanceToNextPositionForThisWorker();
         if (endOfEpoch)
