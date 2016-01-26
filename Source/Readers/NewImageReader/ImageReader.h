@@ -12,6 +12,8 @@
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 // Implementation of the image reader.
+// Effectively the class represents a factory for connecting the packer,
+// transformers and deserialzier together.
 class ImageReader : public Reader
 {
 public:

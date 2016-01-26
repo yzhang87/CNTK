@@ -156,6 +156,11 @@ std::vector<std::vector<SequenceDataPtr>> ImageDataDeserializer::GetSequencesByI
         m_currentImages[i] = std::move(cv::imread(imageSequence.m_path, cv::IMREAD_COLOR));
         cv::Mat& cvImage = m_currentImages[i];
 
+        if (!cvImage.data)
+        {
+            RuntimeError("Cannot open file '%s'", imageSequence.m_path.c_str());
+        }
+
         // Convert element type.
         // TODO We should all native CV element types to be able to match the behavior of the old reader.
         int dataType = m_featureElementType == ElementType::tfloat ? CV_32F : CV_64F;

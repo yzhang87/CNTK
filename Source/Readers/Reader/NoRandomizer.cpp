@@ -9,25 +9,22 @@
 #include "NoRandomizer.h"
 #include "DataReader.h"
 
-#ifndef UNREFERENCED_PARAMETER
-#define UNREFERENCED_PARAMETER(P) (P)
-#endif
-
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 NoRandomizer::NoRandomizer(DataDeserializerPtr deserializer)
     : m_deserializer(deserializer),
-      m_sequencePosition(0),
-      m_samplePositionInEpoch(SIZE_MAX), 
-      m_totalNumberOfSamples(0)
+      m_samplePositionInEpoch(0),
+      m_sequencePosition(0)
 {
     assert(deserializer != nullptr);
 
     m_timeline = m_deserializer->GetSequenceDescriptions();
-    for (const auto& seqDesc : m_timeline)
+    for (const auto& s : m_timeline)
     {
-        assert(seqDesc->m_numberOfSamples == 1);
-        m_totalNumberOfSamples += seqDesc->m_numberOfSamples;
+        if (s->m_numberOfSamples != 1)
+        {
+            RuntimeError("Currently, no randomizer supports only frame mode. Received a sequence with %d number of samples.", s->m_numberOfSamples);
+        }
     }
 }
 
@@ -40,43 +37,41 @@ void NoRandomizer::StartEpoch(const EpochConfiguration& config)
     m_deserializer->StartEpoch(config);
     m_config = config;
 
-    // TODO: check partial minibatches.
     if (m_config.m_totalEpochSizeInSamples == requestDataSize)
     {
-        m_config.m_totalEpochSizeInSamples = m_totalNumberOfSamples;
+        m_config.m_totalEpochSizeInSamples = m_timeline.size();
     }
 
     m_samplePositionInEpoch = 0;
-    size_t timeframe = m_config.m_totalEpochSizeInSamples * config.m_epochIndex;
-    assert(timeframe != SIZE_MAX); // used as special value for init
-
-    // TODO: This works only for sample mode.
-    m_sequencePosition = timeframe % m_totalNumberOfSamples;
+    size_t globalSamplePosition = m_config.m_totalEpochSizeInSamples * config.m_epochIndex;
+    m_sequencePosition = globalSamplePosition % m_timeline.size();
 };
 
 Sequences NoRandomizer::GetNextSequences(size_t sampleCount)
 {
-    assert(m_samplePositionInEpoch != SIZE_MAX);
-
-    bool endOfEpoch = false;
-    std::vector<size_t> originalIds;
-    while (originalIds.size() < sampleCount) // TODO fix
-    {
-        endOfEpoch = AdvanceToNextPositionForThisWorker();
-        if (endOfEpoch)
-        {
-            break;
-        }
-
-        assert(m_sequencePosition < m_timeline.size());
-        const auto& sequence = m_timeline[m_sequencePosition];
-        originalIds.push_back(sequence->m_id);
-        m_samplePositionInEpoch += sequence->m_numberOfSamples;
-        m_sequencePosition++;
-    };
-
     Sequences result;
-    result.m_endOfEpoch = endOfEpoch;
+    if(m_config.m_totalEpochSizeInSamples <= m_samplePositionInEpoch)
+    {
+        result.m_endOfEpoch = true;
+        return result;
+    }
+
+    size_t maxSampleCount = std::min(sampleCount, m_config.m_totalEpochSizeInSamples - m_samplePositionInEpoch);
+    size_t start = maxSampleCount * m_config.m_workerRank / m_config.m_numberOfWorkers;
+    size_t end = maxSampleCount * (m_config.m_workerRank + 1) / m_config.m_numberOfWorkers;
+    size_t subsetSize = end - start;
+
+    std::vector<size_t> originalIds;
+    originalIds.reserve(subsetSize);
+    for (size_t i = start; i < end; ++i)
+    {
+        const auto& sequence = m_timeline[(m_sequencePosition + i) % m_timeline.size()];
+        assert(sequence->m_numberOfSamples == 1);
+        originalIds.push_back(sequence->m_id);
+    }
+
+    m_samplePositionInEpoch += maxSampleCount;
+    m_sequencePosition = (m_sequencePosition + maxSampleCount) % m_timeline.size();
 
     if (originalIds.size() == 0)
     {
@@ -85,26 +80,6 @@ Sequences NoRandomizer::GetNextSequences(size_t sampleCount)
 
     result.m_data = m_deserializer->GetSequencesById(originalIds);
     return result;
-}
-
-bool NoRandomizer::AdvanceToNextPositionForThisWorker()
-{
-    while (m_samplePositionInEpoch < m_config.m_totalEpochSizeInSamples)
-    {
-        m_sequencePosition = m_sequencePosition % m_timeline.size();
-
-        const auto& sequence = m_timeline[m_sequencePosition];
-        if ((sequence->m_chunkId % m_config.m_numberOfWorkers) == m_config.m_workerRank)
-        {
-            // Got one
-            break;
-        }
-
-        m_samplePositionInEpoch += sequence->m_numberOfSamples;
-        m_sequencePosition++;
-    }
-
-    return m_config.m_totalEpochSizeInSamples <= m_samplePositionInEpoch;
 }
 
 }}}

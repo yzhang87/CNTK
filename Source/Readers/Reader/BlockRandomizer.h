@@ -12,6 +12,10 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+// The class represents a randomizer that does randomization based on chunks/sequences inside a set of chunk.
+// TODO: currently this code moved from the old block randomizer.
+// The class will be further refactored and common based will be extracted with NoRandomizer.
+// Currently works only for frame mode (numberOfSample in sequence == 1)
 class BlockRandomizer : public Transformer
 {
 public:

@@ -18,7 +18,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 class ConfigParameters;
 
-// Base class for image transformations based on OpenCV.
+// Base class for image transformations based on OpenCV
+// that helps to wrap the sequences into OpenCV::Mat class.
 class ImageTransformerBase : public TransformerBase<cv::Mat>
 {
 public:
@@ -61,6 +62,8 @@ private:
     unsigned int m_seed;
 };
 
+// Crop transformation of the image.
+// Can work on images of any size.
 class CropTransformer : public ImageTransformerBase
 {
 public:
@@ -98,6 +101,8 @@ private:
     bool m_hFlip;
 };
 
+// Scale transformation of the image.
+// Scales the image to the dimensions requested by the network.
 class ScaleTransformer : public ImageTransformerBase
 {
 public:
@@ -119,6 +124,7 @@ private:
     size_t m_imgChannels;
 };
 
+// Mean transformation.
 class MeanTransformer : public ImageTransformerBase
 {
 public:
@@ -132,6 +138,7 @@ private:
     cv::Mat m_meanImg;
 };
 
+// Transpose transformation from HWC to CHW.
 class TransposeTransformer : public TransformerBase<vector<char>>
 {
 public:
