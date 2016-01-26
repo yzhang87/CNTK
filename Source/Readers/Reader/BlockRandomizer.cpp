@@ -396,8 +396,8 @@ Sequences BlockRandomizer::GetNextSequences(size_t sampleCount)
         return result;
     }
 
-    // TODO implement require and release chunks from the data deserializer, but only fo this worker
-    //   (probably in GetNextSequenceIds())
+    // TODO implement require and release chunks from the data deserializer, but only for this worker
+    //      (probably in GetNextSequenceIds())
 
     result.m_data = m_deserializer->GetSequencesById(originalIds);
     return result;
