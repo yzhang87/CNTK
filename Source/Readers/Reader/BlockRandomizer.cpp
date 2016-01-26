@@ -11,6 +11,7 @@
 #include <iostream>
 
 #include "DataReader.h"
+#include <random>
 
 #ifndef UNREFERENCED_PARAMETER
 #define UNREFERENCED_PARAMETER(P) (P)
@@ -24,26 +25,6 @@ static inline size_t rand(const size_t begin, const size_t end)
     // still only covers 32-bit range
     const size_t randomNumber = ::rand() * RAND_MAX + ::rand();
     return begin + randomNumber % (end - begin);
-}
-
-// Shuffle a vector into random order by randomly swapping elements
-// TODO: This functionality will be changed to std::shuffle - this work will be done during merging to master,
-// and based on the work Alexey(R) has already done.
-template <typename TVector>
-void RandomShuffle(TVector& v, size_t randomSeed)
-{
-    if (v.size() > RAND_MAX * static_cast<size_t>(RAND_MAX))
-    {
-        RuntimeError("RandomShuffle: too large set: need to change to different random generator!");
-    }
-
-    srand(static_cast<unsigned int>(randomSeed));
-    foreach_index (currentLocation, v)
-    {
-        // Pick a random location a location and swap with current
-        const size_t randomLocation = rand(0, v.size());
-        std::swap(v[currentLocation], v[randomLocation]);
-    }
 }
 
 bool BlockRandomizer::TimelineIsValidForRandomization(const SequenceDescriptions& timeline) const
@@ -73,7 +54,10 @@ void BlockRandomizer::RandomizeChunks()
     {
         randomizedChunkIndices.push_back(i);
     }
-    RandomShuffle(randomizedChunkIndices, m_sweep);
+
+    std::mt19937 m_rng(static_cast<int>(m_sweep));
+
+    std::shuffle(randomizedChunkIndices.begin(), randomizedChunkIndices.end(), m_rng);
 
     // Place randomized chunks on global time line
     m_randomizedChunks.clear();
