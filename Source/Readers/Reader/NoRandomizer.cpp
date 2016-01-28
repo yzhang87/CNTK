@@ -19,12 +19,12 @@ NoRandomizer::NoRandomizer(DataDeserializerPtr deserializer)
     assert(deserializer != nullptr);
 
     m_timeline = m_deserializer->GetSequenceDescriptions();
-    for (const auto& s : m_timeline)
+    for (const auto& sequence : m_timeline)
     {
-        if (s->m_numberOfSamples != 1)
+        if (sequence->m_numberOfSamples != 1)
         {
             RuntimeError("Currently, no randomizer supports only frame mode. Received a sequence with %d number of samples.",
-                         static_cast<int>(s->m_numberOfSamples));
+                static_cast<int>(sequence->m_numberOfSamples));
         }
     }
 }

@@ -55,7 +55,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         }
         else if (!AreEqualIgnoreCase(mbFmt, "nchw"))
         {
-            RuntimeError("ImageReader does not support the mini-batch format %s.", mbFmt.c_str());
+            RuntimeError("ImageReader does not support the sample format '%s', only 'nchw' and 'nhwc' are supported.", mbFmt.c_str());
         }
 
         auto features = std::make_shared<StreamDescription>();

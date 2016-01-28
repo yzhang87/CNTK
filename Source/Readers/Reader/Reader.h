@@ -60,6 +60,7 @@ typedef std::shared_ptr<StreamDescription> StreamDescriptionPtr;
 
 // Represent a minibatch date for a single stream formatted in according to the minibatch layout.
 // This data is returned per stream as a part of Minibatch from the ReadMinibatch function.
+// All raw non owned pointers are valid till the next call to the ReadMinibatch function.
 struct StreamMinibatch
 {
     void* m_data;         // Contiguous array of data. Can be encoded in dense or sparse formats depending on the stream description.
