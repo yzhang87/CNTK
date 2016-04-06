@@ -102,12 +102,6 @@ ifdef CUDA_PATH
   INCLUDEPATH+=$(GDK_PATH)/include/nvidia/gdk
   INCLUDEPATH+=$(CUB_PATH)
   NVMLPATH=$(GDK_PATH)/src/gdk/nvml/lib
-
-# Set up CUDA includes and libraries
-  INCLUDEPATH += $(CUDA_PATH)/include
-  LIBPATH += $(CUDA_PATH)/lib64
-  LIBS += -lcublas -lcudart -lcuda -lcurand -lcusparse -lnvidia-ml
-
 # Set up cuDNN if needed
   ifdef CUDNN_PATH
     INCLUDEPATH += $(CUDNN_PATH)/cuda/include
@@ -115,6 +109,12 @@ ifdef CUDA_PATH
     LIBS += -lcudnn
     COMMON_FLAGS +=-DUSE_CUDNN
   endif
+
+# Set up CUDA includes and libraries
+  INCLUDEPATH += $(CUDA_PATH)/include
+  LIBPATH += $(CUDA_PATH)/lib64
+  LIBS += -lcublas -lcudart -lcuda -lcurand -lcusparse -lnvidia-ml
+
 else
   DEVICE = cpu
 

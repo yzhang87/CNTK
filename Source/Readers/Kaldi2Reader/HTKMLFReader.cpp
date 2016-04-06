@@ -473,12 +473,12 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
         // Note, we are actually not using <m_lattices>, the only reason we
         // kept it was because it was required by
         // <minibatchutterancesourcemulti>.
-        m_lattices = new msra::dbn::latticesource(latticetocs, modelsymmap, L"");
+        m_lattices.reset(new msra::dbn::latticesource(latticetocs, modelsymmap, L""));
         
         // now get the frame source. This has better randomization and doesn't create temp files
-        m_frameSource = new msra::dbn::minibatchutterancesourcemulti(
+        m_frameSource.reset(new msra::dbn::minibatchutterancesourcemulti(
             scriptpaths, infilesmulti, labelsmulti, m_featDims, m_labelDims,
-            numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, m_framemode);
+            numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, m_framemode));
     }
     else if (EqualCI(readMethod, "rollingWindow"))
     {
@@ -554,7 +554,7 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
         // m_frameSourceMultiIO = new msra::dbn::minibatchframesourcemulti(infilesmulti, labelsmulti, m_featDims, m_labelDims, randomize, pagepath, mayhavenoframe, addEnergy);
         // m_frameSourceMultiIO->setverbosity(verbosity);
         int verbosity = readerConfig(L"verbosity", 2);
-        m_frameSource = new msra::dbn::minibatchframesourcemulti(scriptpaths, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, pagePaths, mayhavenoframe, addEnergy);
+        m_frameSource.reset(new msra::dbn::minibatchframesourcemulti(scriptpaths, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, pagePaths, mayhavenoframe, addEnergy));
         m_frameSource->setverbosity(verbosity);
     }
     else
@@ -666,30 +666,16 @@ void HTKMLFReader<ElemType>::PrepareForWriting(const ConfigRecordType& readerCon
         m_inputFilesMultiIO.push_back(filelist);
     }
 
-    m_fileEvalSource = new msra::dbn::FileEvalSource(realDims, numContextLeft, numContextRight, evalchunksize);
+    m_fileEvalSource.reset(new msra::dbn::FileEvalSource(realDims, numContextLeft, numContextRight, evalchunksize));
 }
 
 // destructor - virtual so it gets called properly
 template <class ElemType>
 HTKMLFReader<ElemType>::~HTKMLFReader()
 {
-    delete m_mbiter;
-    delete m_frameSource;
-    delete m_lattices;
     delete m_seqTrainDeriv;
     delete m_uttDerivBuffer;
 
-    foreach_index(i, m_featuresBufferMultiIO)
-        delete[] m_featuresBufferMultiIO[i];
-
-    foreach_index(i, m_labelsBufferMultiIO)
-        delete[] m_labelsBufferMultiIO[i];
-
-    for (size_t i = 0; i < m_numberOfuttsPerMinibatch; i++)
-    {
-        delete[] m_featuresBufferMultiUtt[i];
-        delete[] m_labelsBufferMultiUtt[i];
-    }
 
     foreach_index (i, m_trainingOrTestingFeatureSections)
         delete m_trainingOrTestingFeatureSections[i];
@@ -753,14 +739,12 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size
     }
 
     // Gets a new minibatch iterator.
-    if (m_mbiter != NULL)
+    if (m_mbiter != nullptr)
     {
-        delete m_mbiter;
-        m_mbiter = NULL;
+        m_mbiter = nullptr;
     }
-    msra::dbn::minibatchsource* source = m_frameSource;
     size_t currentMBSize = (m_framemode == true) ? mbSize : 1;
-    m_mbiter = new msra::dbn::minibatchiterator(*source, epoch, requestedEpochSamples, currentMBSize, datapasses);
+    m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, epoch, requestedEpochSamples, currentMBSize, datapasses));
 
     // Resets utterance derivative buffering class.
     if (m_doMinibatchBuffering)
@@ -781,10 +765,9 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size
     {
         foreach_index (i, m_featuresBufferMultiIO)
         {
-            if (m_featuresBufferMultiIO[i] != NULL)
+            if (m_featuresBufferMultiIO[i] != nullptr)
             {
-                delete[] m_featuresBufferMultiIO[i];
-                m_featuresBufferMultiIO[i] = NULL;
+                m_featuresBufferMultiIO[i] = nullptr;
                 m_featuresBufferAllocatedMultiIO[i] = 0;
             }
         }
@@ -793,10 +776,9 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size
     {
         foreach_index (i, m_labelsBufferMultiIO)
         {
-            if (m_labelsBufferMultiIO[i] != NULL)
+            if (m_labelsBufferMultiIO[i] != nullptr)
             {
-                delete[] m_labelsBufferMultiIO[i];
-                m_labelsBufferMultiIO[i] = NULL;
+                m_labelsBufferMultiIO[i] = nullptr;
                 m_labelsBufferAllocatedMultiIO[i] = 0;
             }
         }
@@ -806,16 +788,14 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size
     m_labelsStartIndexMultiUtt.assign(m_labelsBufferMultiIO.size() * m_numberOfuttsPerMinibatch, 0);
     for (size_t u = 0; u < m_numberOfuttsPerMinibatch; u++)
     {
-        if (m_featuresBufferMultiUtt[u] != NULL)
+        if (m_featuresBufferMultiUtt[u] != nullptr)
         {
-            delete[] m_featuresBufferMultiUtt[u];
-            m_featuresBufferMultiUtt[u] = NULL;
+            m_featuresBufferMultiUtt[u] = nullptr;
             m_featuresBufferAllocatedMultiUtt[u] = 0;
         }
-        if (m_labelsBufferMultiUtt[u] != NULL)
+        if (m_labelsBufferMultiUtt[u] != nullptr)
         {
-            delete[] m_labelsBufferMultiUtt[u];
-            m_labelsBufferMultiUtt[u] = NULL;
+            m_labelsBufferMultiUtt[u] = nullptr;
             m_labelsBufferAllocatedMultiUtt[u] = 0;
         }
         ReNewBufferForMultiIO(u);
@@ -832,10 +812,9 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToWrite(size_t mbSize, size_t /*e
 
     foreach_index (i, m_featuresBufferMultiIO)
     {
-        if (m_featuresBufferMultiIO[i] != NULL)
+        if (m_featuresBufferMultiIO[i] != nullptr)
         {
-            delete[] m_featuresBufferMultiIO[i];
-            m_featuresBufferMultiIO[i] = NULL;
+            m_featuresBufferMultiIO[i] = nullptr;
             m_featuresBufferAllocatedMultiIO[i] = 0;
         }
     }
@@ -887,6 +866,7 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
     size_t numOfLabel = m_labelsBufferMultiIO.size();
     for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
     {
+        Matrix<ElemType>& data = matrices.GetInputMatrix<ElemType>(iter->first);
         if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
         { // Features.
             size_t id = m_featureNameToIdMap[iter->first];
@@ -894,13 +874,12 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
 
             if (m_featuresBufferMultiIO[id] == NULL)
             {
-                m_featuresBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
+                m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numberOfuttsPerMinibatch);
                 m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
             }
             else if (m_featuresBufferAllocatedMultiIO[id] < dim * mbSize * m_numberOfuttsPerMinibatch)
             { // Buffer too small, we have to increase it.
-                delete[] m_featuresBufferMultiIO[id];
-                m_featuresBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
+                m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numberOfuttsPerMinibatch);
                 m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
             }
 
@@ -908,9 +887,9 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
             { // For float, we copy entire column.
                 for (size_t j = startFrame, k = 0; j < endFrame; j++, k++)
                 {
-                    memcpy_s(&m_featuresBufferMultiIO[id][((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim],
+                    memcpy_s(&m_featuresBufferMultiIO[id].get()[((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim],
                              sizeof(ElemType) * dim,
-                             &m_featuresBufferMultiUtt[uttIndex][j * dim + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]],
+                             &m_featuresBufferMultiUtt[uttIndex].get()[j * dim + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]],
                              sizeof(ElemType) * dim);
                 }
             }
@@ -920,7 +899,7 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
                 {
                     for (int d = 0; d < dim; d++)
                     {
-                        m_featuresBufferMultiIO[id][((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim + d] = m_featuresBufferMultiUtt[uttIndex][j * dim + d + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]];
+                        m_featuresBufferMultiIO[id].get()[((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim + d] = m_featuresBufferMultiUtt[uttIndex].get()[j * dim + d + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]];
                     }
                 }
             }
@@ -932,13 +911,12 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
 
             if (m_labelsBufferMultiIO[id] == NULL)
             {
-                m_labelsBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
+                m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numberOfuttsPerMinibatch);
                 m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
             }
             else if (m_labelsBufferAllocatedMultiIO[id] < dim * mbSize * m_numberOfuttsPerMinibatch)
             {
-                delete[] m_labelsBufferMultiIO[id];
-                m_labelsBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
+                m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numberOfuttsPerMinibatch);
                 m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
             }
 
@@ -946,7 +924,7 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
             {
                 for (int d = 0; d < dim; d++)
                 {
-                    m_labelsBufferMultiIO[id][((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim + d] = m_labelsBufferMultiUtt[uttIndex][j * dim + d + m_labelsStartIndexMultiUtt[id + uttIndex * numOfLabel]];
+                    m_labelsBufferMultiIO[id].get()[((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim + d] = m_labelsBufferMultiUtt[uttIndex].get()[j * dim + d + m_labelsStartIndexMultiUtt[id + uttIndex * numOfLabel]];
                 }
             }
         }
@@ -1335,8 +1313,8 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
         for (size_t i = 0; i < m_featuresBufferMultiIO.size(); ++i)
         {
             std::vector<ElemType> tmpFeatures(
-                m_featuresBufferMultiIO[i] + startDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]],
-                m_featuresBufferMultiIO[i] + endDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]]);
+                m_featuresBufferMultiIO[i].get() + startDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]],
+                m_featuresBufferMultiIO[i].get() + endDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]]);
             currentMinibatch.features.push_back(tmpFeatures);
         }
 
@@ -1345,8 +1323,8 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
         for (size_t i = 0; i < m_labelsBufferMultiIO.size(); ++i)
         {
             std::vector<ElemType> tmpLabels(
-                m_labelsBufferMultiIO[i] + startDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]],
-                m_labelsBufferMultiIO[i] + endDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]]);
+                m_labelsBufferMultiIO[i].get() + startDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]],
+                m_labelsBufferMultiIO[i].get() + endDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]]);
             currentMinibatch.labels.push_back(tmpLabels);
         }
 
@@ -1443,8 +1421,8 @@ void HTKMLFReader<ElemType>::CopyMinibatchFromBufferToMatrix(
 template <class ElemType>
 void HTKMLFReader<ElemType>::CopyMinibatchToMatrix(
     size_t size,
-    const vector<ElemType*>& featureBuffer,
-    const vector<ElemType*>& labelBuffer,
+    const vector<std::shared_ptr<ElemType>>& featureBuffer,
+    const vector<std::shared_ptr<ElemType>>& labelBuffer,
     StreamMinibatchInputs& matrices) const
 {
     for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
@@ -1455,14 +1433,14 @@ void HTKMLFReader<ElemType>::CopyMinibatchToMatrix(
             size_t id = m_featureNameToIdMap.at(iter->first);
             size_t dim = m_featureNameToDimMap.at(iter->first);
             assert(id < featureBuffer.size());
-            data.SetValue(dim, size, data.GetDeviceId(), featureBuffer[id], matrixFlagNormal);
+            data.SetValue(dim, size, data.GetDeviceId(), featureBuffer[id].get(), matrixFlagNormal);
         }
         else if (m_nameToTypeMap.at(iter->first) == InputOutputTypes::category)
         {
             size_t id = m_labelNameToIdMap.at(iter->first);
             size_t dim = m_labelNameToDimMap.at(iter->first);
             assert(id < labelBuffer.size());
-            data.SetValue(dim, size, data.GetDeviceId(), labelBuffer[id], matrixFlagNormal);
+            data.SetValue(dim, size, data.GetDeviceId(), labelBuffer[id].get(), matrixFlagNormal);
         }
         else if (m_doMinibatchBuffering)
         {
@@ -1609,15 +1587,14 @@ bool HTKMLFReader<ElemType>::GetMinibatchToWrite(StreamMinibatchInputs& matrices
                 assert(feat.rows() == dim);
                 dim; // check feature dimension matches what's expected
 
-                if (m_featuresBufferMultiIO[id] == NULL)
+                if (m_featuresBufferMultiIO[id] == nullptr)
                 {
-                    m_featuresBufferMultiIO[id] = new ElemType[feat.rows() * feat.cols()];
+                    m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), feat.rows() * feat.cols());
                     m_featuresBufferAllocatedMultiIO[id] = feat.rows() * feat.cols();
                 }
                 else if (m_featuresBufferAllocatedMultiIO[id] < feat.rows() * feat.cols()) // buffer size changed. can be partial minibatch
                 {
-                    delete[] m_featuresBufferMultiIO[id];
-                    m_featuresBufferMultiIO[id] = new ElemType[feat.rows() * feat.cols()];
+                    m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), feat.rows() * feat.cols());
                     m_featuresBufferAllocatedMultiIO[id] = feat.rows() * feat.cols();
                 }
                 // shouldn't need this since we fill up the entire buffer below
@@ -1628,7 +1605,7 @@ bool HTKMLFReader<ElemType>::GetMinibatchToWrite(StreamMinibatchInputs& matrices
                     for (int j = 0; j < feat.cols(); j++) // column major, so iterate columns
                     {
                         // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
-                        memcpy_s(&m_featuresBufferMultiIO[id][j * feat.rows()], sizeof(ElemType) * feat.rows(), &feat(0, j), sizeof(ElemType) * feat.rows());
+                        memcpy_s(&m_featuresBufferMultiIO[id].get()[j * feat.rows()], sizeof(ElemType) * feat.rows(), &feat(0, j), sizeof(ElemType) * feat.rows());
                     }
                 }
                 else
@@ -1637,11 +1614,11 @@ bool HTKMLFReader<ElemType>::GetMinibatchToWrite(StreamMinibatchInputs& matrices
                     {
                         for (int i = 0; i < feat.rows(); i++)
                         {
-                            m_featuresBufferMultiIO[id][j * feat.rows() + i] = feat(i, j);
+                            m_featuresBufferMultiIO[id].get()[j * feat.rows() + i] = feat(i, j);
                         }
                     }
                 }
-                data.SetValue(feat.rows(), feat.cols(), data.GetDeviceId(), m_featuresBufferMultiIO[id], matrixFlagNormal);
+                data.SetValue(feat.rows(), feat.cols(), data.GetDeviceId(), m_featuresBufferMultiIO[id].get(), matrixFlagNormal);
             }
             else
             { // Resizes other inputs so they won't affect actual minibatch size.
@@ -1745,13 +1722,12 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
     }
     if (m_featuresBufferMultiUtt[i] == NULL)
     {
-        m_featuresBufferMultiUtt[i] = new ElemType[totalFeatNum];
+        m_featuresBufferMultiUtt[i] =AllocateIntermediateBuffer(-1, totalFeatNum);
         m_featuresBufferAllocatedMultiUtt[i] = totalFeatNum;
     }
     else if (m_featuresBufferAllocatedMultiUtt[i] < totalFeatNum) // buffer size changed. can be partial minibatch
     {
-        delete[] m_featuresBufferMultiUtt[i];
-        m_featuresBufferMultiUtt[i] = new ElemType[totalFeatNum];
+        m_featuresBufferMultiUtt[i] = AllocateIntermediateBuffer(-1,totalFeatNum);
         m_featuresBufferAllocatedMultiUtt[i] = totalFeatNum;
     }
 
@@ -1769,16 +1745,15 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
     }
     if (m_labelsBufferMultiUtt[i] == NULL)
     {
-        m_labelsBufferMultiUtt[i] = new ElemType[totalLabelsNum];
+        m_labelsBufferMultiUtt[i] = AllocateIntermediateBuffer(-1,totalLabelsNum);
         m_labelsBufferAllocatedMultiUtt[i] = totalLabelsNum;
     }
     else if (m_labelsBufferAllocatedMultiUtt[i] < totalLabelsNum)
     {
-        delete[] m_labelsBufferMultiUtt[i];
-        m_labelsBufferMultiUtt[i] = new ElemType[totalLabelsNum];
+        m_labelsBufferMultiUtt[i] = AllocateIntermediateBuffer(-1,totalLabelsNum);
         m_labelsBufferAllocatedMultiUtt[i] = totalLabelsNum;
     }
-    memset(m_labelsBufferMultiUtt[i], 0, sizeof(ElemType) * totalLabelsNum);
+    memset(m_labelsBufferMultiUtt[i].get(), 0, sizeof(ElemType) * totalLabelsNum);
 
     // Copies features to buffer.
     // foreach_index(id, m_featuresBufferMultiIO)
@@ -1808,7 +1783,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
             for (int k = 0; k < actualmbsizeOri; k++) // column major, so iterate columns
             {
                 // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
-                memcpy_s(&m_featuresBufferMultiUtt[i][k * fdim + m_featuresStartIndexMultiUtt[id + i * numOfFea]], sizeof(ElemType) * fdim, &featOri(0, k), sizeof(ElemType) * fdim);
+                memcpy_s(&m_featuresBufferMultiUtt[i].get()[k * fdim + m_featuresStartIndexMultiUtt[id + i * numOfFea]], sizeof(ElemType) * fdim, &featOri(0, k), sizeof(ElemType) * fdim);
             }
         }
         else
@@ -1817,7 +1792,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
             {
                 for (int d = 0; d < featOri.rows(); d++)
                 {
-                    m_featuresBufferMultiUtt[i][k * fdim + d + m_featuresStartIndexMultiUtt[id + i * numOfFea]] = featOri(d, k);
+                    m_featuresBufferMultiUtt[i].get()[k * fdim + d + m_featuresStartIndexMultiUtt[id + i * numOfFea]] = featOri(d, k);
                 }
             }
         }
@@ -1841,7 +1816,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
                 size_t labelId = uids[k];
                 for (int j = 0; j < dim; j++)
                 {
-                    m_labelsBufferMultiUtt[i][k * dim + j + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = m_labelToTargetMapMultiIO[id][labelId][j];
+                    m_labelsBufferMultiUtt[i].get()[k * dim + j + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = m_labelToTargetMapMultiIO[id][labelId][j];
                 }
             }
         }
@@ -1853,7 +1828,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
             {
                 assert(uids[k] < dim);
                 // labels(uids[i], i) = (ElemType)1;
-                m_labelsBufferMultiUtt[i][k * dim + uids[k] + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = (ElemType) 1;
+                m_labelsBufferMultiUtt[i].get()[k * dim + uids[k] + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = (ElemType) 1;
             }
         }
     }
@@ -2045,6 +2020,49 @@ void HTKMLFReader<ElemType>::GetDataNamesFromConfig(const ConfigRecordType& read
         }
     }
 }
+
+template <class ElemType>
+unique_ptr<CUDAPageLockedMemAllocator>& HTKMLFReader<ElemType>::GetCUDAAllocator(int deviceID)
+{
+    if (m_cudaAllocator != nullptr)
+    {
+        if (m_cudaAllocator->GetDeviceId() != deviceID)
+        {
+            m_cudaAllocator.reset(nullptr);
+        }
+    }
+
+    if (m_cudaAllocator == nullptr)
+    {
+        m_cudaAllocator.reset(new CUDAPageLockedMemAllocator(deviceID));
+    }
+
+    return m_cudaAllocator;
+}
+
+
+
+template <class ElemType>
+std::shared_ptr<ElemType> HTKMLFReader<ElemType>::AllocateIntermediateBuffer(int deviceID, size_t numElements)
+{
+    if (deviceID >= 0)
+    {
+        // Use pinned memory for GPU devices for better copy performance
+        size_t totalSize = sizeof(ElemType) * numElements;
+        return std::shared_ptr<ElemType>((ElemType*) GetCUDAAllocator(deviceID)->Malloc(totalSize), [this, deviceID](ElemType* p)
+                                         {
+                                             this->GetCUDAAllocator(deviceID)->Free((char*) p);
+                                         });
+    }
+    else
+    {
+        return std::shared_ptr<ElemType>(new ElemType[numElements], [](ElemType* p)
+                                         {
+                                             delete[] p;
+                                         });
+    }
+}
+
 
 template class HTKMLFReader<float>;
 template class HTKMLFReader<double>;

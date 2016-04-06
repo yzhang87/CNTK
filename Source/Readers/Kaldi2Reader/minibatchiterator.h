@@ -86,6 +86,10 @@ class minibatchiterator
 
     msra::dbn::minibatchsource &source; // feature source to read from
 
+    // subset to read during distributed data-parallel training (no subsetting: (0,1))
+    size_t subsetnum;
+    size_t numsubsets;
+
     std::vector<msra::dbn::matrix> featbuf;                                                      // buffer for holding curernt minibatch's frames
     std::vector<std::vector<size_t>> uids;                                                       // buffer for storing current minibatch's frame-level label sequence
     std::vector<std::pair<wstring, size_t>> utteranceinfo;                                       // buffer for current minibatch's utterance ID information.
@@ -133,7 +137,7 @@ private:
             foreach_index (i, lattices)
                 totalframes += lattices[i]->getnumframes();
             if (totalframes != actualmbframes)
-                throw std::logic_error("fillorclear: frames in lattices do not match minibatch size");
+                LogicError("fillorclear: frames in lattices do not match minibatch size");
         }
         timechecklattice = timerchecklattice;
     }
@@ -144,7 +148,7 @@ private:
     void checkhasdata() const
     {
         if (!hasdata())
-            throw std::logic_error("minibatchiterator: access beyond end of epoch");
+            LogicError("minibatchiterator: access beyond end of epoch");
     }
 
 public:

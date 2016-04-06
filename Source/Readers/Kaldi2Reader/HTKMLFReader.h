@@ -10,19 +10,20 @@
 #include "UtteranceDerivativeBuffer.h"
 #include "Config.h" // for intargvector
 
+#include "CUDAPageLockedMemAllocator.h"
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 template <class ElemType>
 class HTKMLFReader : public IDataReader
 {
 private:
-    msra::dbn::minibatchiterator* m_mbiter;
-    msra::dbn::minibatchsource* m_frameSource;
+    unique_ptr<msra::dbn::minibatchiterator> m_mbiter;
+    unique_ptr<msra::dbn::minibatchsource> m_frameSource;
     vector<msra::asr::FeatureSection*> m_trainingOrTestingFeatureSections;
     // msra::dbn::minibatchreadaheadsource* m_readAheadSource;
-    msra::dbn::FileEvalSource* m_fileEvalSource;
+    unique_ptr<msra::dbn::FileEvalSource> m_fileEvalSource;
     vector<msra::asr::FeatureSection*> m_writingFeatureSections;
-    msra::dbn::latticesource* m_lattices;
+    unique_ptr<msra::dbn::latticesource> m_lattices;
     map<wstring, msra::lattices::lattice::htkmlfwordsequence> m_latticeMap;
 
     // Sequence training realted members.
@@ -76,16 +77,17 @@ private:
 
     bool m_partialMinibatch; // allow partial minibatches?
 
-    std::vector<ElemType*> m_featuresBufferMultiUtt;
+    std::vector<std::shared_ptr<ElemType>> m_featuresBufferMultiUtt;
     std::vector<size_t> m_featuresBufferAllocatedMultiUtt;
-    std::vector<ElemType*> m_labelsBufferMultiUtt;
+    std::vector<std::shared_ptr<ElemType>> m_labelsBufferMultiUtt;
     std::vector<size_t> m_labelsBufferAllocatedMultiUtt;
     std::vector<size_t> m_featuresStartIndexMultiUtt;
     std::vector<size_t> m_labelsStartIndexMultiUtt;
 
-    std::vector<ElemType*> m_featuresBufferMultiIO;
+    unique_ptr<CUDAPageLockedMemAllocator> m_cudaAllocator;
+    std::vector<std::shared_ptr<ElemType>> m_featuresBufferMultiIO;
     std::vector<size_t> m_featuresBufferAllocatedMultiIO;
-    std::vector<ElemType*> m_labelsBufferMultiIO;
+    std::vector<std::shared_ptr<ElemType>> m_labelsBufferMultiIO;
     std::vector<size_t> m_labelsBufferAllocatedMultiIO;
 
     std::map<std::wstring, size_t> m_featureNameToIdMap;
@@ -130,7 +132,7 @@ private:
     void CopyMinibatchFromBufferToMatrix(size_t index, StreamMinibatchInputs& matrices);
 
     // Copys one minibatch from <m_featuresBufferMultiIO> to matrix.
-    void CopyMinibatchToMatrix(size_t size, const std::vector<ElemType*>& featureBuffer, const std::vector<ElemType*>& labelBuffer, StreamMinibatchInputs& matrices) const;
+    void CopyMinibatchToMatrix(size_t size, const std::vector<std::shared_ptr<ElemType>>& featureBuffer, const std::vector<std::shared_ptr<ElemType>>& labelBuffer, StreamMinibatchInputs& matrices) const;
 
     void StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
     void StartMinibatchLoopToWrite(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
@@ -154,6 +156,11 @@ private:
         readerDeriv, /*derivative computed in the reader*/
         readerObj,   /*objective computed in the reader*/
     };
+
+private:
+    // Helper functions
+    unique_ptr<CUDAPageLockedMemAllocator>& GetCUDAAllocator(int deviceID);
+    std::shared_ptr<ElemType> AllocateIntermediateBuffer(int deviceID, size_t numElements);
 
 public:
     MBLayoutPtr m_pMBLayout;
