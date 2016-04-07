@@ -19,17 +19,17 @@ class HTKMLFReader : public IDataReader
 private:
     unique_ptr<msra::dbn::minibatchiterator> m_mbiter;
     unique_ptr<msra::dbn::minibatchsource> m_frameSource;
-    vector<msra::asr::FeatureSection*> m_trainingOrTestingFeatureSections;
+    vector<std::shared_ptr<msra::asr::FeatureSection>> m_trainingOrTestingFeatureSections;
     // msra::dbn::minibatchreadaheadsource* m_readAheadSource;
     unique_ptr<msra::dbn::FileEvalSource> m_fileEvalSource;
-    vector<msra::asr::FeatureSection*> m_writingFeatureSections;
+    vector<std::shared_ptr<msra::asr::FeatureSection>> m_writingFeatureSections;
     unique_ptr<msra::dbn::latticesource> m_lattices;
     map<wstring, msra::lattices::lattice::htkmlfwordsequence> m_latticeMap;
 
     // Sequence training realted members.
     bool m_doSeqTrain;
     wstring m_seqTrainCriterion;
-    KaldiSequenceTrainingDerivative<ElemType>* m_seqTrainDeriv;
+    unique_ptr<KaldiSequenceTrainingDerivative<ElemType>> m_seqTrainDeriv;
 
     // Minibatch buffering.
     struct MinibatchBufferUnit
@@ -49,7 +49,7 @@ private:
     bool m_doMinibatchBufferTruncation;
     size_t m_minibatchBufferIndex;
     std::deque<MinibatchBufferUnit> m_minibatchBuffer;
-    UtteranceDerivativeBuffer<ElemType>* m_uttDerivBuffer;
+    unique_ptr<UtteranceDerivativeBuffer<ElemType>> m_uttDerivBuffer;
     unordered_map<wstring, bool> m_hasUttInCurrentMinibatch;
 
     // Utterance information.
@@ -59,11 +59,11 @@ private:
     vector<bool> m_sentenceEnd;
     bool m_readAhead;
     bool m_truncated;
-    bool m_framemode;
+    bool m_frameMode;
     vector<size_t> m_processedFrame;
+    intargvector m_numSeqsPerMBForAllEpochs;
     size_t m_maxUtteranceLength;
-    size_t m_numberOfuttsPerMinibatch;
-    size_t m_actualnumberOfuttsPerMinibatch;
+    size_t m_numSeqsPerMB;
     size_t m_mbSize;
     size_t m_currentMBSize;
     vector<size_t> m_currentBufferFrames;
@@ -106,9 +106,10 @@ private:
     size_t m_inputFileIndex;
     std::vector<size_t> m_featDims;
     std::vector<size_t> m_labelDims;
-
+    std::vector<bool> m_expandToUtt; // support for i-vector type of input - single fram should be applied to entire utterance
     std::vector<std::vector<std::vector<ElemType>>> m_labelToTargetMapMultiIO;
 
+    int m_verbosity;
     template <class ConfigRecordType>
     void PrepareForTrainingOrTesting(const ConfigRecordType& config);
     template <class ConfigRecordType>
@@ -134,16 +135,16 @@ private:
     // Copys one minibatch from <m_featuresBufferMultiIO> to matrix.
     void CopyMinibatchToMatrix(size_t size, const std::vector<std::shared_ptr<ElemType>>& featureBuffer, const std::vector<std::shared_ptr<ElemType>>& labelBuffer, StreamMinibatchInputs& matrices) const;
 
-    void StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
+    void StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize);
     void StartMinibatchLoopToWrite(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
 
     bool ReNewBufferForMultiIO(size_t i);
 
-    size_t NumberSlicesInEachRecurrentIter()
+    size_t GetNumParallelSequences()
     {
-        return m_numberOfuttsPerMinibatch;
+        return m_numSeqsPerMB;
     }
-    void SetNbrSlicesEachRecurrentIter(const size_t){};
+    void SetNumParallelSequences(const size_t){};
 
     template <class ConfigRecordType>
     void GetDataNamesFromConfig(const ConfigRecordType& readerConfig, std::vector<std::wstring>& features, std::vector<std::wstring>& labels);
@@ -190,16 +191,22 @@ public:
         delete this;
     }
     virtual ~HTKMLFReader();
-    virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
+    virtual void StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize)
+    {
+        return StartDistributedMinibatchLoop(mbSize, epoch, 0, 1, requestedEpochSamples);
+    }
+    virtual bool SupportsDistributedMBRead() const override
+    {
+        return m_frameSource && m_frameSource->supportsbatchsubsetting();
+    }
+
+    virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize) override;
+
+
     virtual bool GetMinibatch(StreamMinibatchInputs& matrices);
     virtual const std::map<LabelIdType, LabelType>& GetLabelMapping(const std::wstring& sectionName);
     virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping);
     virtual bool GetData(const std::wstring& sectionName, size_t numRecords, void* data, size_t& dataBufferSize, size_t recordStart = 0);
-    virtual size_t GetNumParallelSequences()
-    {
-        return m_numberOfuttsPerMinibatch;
-    }
-
     virtual bool GetMinibatchCopy(
         std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
         StreamMinibatchInputs& matrices,
