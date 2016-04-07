@@ -190,6 +190,7 @@ bool CheckFunction(std::string& p_nodeType, bool* allowUndeterminedVariable)
     else if (EqualInsensitive(nodeType, OperationNameOf(MinusNode))) ret = true;
     else if (EqualInsensitive(nodeType, OperationNameOf(NegateNode))) ret = true;
     else if (EqualInsensitive(nodeType, OperationNameOf(PastValueNode), L"Delay")) ret = true;
+    else if (EqualInsensitive(nodeType, OperationNameOf(LCPastValueNode))) ret = true;
     else if (EqualInsensitive(nodeType, OperationNameOf(PerDimMeanVarDeNormalizationNode), L"PerDimMVDeNorm")) ret = true;
     else if (EqualInsensitive(nodeType, OperationNameOf(PerDimMeanVarNormalizationNode), L"PerDimMVNorm")) ret = true;
     else if (EqualInsensitive(nodeType, OperationNameOf(PlusNode))) ret = true;

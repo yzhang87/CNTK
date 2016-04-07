@@ -1085,13 +1085,6 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
         {
             m_pMBLayout->Init(m_numSeqsPerMB, m_currentMBSize);
         }
-        /*for (size_t i = 0; i < m_numSeqsPerMB; i++)
-            {
-                for (size_t j = 0; j < m_currentMBSize; j++)
-                {
-                    m_pMBLayout->SetWithoutOr(i, j, MinibatchPackingFlags::None);
-                }
-            }*/
 
         // Iterates over utterances. m_numSeqsPerMB = 1 is a
         // special case.

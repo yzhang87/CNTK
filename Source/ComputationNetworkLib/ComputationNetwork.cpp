@@ -728,6 +728,15 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
             pastValueNodes.push_back(n);
     }
 
+    // get LCPastValue node
+    vector<ComputationNodeBasePtr> lcpastValueNodes;
+    for (const auto& n : allnodes)
+    {
+        if (n->OperationName() == OperationNameOf(LCPastValueNode))
+            lcpastValueNodes.push_back(n);
+    }
+
+
     // get FuturetValue node
     vector<ComputationNodeBasePtr> futureValueNodes;
     for (const auto& n : allnodes)
@@ -762,7 +771,9 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
     // pre-compute nodes
     fstream << FormSpecialNodes(dotcfg.m_PrecomputingNodeStyle, PreComputedNodes);
     // PastValue nodes
-    fstream << FormSpecialNodes(dotcfg.m_pastValueNodeStyle, pastValueNodes);
+    fstream << FormSpecialNodes(dotcfg.m_pastValueNodeStyle, pastValueNodes);    
+    // LCPastValue nodes
+    fstream << FormSpecialNodes(dotcfg.m_pastValueNodeStyle, lcpastValueNodes);
     // FutureValue nodes
     fstream << FormSpecialNodes(dotcfg.m_futureValueNodeStyle, futureValueNodes);
     // normal nodes
@@ -825,6 +836,18 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
             wstring dummyName = des->GetName() + L".dummy";
             wstring out = msra::strfun::wstrprintf(L"node [ shape = box3d  , color = lightgray, style = \"filled\" , label = \"%ls\" ] ; \"%ls\"\n",
                                                    (pastValueNode->GetName() + L"\\n(PastValue)").c_str(),
+                                                   dummyName.c_str());
+            line = out;
+            line += msra::strfun::wstrprintf(L"\"%ls\" -> \"%ls\" ; \n", dummyName.c_str(), srcname.c_str());
+        }
+        else if (des->OperationName() == OperationNameOf(LCPastValueNode))
+        {
+            // special treament for arc with PastValue node as the children
+            // create a dummy node
+            ComputationNodeBasePtr lcpastValueNode = des;
+            wstring dummyName = des->GetName() + L".dummy";
+            wstring out = msra::strfun::wstrprintf(L"node [ shape = box3d  , color = lightgray, style = \"filled\" , label = \"%ls\" ] ; \"%ls\"\n",
+                                                   (lcpastValueNode->GetName() + L"\\n(LCPastValue)").c_str(),
                                                    dummyName.c_str());
             line = out;
             line += msra::strfun::wstrprintf(L"\"%ls\" -> \"%ls\" ; \n", dummyName.c_str(), srcname.c_str());
