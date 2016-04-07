@@ -54,16 +54,12 @@ writeWordAndClassInfo = [
 
 train = [
     action = "train"
-    minibatchSize = 128:256:512
     traceLevel = 1
     epochSize = 0               # (for quick tests, this can be overridden with something small)
-    defaultHiddenActivity = 0.1
-    useValidation = true
 
     SimpleNetworkBuilder = [
-        rnnType = "CLASSLSTM"
+        rnnType = "CLASSLSTM"   # TODO: camelCase
         recurrentLayer = 1      # number of recurrent layers
-        nodeType = "sigmoid"    # TODO: Why do we need this? It's an LSTM without dense FF layers
 
         trainingCriterion = "classCrossEntropyWithSoftmax"
         evalCriterion     = "classCrossEntropyWithSoftmax"
@@ -71,6 +67,7 @@ train = [
         initValueScale = 6.0
         uniformInit = true
         layerSizes = "$confVocabSize$:150:200:10000"
+        defaultHiddenActivity = 0.1 # default value for hidden states
         addPrior = false
         addDropoutNodes = false
         applyMeanVarNorm = false
@@ -82,6 +79,7 @@ train = [
     ]
 
     SGD = [
+        minibatchSize = 128:256:512
         learningRatesPerSample = 0.1
         momentumPerMB = 0
         gradientClippingWithTruncation = true
@@ -90,6 +88,10 @@ train = [
         numMBsToShowResult = 100
         gradUpdateType = "none"
         loadBestModel = true
+
+        dropoutRate = 0.0
+
+        #traceNodeNamesReal = AutoName37 # this allows to track a node's value
 
         # settings for Auto Adjust Learning Rate
         AutoAdjust = [
@@ -103,8 +105,6 @@ train = [
             numPrevLearnRates = 5
             numBestSearchEpoch = 1
         ]
-
-        dropoutRate = 0.0
     ]
 
     reader = [

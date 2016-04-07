@@ -61,10 +61,16 @@ template <class E>
 __declspec_noreturn static inline void ThrowFormatted(const char* format, ...)
 {
     va_list args;
-    char buffer[1024];
-
     va_start(args, format);
-    vsprintf(buffer, format, args);
+
+    char buffer[1024] = { 0 }; // Note: pre-VS2015 vsnprintf() is not standards-compliant and may not add a terminator
+    int written = vsnprintf(buffer, _countof(buffer) - 1, format, args); // -1 because pre-VS2015 vsnprintf() does not always write a 0-terminator
+    // TODO: In case of EILSEQ error, choose between just outputting the raw format itself vs. continuing the half-completed buffer
+    //if (written < 0) // an invalid wide-string conversion may lead to EILSEQ
+    //    strncpy(buffer, format, _countof(buffer)
+    UNUSED(written); // pre-VS2015 vsnprintf() returns -1 in case of overflow, instead of the #characters written
+    if (strlen(buffer)/*written*/ >= (int)_countof(buffer) - 2)
+        sprintf(buffer + _countof(buffer) - 4, "...");
 #ifdef _DEBUG // print this to log, so we can see what the error is before throwing
     fprintf(stderr, "\nAbout to throw exception '%s'\n", buffer);
 #endif
@@ -602,11 +608,11 @@ public:
         m_dllName += L".dll";
         m_hModule = LoadLibrary(m_dllName.c_str());
         if (m_hModule == NULL)
-            RuntimeError("Plugin not found: %s", msra::strfun::utf8(m_dllName).c_str());
+            RuntimeError("Plugin not found: '%ls'", m_dllName.c_str());
         // create a variable of each type just to call the proper templated version
         FARPROC entryPoint = GetProcAddress(m_hModule, proc.c_str());
         if (entryPoint == nullptr)
-            RuntimeError("Symbol '%s' not found in plugin %s", proc.c_str(), m_dllName.c_str());
+            RuntimeError("Symbol '%s' not found in plugin '%ls'", proc.c_str(), m_dllName.c_str());
         return entryPoint;
     }
     ~Plugin()
@@ -633,10 +639,10 @@ public:
         soName = soName + ".so";
         void* handle = dlopen(soName.c_str(), RTLD_LAZY);
         if (handle == NULL)
-            RuntimeError("Plugin not found: %s (error: %s)", soName.c_str(), dlerror());
+            RuntimeError("Plugin not found: '%s' (error: %s)", soName.c_str(), dlerror());
         void* entryPoint = dlsym(handle, proc.c_str());
         if (entryPoint == nullptr)
-            RuntimeError("Symbol '%s' not found in plugin %s", proc.c_str(), soName.c_str());
+            RuntimeError("Symbol '%s' not found in plugin '%s'", proc.c_str(), soName.c_str());
         return entryPoint;
     }
     ~Plugin()

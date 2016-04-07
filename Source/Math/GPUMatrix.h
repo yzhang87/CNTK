@@ -45,6 +45,11 @@ typedef struct CUstream_st* cudaStream_t;
 #define USE_TIME_BASED_SEED ULONG_MAX
 #endif
 
+// Max number of GPUs on a _single_ node.
+#ifndef MAX_GPUS
+#define MAX_GPUS 16
+#endif
+
 // Stream management functions
 void MATH_API SetStream(cudaStream_t stream);
 cudaStream_t MATH_API GetStream();
@@ -91,27 +96,39 @@ void PrepareDevice(DEVICEID_TYPE deviceId);
 template <class ElemType>
 class MATH_API GPUMatrix : public BaseMatrix<ElemType>
 {
-    typedef BaseMatrix<ElemType> B;
-    using B::m_numRows;
-    using B::m_numCols;
-    using B::m_pArray; // without this, base members would require to use thi-> in GCC
+    typedef BaseMatrix<ElemType> Base;
+    using Base::m_numRows;
+    using Base::m_numCols;
+    using Base::m_sliceViewOffset;
+    using Base::HasExternalBuffer;
+    using Base::SetBuffer;
+    using Base::SetComputeDeviceId;
+    using Base::ZeroInit;
+    using Base::ZeroValues;
+    using Base::m_sob;
+    using Base::ShallowCopyFrom;
+    using Base::ReleaseStorageMemory;
+    using Base::GetSizeAllocated;
+    using Base::SetSizeAllocated;
 
     template <typename T>
     friend class GPUMatrix;
 
 public:
-    static const int MaxGpus = 8; // support up to 8 GPUs
-    using BaseMatrix<ElemType>::m_computeDevice;
-    using BaseMatrix<ElemType>::m_elemSizeAllocated;
-    using BaseMatrix<ElemType>::m_format;
-    using BaseMatrix<ElemType>::m_externalBuffer;
-    using BaseMatrix<ElemType>::m_nz;
-    using BaseMatrix<ElemType>::OwnBuffer;
-    using BaseMatrix<ElemType>::GetNumElements;
-    using BaseMatrix<ElemType>::IsEmpty;
-    using BaseMatrix<ElemType>::GetArray;
-    using BaseMatrix<ElemType>::GetNumRows;
-    using BaseMatrix<ElemType>::GetNumCols;
+    using Base::GetComputeDeviceId;
+    using Base::Buffer;
+    using Base::GetNumRows;
+    using Base::GetNumCols;
+    using Base::GetNumElements;
+    using Base::OwnBuffer;
+    using Base::GetFormat;
+    using Base::SetFormat;
+    using Base::IsEmpty;
+    using Base::VerifyResizable;
+
+public:
+    using Base::VerifyWritable;
+    static const int MaxGpus = MAX_GPUS;
 
 private:
     static cublasHandle_t s_cuHandle[MaxGpus];
@@ -131,6 +148,7 @@ private:
     size_t LocateColumn(const size_t j) const;
     void Clear();
     void ZeroInit(int deviceId);
+    void ZeroInit() { Base::ZeroInit(); }
 
     std::unique_ptr<GPUMatrix<ElemType>> GetOrCreateWorkspace() const;
     void ReleaseWorkspace(std::unique_ptr<GPUMatrix<ElemType>> src) const;
@@ -146,7 +164,6 @@ public:
     ~GPUMatrix(void);
 
     static void SetDevice(DEVICEID_TYPE deviceId);
-    int GetComputeDeviceId() const;
     DEVICEID_TYPE PrepareDevice(DEVICEID_TYPE deviceId = -1) const;
 
     static cublasHandle_t GetCublasHandle(int computeDevice = -1);
@@ -169,9 +186,9 @@ public:
     {
         return m_numRows * m_numCols * sizeof(ElemType);
     }
-    ElemType* BufferPointer() const
+    ElemType* Data() const
     {
-        return m_pArray;
+        return Buffer() + m_sliceViewOffset;
     }
 
     ElemType Adagrad(GPUMatrix<ElemType>& gradients, const bool needAveMultiplier);
@@ -179,6 +196,13 @@ public:
     ElemType RmsProp(GPUMatrix<ElemType>& gradients, ElemType RMS_GAMMA, ElemType RMS_WGT_INC, ElemType RMS_WGT_MAX, ElemType RMS_WGT_DEC, ElemType RMS_WGT_MIN, const bool needAveMultiplier);
 
     void Reshape(const size_t numRows, const size_t numCols);
+
+    // RequireSize is now the new preferred method of ensuring the correct size inside of the Matrix class. Since Resize will fail if the storage object has
+    // multiple views, RequireSize will first check to see if Resize is required. If it is not, then it short-circuits and is a noop. Otherwise, RequireSize
+    // will call Resize, which may fail if the matrix has multiple views.
+    void RequireSize(const size_t numRows, const size_t numCols, bool growOnly = true); // by default we only reallocate if need to grow
+    // Resize first checks to ensure that the caller has the authority to call Resize (i.e., it checks to ensure the underlying data is owned by only this matrix), and then
+    // actually resizes the underlying matrix, doing any allocation as required.
     void Resize(const size_t numRows, const size_t numCols, bool growOnly = true); // by default we only reallocate if need to grow
 
     ElemType& operator()(const size_t /*row*/, const size_t /*col*/)
@@ -209,6 +233,9 @@ public:
 
     GPUMatrix<ElemType> Transpose() const;
     GPUMatrix<ElemType>& AssignTransposeOf(const GPUMatrix<ElemType>& a);
+
+    GPUMatrix<ElemType>& DoGatherColumnsOf (ElemType beta, const GPUMatrix<ElemType>& m, const GPUMatrix<ElemType>& a, ElemType alpha);
+    GPUMatrix<ElemType>& DoScatterColumnsOf(ElemType beta, const GPUMatrix<ElemType>& m, const GPUMatrix<ElemType>& a, ElemType alpha);
 
     GPUMatrix<ElemType>& operator+=(const ElemType alpha);
     GPUMatrix<ElemType> operator+(const ElemType alpha) const;
@@ -398,6 +425,27 @@ public:
                                                    const size_t outputWidth, const size_t outputHeight, const size_t outputSizePerSample,
                                                    const size_t windowWidth, const size_t windowHeight, const size_t horizontalSubsample, const size_t verticalSubsample);
 
+    void ConvolutionForward(const GPUMatrix<ElemType>& kernel, const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIwht,
+                            const GPUMatrix<int>& mpRowRun, const GPUMatrix<int>& runs, GPUMatrix<ElemType>& output) const;
+    void ConvolutionBackwardData(const GPUMatrix<ElemType>& kernel, const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIwht,
+                                 const GPUMatrix<int>& mpRowRun, const GPUMatrix<int>& runs, GPUMatrix<ElemType>& grad) const;
+    void ConvolutionBackwardKernel(const GPUMatrix<ElemType>& in, const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIwht,
+                                   const GPUMatrix<int>& mpRowRun, const GPUMatrix<int>& runs, GPUMatrix<ElemType>& kernelGrad) const;
+
+    void MaxPoolingForward(const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices, GPUMatrix<ElemType>& output) const;
+    void MaxPoolingBackward(const GPUMatrix<ElemType>& out, const GPUMatrix<ElemType>& in,
+                            const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices,
+                            GPUMatrix<ElemType>& grad) const;
+
+    void AveragePoolingForward(const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices, GPUMatrix<ElemType>& output) const;
+    void AveragePoolingBackward(const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices, GPUMatrix<ElemType>& grad) const;
+
+    void BatchNormalizationForward(const GPUMatrix<ElemType>& scale, const GPUMatrix<ElemType>& bias, double expAvgFactor, double blendFactor,
+                                   GPUMatrix<ElemType>& runMean, GPUMatrix<ElemType>& runInvStdDev, GPUMatrix<ElemType>& out, double epsilon,
+                                   GPUMatrix<ElemType>& saveMean, GPUMatrix<ElemType>& saveInvStdDev) const;
+    void BatchNormalizationBackward(const GPUMatrix<ElemType>& in, GPUMatrix<ElemType>& grad, const GPUMatrix<ElemType>& scale, const GPUMatrix<ElemType>& saveMean, const GPUMatrix<ElemType>& saveInvStdDev,
+                                    GPUMatrix<ElemType>& scaleGrad, GPUMatrix<ElemType>& biasGrad) const;
+
 public:
     // static BLAS functions
     static void MultiplyAndWeightedAdd(ElemType alpha, const GPUMatrix<ElemType>& a, const bool transposeA, const GPUMatrix<ElemType>& b, const bool transposeB, ElemType beta, GPUMatrix<ElemType>& c);
@@ -454,7 +502,7 @@ public:
 
     static ElemType GetLearnRateForBlock_Helper(const GPUMatrix<ElemType>& Gradients, const GPUMatrix<ElemType>& SmoothedGradients);
 
-    ElemType LogAddSumOfElements() const;
+    ElemType LogSumOfElements() const;
 
 public:
     GPUMatrix<ElemType>& AssignElementProductOfWithShiftNeg(const GPUMatrix<ElemType>& a, const GPUMatrix<ElemType>& b, const size_t shift, const size_t nt);
@@ -504,7 +552,7 @@ public:
 
         // TODO: This is now ignored on input, so we can should change to an empty string. This might break parsing, and must be tested first
         std::wstring s = std::wstring(L"unnamed");
-        int format = us.m_format;
+        int format = us.GetFormat();
         stream << s << format;
 
         stream << us.m_numRows << us.m_numCols;

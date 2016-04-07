@@ -923,7 +923,8 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
     {
         Matrix<ElemType>& data = matrices.GetInputMatrix<ElemType>(iter->first);
         if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
-        { // Features.
+        { 
+            // Features.
             size_t id = m_featureNameToIdMap[iter->first];
             size_t dim = m_featureNameToDimMap[iter->first];
 
@@ -933,13 +934,14 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
                 m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
             }
             else if (m_featuresBufferAllocatedMultiIO[id] < dim * mbSize * m_numSeqsPerMB)
-            { // Buffer too small, we have to increase it.
+            { 
                 m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
                 m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
             }
 
             if (sizeof(ElemType) == sizeof(float))
-            { // For float, we copy entire column.
+            { 
+                // For float, we copy entire column.
                 for (size_t j = startFrame, k = 0; j < endFrame; j++, k++)
                 {
                     memcpy_s(&m_featuresBufferMultiIO[id].get()[((k + mbOffset) * m_numSeqsPerMB + uttIndex) * dim],
@@ -949,7 +951,8 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
                 }
             }
             else
-            { // For double, we have to copy element by element.
+            { 
+                // For double, we have to copy element by element.
                 for (size_t j = startFrame, k = 0; j < endFrame; j++, k++)
                 {
                     for (int d = 0; d < dim; d++)
@@ -960,7 +963,8 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
             }
         }
         else if (m_nameToTypeMap[iter->first] == InputOutputTypes::category)
-        { // Labels.
+        { 
+            // Labels.
             size_t id = m_labelNameToIdMap[iter->first];
             size_t dim = m_labelNameToDimMap[iter->first];
 

@@ -91,13 +91,8 @@ protected:
 template <class ElemType, int direction /*-1 for Past/left-to-right or +1 for Future/right-to-left*/ /*, MinibatchPackingFlags SequenceStart_or_End/*-Start or -End*/>
 class DelayedValueNodeBase : public ComputationNode<ElemType>, public IRecurrentNode, public ILateAttachingNode, public IStatefulNode, public NumInputs<1>
 {
-    typedef ComputationNode<ElemType> Base;
-    UsingComputationNodeMembersBoilerplate;
+    typedef ComputationNode<ElemType> Base; UsingComputationNodeMembers;
     typedef std::shared_ptr<DelayedValueNodeState<ElemType>> DelayedNodeStatePtr;
-    static const std::wstring TypeName()
-    {
-        return L"DelayedValue";
-    }
 
 private:
     void Init(const TensorShape& sampleLayout, ElemType initialActivationValue)
@@ -149,8 +144,11 @@ public:
         Base::Save(fstream);
 
         fstream << m_timeStep;
-        size_t colsDummy = 0;
-        fstream << GetSampleMatrixNumRows() << colsDummy; // #rows saved for legacy file format
+#if CURRENT_CNTK_MODEL_VERSION > CNTK_MODEL_VERSION_3
+        m_sampleLayout.Save(fstream);
+#else
+        fstream << GetSampleLayout().GetNumElements() << (size_t)0; // used to be (rows,cols); no need since inferred in Validate(), and wrong for non-matrix tensors
+#endif
 
         fstream << m_initialActivationValue;
     }
@@ -162,11 +160,22 @@ public:
 
         fstream >> m_timeStep;
 
-        size_t rows, colsDummy;
-        fstream >> rows >> colsDummy;
-
-        SetDims(TensorShape(rows), HasMBLayout() /*may be true on reload (roll-back)*/); // tensor shape will be overwritten in Validate()  --TODO: We should serialize it here.
-        m_delayedValue.Resize(rows, 0);                                                  // Note: If we try to access history in first minibatch, we shall crash. It would be a consequence of a missing sentence-begin flag
+        if (modelVersion > CNTK_MODEL_VERSION_3)
+        {
+            TensorShape sampleLayout;
+            sampleLayout.Load(fstream);
+            SetDims(sampleLayout, HasMBLayout() /*may be true on reload (roll-back)*/);
+        }
+        else
+        {
+            size_t rows, colsDummy;
+            fstream >> rows >> colsDummy;
+            // legacy format: if #rows matches then assume current tensor shape is up to date
+            // BUGBUG: This fails for non-column tensors. It should be sufficient to set
+            //         these to 0 and rely on Validate(), but some unknown nodes in the loop don't do that right.
+            SetDims(TensorShape(rows), HasMBLayout() /*may be true on reload (roll-back)*/); // tensor shape will be overwritten in Validate()
+        }
+        m_delayedValue.Resize(m_sampleLayout.GetNumElements(), 0); // Note: If we try to access history in first minibatch, we shall crash. It would be a consequence of a missing sentence-begin flag
 
         if (modelVersion >= CNTK_MODEL_VERSION_2)
             fstream >> m_initialActivationValue;
@@ -229,20 +238,8 @@ public:
         }
     }
 
-    virtual bool OutputUsedInComputingInputNodesGradients() const override
-    {
-        // The DelayedValueNode does not require its output value for computing
-        // the gradients of its input nodes
-        return false;
-    }
-
-    virtual bool InputUsedInComputingInputNodesGradients(size_t childIndex) const override
-    {
-        // The DelayedValueNode does not require any of it's input's values for computing
-        // the gradients of its input nodes
-        UNREFERENCED_PARAMETER(childIndex);
-        return false;
-    }
+    virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
+    virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
 
     virtual void EndForwardProp() override // called after last iteration step of ForwardProp()
     {
@@ -1180,4 +1177,4 @@ protected:
 
 #endif
 
-} } }
+}}}

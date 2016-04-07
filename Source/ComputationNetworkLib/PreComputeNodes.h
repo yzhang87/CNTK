@@ -27,8 +27,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 template <class ElemType>
 class PreComputedNodeBase : public ComputationNodeNonLooping /*ComputationNode*/<ElemType>, public IPreComputeNode
 {
-    typedef ComputationNodeNonLooping<ElemType> Base;
-    UsingComputationNodeMembers;
+    typedef ComputationNodeNonLooping<ElemType> Base; UsingComputationNodeMembers;
     using Base::OperationName;
 
 public:
@@ -41,22 +40,18 @@ public:
     // interface through which this node is operated on are these two functions
 
     // check whether node has already undergone precomputation
-    virtual bool /*IPreComputeNode::*/ HasComputed() const override
-    {
-        return m_hasComputed;
-    }
+    virtual bool /*IPreComputeNode::*/ HasComputed() const override { return m_hasComputed; }
 
     // call this with 'false' at start and with 'true' at end
     // This is used for resetting and updating from accumulators.
     virtual void /*IPreComputeNode::*/ MarkComputed(const bool hasComputed) override
     {
+        if (!Environment().IsPreComputing())
+            LogicError("MarkComputed: Network must be in preComputing mode.");
         m_hasComputed = hasComputed;
     }
 
-    virtual bool RequiresPreCompute() const override
-    {
-        return true;
-    }
+    virtual bool RequiresPreCompute() const override { return true; }
 
     virtual void Save(File& fstream) const override
     {
@@ -92,14 +87,11 @@ public:
     virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
     {
         Base::Validate(isFinalValidationPass);
-        if (!Input(0)->HasMBLayout())
+        if (isFinalValidationPass && !Input(0)->HasMBLayout())
             InvalidArgument("%ls %ls operation requires its input to come in minibatches of samples.", NodeName().c_str(), OperationName().c_str());
-        m_pMBLayout = nullptr; // this node does not hold mini-batch data
 
-        if (!m_hasComputed) // this node retains state, and state gets destroyed by Resize(), so we must be careful
-            SetDims(Input(0)->GetSampleLayout(), false);
-        else if (!GetSampleLayout().IsElementwiseCompatibleWith(Input(0)->GetSampleLayout()))
-            InvalidArgument("%ls %ls operation: Precomputed parameter does not match input dimensions.", NodeName().c_str(), OperationName().c_str());
+        m_pMBLayout = nullptr; // this node does not hold mini-batch data
+        SetDims(Input(0)->GetSampleLayout(), false);
     }
 
     virtual void CopyTo(ComputationNodeBasePtr nodeP, const std::wstring& newName, const CopyNodeFlags flags) const override
@@ -112,7 +104,7 @@ public:
         }
     }
 
-    // this is for the special case: convertDBN needs this; because we initialize values directly from another well-trained model
+    // this is for the special-purpose "convertdbn" command (initialize values directly from another well-trained model)
     virtual void SideLoadFromMatrix(const Matrix<ElemType>& value)
     {
         if (value.GetNumCols() != 1)
@@ -154,7 +146,7 @@ public:
         m_numSamples = SIZE_MAX;
     }
 
-    // this is used by convertDBN
+    // this is used by the special-purpose command "convertdbn".
     virtual void SideLoadFromMatrix(const Matrix<ElemType>& m)
     {
         Base::SideLoadFromMatrix(m);
@@ -199,10 +191,7 @@ public:
 
 protected:
     size_t m_numSamples; // (SIZE_MAX while outside accumulation state)
-    bool IsAccumulating() const
-    {
-        return m_numSamples != SIZE_MAX;
-    }
+    bool IsAccumulating() const { return m_numSamples != SIZE_MAX; }
 };
 
 #define UsingMeanInvStdDevNodeBaseNodeMembers \
@@ -261,8 +250,7 @@ public:
             totalNumSamples = 1; // 0/0=1 in this context
         ElemType alpha =                   1.0f / totalNumSamples;
         ElemType beta  = (ElemType)m_numSamples / totalNumSamples;
-#define MEANVAR_TENSOR_SUPPORT 2 // 0=old code; 1=tensor for mean estimate only; 2=tensor for mean and var estimate  --will removed in next commit
-#if MEANVAR_TENSOR_SUPPORT > 0
+
         size_t rank = DetermineElementwiseTensorRank();
         auto mean  =           ValueTensorFor(rank, FrameRange()); // mean is formed directly in our m_value
         auto input = Input(0)->ValueTensorFor(rank, fr);
@@ -270,16 +258,6 @@ public:
         mean.DoCopyOf(beta, input, alpha);
         // Note: We leverage that TensorView allows "broadcasting" the output,
         // which really means a reduction.
-#else
-        auto& samples = Input(0)->Value();
-        auto& avg = Value();
-        Matrix<ElemType>::MultiplyAndWeightedAdd(alpha, samples, false,
-                                                 ConstOnes(Input(0)->Value().GetNumCols(), 1, samples.GetDeviceId()),
-                                                 false, beta, avg);
-#endif
-#if NANCHECK
-        avg.HasNan("Mean-avg");
-#endif
 
         m_numSamples += numNewSamples;
     }
@@ -317,12 +295,12 @@ public:
         {
             // reset accumulators
             UpdateFunctionValuesSize();
-            Value().SetValue(0);    // Note: We must do this here already because dimensions are verified at places.
             m_mean.Resize(Value()); // mean accumulator normalized by #samples in it
             m_var .Resize(Value()); // likewise the variance
             m_temp.Resize(Value()); // and a temp
-            m_mean.SetValue(0); // reset the mean and var accumulators
+            m_mean.SetValue(0);  // reset the mean and var accumulators
             m_var .SetValue(0);
+            Value().SetValue(0); // and clear m_value as well: We must do this here already to avoid a NaN check to flag while this is being estimated.
         }
         else // finalize
         {
@@ -347,17 +325,13 @@ public:
         // set gaps to zero, since we are reducing in time
         Input(0)->MaskMissingValueColumnsToZero(fr);
 
-#if MEANVAR_TENSOR_SUPPORT < 2
-        m_temp.SetValue(m_mean); // old mean
-        auto& samples = Input(0)->Value();
-#endif
         size_t numNewSamples = Input(0)->GetMBLayout()->GetActualNumSamples();
         size_t totalNumSamples = m_numSamples + numNewSamples;
         if (totalNumSamples == 0)
             totalNumSamples = 1; // 0/0=1 in this context
         ElemType alpha =                   1.0f / totalNumSamples;
         ElemType beta  = (ElemType)m_numSamples / totalNumSamples;
-#if MEANVAR_TENSOR_SUPPORT > 0
+
         size_t rank = DetermineElementwiseTensorRank();
         auto input    = Input(0)->ValueTensorFor(        rank, fr);
         auto mean     =            DataTensorFor(m_mean, rank, FrameRange());
@@ -365,55 +339,20 @@ public:
         auto var      =            DataTensorFor(m_var,  rank, FrameRange());
 
         // preserve the old mean value for the next step
-#if MEANVAR_TENSOR_SUPPORT > 1
         temp.AssignCopyOf(mean);
-#endif
 
         // accumulate the mean
         mean.DoCopyOf(beta, input, alpha); // Note: This reduces over samples.
-#else
-        Matrix<ElemType>::MultiplyAndWeightedAdd(alpha, samples, false,
-                                                 ConstOnes(Input(0)->Value().GetNumCols(), 1, samples.GetDeviceId()),
-                                                 false, beta, m_mean);
-#endif
 
         // compute the correction term
-#if MEANVAR_TENSOR_SUPPORT > 1
         // var += (oldMean - newMean)^2
         temp.AddCopyOf(mean, -1.0f); // subtract new 'mean' from the old one
         var.AddSqrOf(temp);          // add the square
 
         // var += (input - mean)^2
-//Input(0)->Value().Print("input before", -3, -3, 0, INT_MAX);
-//m_mean.Print("mean before", -3, -3, -5, -5);
-//m_var.Print("var before", -3, -3, -5, -5);
         var.DoSqrOfDifferenceOf(beta, input, mean, alpha); // this reduces as well
-//m_var.Print("var after", -3, -3, -5, -5);
-#else
-        // var += (oldMean - newMean)^2
-        m_temp -= m_mean;
-        m_temp.AssignElementPowerOf(m_temp, 2);
-        m_var  += m_temp;
 
-        m_temp.AssignDifferenceOf(Input(0)->Value(), m_mean); // this is not reduced
-        m_temp.AssignElementPowerOf(m_temp, 2);               // elementwise per sample
-
-m_var.Print("var before 1", -3, -3, -5, -5);
-        Matrix<ElemType>::MultiplyAndWeightedAdd(alpha, m_temp, false,
-                                                 ConstOnes(Input(0)->Value().GetNumCols(), 1, samples.GetDeviceId()),
-                                                 false, beta, m_var);
-m_var.Print("var after 1", -3, -3, -5, -5);
-#endif
-
-#if NANCHECK
-        m_var.HasNan("InvStdDev-m_var");
-#endif
-
-#if 0   // BUGBUG: This is the correct version, but it will break test cases, so do this later. MeanNode does it right already.
         m_numSamples += Input(0)->GetMBLayout()->GetActualNumSamples();
-#else
-        m_numSamples += Input(0)->Value().GetNumCols(); // BUGBUG: Should be -> GetActualNumSamples().
-#endif
     }
 
     virtual void CopyTo(ComputationNodeBasePtr nodeP, const std::wstring& newName, const CopyNodeFlags flags) const override
@@ -470,7 +409,6 @@ public:
 
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override
     {
-#if 1
         size_t rank = DetermineElementwiseTensorRank();
         auto output    =           ValueTensorFor(rank, fr);
         auto input     = Input(0)->ValueTensorFor(rank, fr);
@@ -479,25 +417,56 @@ public:
 
         output.AssignDifferenceOf(input, mean);               // output = input - mean
         output.AssignElementwiseProductOf(output, invStdDev); // output *= invStdDev
-#else
-        // only feature (input0) and output needs to be sliced
-        auto functionValues = Input(0)->ValueFor(fr);
-        auto input0         = ValueFor(fr);
-        const auto& input1  = Input(1)->Value(); // mean
-        const auto& input2  = Input(2)->Value(); // inv stddev
-
-        functionValues.AssignDifferenceOf(input0, input1);
-        functionValues.ColumnElementMultiplyWith(input2);
-#endif
     }
 
     virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
     {
         Base::Validate(isFinalValidationPass);
-        InferMBLayoutFromInputsForStandardCase();
+        InferMBLayoutFromInputsForStandardCase(isFinalValidationPass);
 
         Input(1)->ValidateInferInputDimsFrom(Input(0)->GetSampleLayout());
         Input(2)->ValidateInferInputDimsFrom(Input(0)->GetSampleLayout());
+
+
+#if 1
+        // support for legacy models when the mean and variance vectors were stored as column vectors (N,1)
+        // This code will copy the shape of Input(0) (source) to Input(1) and Input(2) (target) if:
+        //   1. The source is a 3-tensor with shape 1x1xM
+        //   2. The target is a vector (i.e., a 2-tensor with shape Nx1)
+        //   3. Both targets have the same number of elements
+        //   4. The number of elements in the target (N) is the same as the number of elements in the source (M)
+        // Note: This is somewhat ugly [Jasha Droppo].
+
+        auto dimsA = Input(0)->GetSampleLayout().GetDims();
+        auto dimsB = Input(1)->GetSampleLayout().GetDims();
+        auto dimsC = Input(2)->GetSampleLayout().GetDims();
+
+        if (
+            // Test condition 1.
+            (dimsA.size() == 3 && dimsA[0] == 1 && dimsA[1] == 1) &&
+            // Test condition 2.
+            (dimsB.size() == 2 && dimsB[1] == 1) &&
+            (dimsC.size() == 2 && dimsC[1] == 1) &&
+            // Test condition 3. and condition 4.
+            (dimsB[0] == dimsC[0] && dimsB[0] == dimsA[2])
+            )
+        {
+            // for error messages
+            string dimsBstring = string(Input(1)->GetSampleLayout());
+            string dimsCstring = string(Input(2)->GetSampleLayout());
+
+            // reshape Input(1)
+            Input(1)->SetDims(TensorShape(dimsA), false);
+            fprintf(stderr, "\n%ls %ls operation: For legacy compatibility, the sample layout of second input (%ls %ls operation) was patched to [%s] (from [%s])\n",
+                NodeName().c_str(), OperationName().c_str(), Input(1)->NodeName().c_str(), Input(1)->OperationName().c_str(), string(Input(1)->GetSampleLayout()).c_str(), dimsBstring.c_str());
+
+            // reshape Input(2)
+            Input(2)->SetDims(TensorShape(dimsA), false);
+            fprintf(stderr, "\n%ls %ls operation: For legacy compatibility, the sample layout of third input (%ls %ls operation) was patched to [%s] (from [%s])\n",
+                NodeName().c_str(), OperationName().c_str(), Input(2)->NodeName().c_str(), Input(2)->OperationName().c_str(), string(Input(2)->GetSampleLayout()).c_str(), dimsCstring.c_str());
+        }
+
+#endif
 
         if (isFinalValidationPass)
         {
@@ -541,7 +510,6 @@ public:
     // feature ./ invStdDev + mean
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override
     {
-#if 1
         size_t rank = DetermineElementwiseTensorRank();
         auto output    =           ValueTensorFor(rank, fr);
         auto input     = Input(0)->ValueTensorFor(rank, fr);
@@ -550,23 +518,12 @@ public:
 
         output.AssignElementwiseQuotientOf(input, invStdDev); // output = input / invStdDev
         output.AddCopyOf(mean);                               // output += mean
-#else
-        // only feature (input0) and output needs to be sliced
-        auto functionValues = Input(0)->ValueFor(fr);
-        auto input0         = ValueFor(fr);
-        const auto& input1  = Input(1)->Value(); // mean
-        const auto& input2  = Input(2)->Value(); // inv stddev
-
-        functionValues.SetValue(input0);
-        functionValues.ColumnElementDivideBy(input2);
-        functionValues += input1;
-#endif
     }
 
     virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
     {
         Base::Validate(isFinalValidationPass);
-        InferMBLayoutFromInputsForStandardCase();
+        InferMBLayoutFromInputsForStandardCase(isFinalValidationPass);
 
         Input(1)->ValidateInferInputDimsFrom(Input(0)->GetSampleLayout());
         Input(2)->ValidateInferInputDimsFrom(Input(0)->GetSampleLayout());
@@ -584,4 +541,4 @@ public:
 template class PerDimMeanVarDeNormalizationNode<float>;
 template class PerDimMeanVarDeNormalizationNode<double>;
 
-} } }
+}}}
