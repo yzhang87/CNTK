@@ -12,7 +12,6 @@
 #include "latticearchive.h" // for reading HTK phoneme lattices (MMI training)
 #include "minibatchsourcehelpers.h"
 #include "minibatchiterator.h"
-#include "unordered_set"
 
 namespace msra { namespace dbn {
 

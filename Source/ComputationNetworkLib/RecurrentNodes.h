@@ -523,7 +523,7 @@ class LCPastValueNode : public DelayedValueNodeBase<ElemType, -1 /*, MinibatchPa
     UsingDelayedValueNodeMembers;
     static const std::wstring TypeName()
     {
-        return L"PastValue";
+        return L"LCPastValue";
     }
 
 public:

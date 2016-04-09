@@ -71,6 +71,15 @@ private:
     vector<size_t> m_switchFrame;
     bool m_noData;
 
+    // Parameter for LC-BlSTM
+    bool m_CSCtruncated;
+    size_t m_leftContext;
+    size_t m_middleContext;
+    size_t m_rightContext;
+    bool m_getPast;
+    size_t m_expandMBSize;
+
+
     bool m_trainOrTest; // if false, in file writing mode
 
     std::map<LabelIdType, LabelType> m_idToLabelMap;
@@ -119,6 +128,8 @@ private:
 
     bool GetMinibatchToTrainOrTest(StreamMinibatchInputs& matrices);
     bool GetOneMinibatchToTrainOrTestDataBuffer(const StreamMinibatchInputs& matrices);
+    void FormulateOneMinibatchToTrainOrTestDataBuffer(const StreamMinibatchInputs& matrices, bool &skip);
+    void FormulateOneMinibatchWithContextToTrainOrTestDataBuffer(const StreamMinibatchInputs& matrices, bool &skip);
     bool GetMinibatchToWrite(StreamMinibatchInputs& matrices);
     bool PopulateUtteranceInMinibatch(const StreamMinibatchInputs& matrices, size_t uttIndex, size_t startFrame, size_t endFrame, size_t mbSize, size_t mbOffset = 0);
 

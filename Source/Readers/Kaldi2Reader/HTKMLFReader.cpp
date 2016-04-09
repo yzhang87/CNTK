@@ -71,6 +71,17 @@ void HTKMLFReader<ElemType>::InitFromConfig(const ConfigRecordType& readerConfig
     m_truncated = readerConfig(L"Truncated", false);
     intargvector numberOfuttsPerMinibatchForAllEpochs = readerConfig(L"nbruttsineachrecurrentiter", ConfigRecordType::Array(intargvector(vector<int>{1})));
     m_numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;
+    
+    // Checks if we use context-sensitive-chunk BPTT
+    m_CSCtruncated = readerConfig(L"CSCTruncated", false);
+    if (m_CSCtruncated)
+    {
+        m_leftContext = readerConfig(L"leftContext", 0);
+        m_rightContext = readerConfig(L"rightContext", 0);
+        m_middleContext = readerConfig(L"middleContext", 20);
+        m_getPast = readerConfig(L"getPast", false);
+    }
+
 
     for (int i = 0; i < m_numSeqsPerMBForAllEpochs.size(); i++)
     {
@@ -992,88 +1003,9 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
 }
 
 template <class ElemType>
-bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
-    const StreamMinibatchInputs& matrices)
+void HTKMLFReader<ElemType>::FormulateOneMinibatchToTrainOrTestDataBuffer(
+    const StreamMinibatchInputs& matrices, bool& skip)
 {
-    bool skip = false;
-
-    // On first minibatch, check if we have input for given names.
-    if (m_checkDictionaryKeys)
-    {
-        for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
-        {
-            if (m_nameToTypeMap.find(iter->first) == m_nameToTypeMap.end())
-            {
-                throw std::runtime_error(msra::strfun::strprintf(
-                    "minibatch requested for input node %S not found in"
-                    "reader - cannot generate input\n",
-                    iter->first.c_str()));
-            }
-        }
-        m_checkDictionaryKeys = false;
-    }
-
-    // If we are doing utterance derivative buffering, we need to keep the
-    // utterance information.
-    if (m_doMinibatchBuffering)
-    {
-        m_minibatchUttInfo.assign(m_numSeqsPerMB,
-                                  std::vector<std::pair<wstring, size_t>>(0));
-
-        // For the moment we don't support same utterance in the same
-        // minibatch.
-        m_hasUttInCurrentMinibatch.clear();
-        for (size_t i = 0; i < m_numSeqsPerMB; i++)
-        {
-            while (m_hasUttInCurrentMinibatch.find(m_uttInfo[i][0].first) != m_hasUttInCurrentMinibatch.end())
-            {
-                fprintf(stderr, "WARNING: Utterance \"%S\" already exists "
-                                "in the minibatch, skipping it.\n",
-                        m_uttInfo[i][0].first.c_str());
-                ReNewBufferForMultiIO(i);
-            }
-            if (m_uttInfo[i].size() > 0)
-            {
-                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
-            }
-        }
-    }
-
-    m_currentMBSize = m_mbSize;
-    do
-    {
-        // Checks if we have finished all the utterances.
-        if (m_noData)
-        {
-            bool endEpoch = true;
-            for (size_t i = 0; i < m_numSeqsPerMB; i++)
-            {
-                if (m_processedFrame[i] != m_toProcess[i])
-                {
-                    endEpoch = false;
-                }
-            }
-            if (endEpoch)
-            {
-                return false;
-            }
-        }
-
-        // If <m_truncated> is true, <m_currentMBSize> is <m_mbSize>
-        // If <m_truncated> is false, <m_currentMBSize> equals to the longest
-        // utterance in the minibatch.
-        if (!m_truncated)
-        {
-            m_currentMBSize = 0;
-            for (size_t i = 0; i < m_numSeqsPerMB; i++)
-            {
-                if (m_currentBufferFrames[i] > m_currentMBSize)
-                {
-                    m_currentMBSize = m_currentBufferFrames[i];
-                }
-            }
-        }
-
         // We initialize the sentence boundary information before we process
         // the utterances.
         if (m_frameMode)
@@ -1267,7 +1199,258 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
             }
         }
 
-        skip = false;
+
+}
+
+template <class ElemType>
+void HTKMLFReader<ElemType>::FormulateOneMinibatchWithContextToTrainOrTestDataBuffer(
+    const StreamMinibatchInputs& matrices, bool& skip)
+{
+    // Context only been supportted by sequence version
+    assert(frameMode == false);
+    
+    // We initialize the sentence boundary information before we process
+    // the utterances.
+    m_expandMBSize = m_leftContext + m_currentMBSize + m_rightContext;
+    m_pMBLayout->Init(m_numSeqsPerMB, m_expandMBSize);
+
+    // Iterates over utterances. m_numSeqsPerMB = 1 is a
+    // special case.
+    for (size_t i = 0; i < m_numSeqsPerMB; i++)
+    {
+        size_t startFrame = m_processedFrame[i];
+        size_t endFrame = 0;
+
+        // left/right Context
+        size_t leftOffset = 0;
+        size_t rightOffset = 0;
+        
+        
+        leftOffset = min (startFrame, m_leftContext);
+        
+        if (!m_getPast)
+        {
+            // if we have enough data to fill
+            if ((m_toProcess[i] - startFrame) >= (m_expandMBSize - leftOffset))
+                m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, 0, m_expandMBSize);
+            else
+                m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, 0, m_toProcess[i] - startFrame);
+        } else
+        {
+            assert (m_leftContext==0);
+            // Sets the utterance boundary.
+            if (m_toProcess[i] > startFrame)
+            {
+                // if we have enough data to fill
+                if ((m_toProcess[i] - startFrame) >= m_expandMBSize)
+                    m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, -(ptrdiff_t) startFrame, m_expandMBSize);
+                else
+                    m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, -(ptrdiff_t) startFrame, m_toProcess[i] - startFrame);
+            }
+        }
+        
+        // fill left context
+        bool populateLeftSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame-leftOffset, startFrame, m_expandMBSize, 0);
+
+        if ((startFrame + m_currentMBSize) < m_toProcess[i])
+        {
+            // There is only 1 case:
+            //     1. <m_frameMode> is false, and <m_truncated> is true.
+            assert(m_frameMode == false);
+            assert(m_truncated == true);
+
+            endFrame = startFrame + m_currentMBSize;
+            // how many right context we need to fill
+            rightOffset = min (m_toProcess[i] - endFrame, m_rightContext);
+                        
+            bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame, endFrame, m_expandMBSize, leftOffset);
+            // fill right context
+            populateSucc = PopulateUtteranceInMinibatch(matrices, i, endFrame, endFrame + rightOffset, m_expandMBSize, leftOffset + m_currentMBSize);
+
+            if (m_doMinibatchBuffering && populateSucc)
+            {
+                m_minibatchUttInfo[i].push_back(m_uttInfo[i][0]);
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+            m_processedFrame[i] += m_currentMBSize;
+
+            // fill the gaps
+            size_t currentMBFilled = leftOffset + m_currentMBSize + rightOffset;
+            m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+            for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+            {
+                PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+            }
+        }
+        else if ((startFrame + m_currentMBSize) == m_toProcess[i])
+        {
+            // There are 3 cases:
+            //     1. <m_frameMode> is false, and <m_truncated> is true,
+            //        and it reaches the end of the utterance.
+            //     2. <m_frameMode> is false, and <m_truncated> is false
+            //        and it reaches the end of the utterance.
+            //     3. <m_frameMode> is true, then we do not have to set
+            //        utterance boundary.
+
+            // Sets the utterance boundary.
+
+            // Now puts the utterance into the minibatch, and loads the
+            // next one.
+            endFrame = startFrame + m_currentMBSize;
+            bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame, endFrame, m_expandMBSize, leftOffset);
+            if (m_doMinibatchBuffering && populateSucc)
+            {
+                m_minibatchUttInfo[i].push_back(m_uttInfo[i][0]);
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+            m_processedFrame[i] += m_currentMBSize;
+            bool reNewSucc = ReNewBufferForMultiIO(i);
+            // fill the gaps
+            size_t currentMBFilled = leftOffset + m_currentMBSize;
+
+            m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+            for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+            {
+                PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+            }
+        }
+        else
+        {
+            // There are 3 cases:
+            //     1. <m_frameMode> is true, then it must be a partial
+            //        minibatch.
+            //     2. <m_frameMode> is false, <m_truncated> is true,
+            //        then we have to pull frames from next utterance.
+            //     3. <m_frameMode> is false, <m_truncated> is false,
+            //        then the utterance is too short, we should try to
+            //        pull next utterance.
+
+            // Checks if we have reached the end of the minibatch.
+            if (startFrame == m_toProcess[i])
+            {
+                m_pMBLayout->AddGap(i, 0, m_expandMBSize);
+                for (size_t k = 0; k < m_expandMBSize; k++)
+                {
+                    PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize, k);
+                }
+                continue;
+            }
+
+            // we set utterance boundary for the partial
+            // minibatch, and then load it.
+            endFrame = m_toProcess[i];
+            bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame, endFrame, m_expandMBSize, leftOffset);
+            
+            if (m_doMinibatchBuffering && populateSucc)
+            {
+                m_minibatchUttInfo[i].push_back(m_uttInfo[i][0]);
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+            m_processedFrame[i] += endFrame - startFrame;
+            size_t currentMBFilled = leftOffset + endFrame - startFrame;
+
+            m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+            for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+            {
+                PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+            }
+
+
+            bool reNewSucc = ReNewBufferForMultiIO(i);
+
+        }
+
+    }
+    m_currentMBSize = m_expandMBSize;
+}
+
+
+template <class ElemType>
+bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
+    const StreamMinibatchInputs& matrices)
+{
+    bool skip = false;
+
+    // On first minibatch, check if we have input for given names.
+    if (m_checkDictionaryKeys)
+    {
+        for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
+        {
+            if (m_nameToTypeMap.find(iter->first) == m_nameToTypeMap.end())
+            {
+                throw std::runtime_error(msra::strfun::strprintf(
+                    "minibatch requested for input node %S not found in"
+                    "reader - cannot generate input\n",
+                    iter->first.c_str()));
+            }
+        }
+        m_checkDictionaryKeys = false;
+    }
+
+    // If we are doing utterance derivative buffering, we need to keep the
+    // utterance information.
+    if (m_doMinibatchBuffering)
+    {
+        m_minibatchUttInfo.assign(m_numSeqsPerMB,
+                                  std::vector<std::pair<wstring, size_t>>(0));
+
+        // For the moment we don't support same utterance in the same
+        // minibatch.
+        m_hasUttInCurrentMinibatch.clear();
+        for (size_t i = 0; i < m_numSeqsPerMB; i++)
+        {
+            if (m_uttInfo[i].size() > 0)
+            {
+                while (m_hasUttInCurrentMinibatch.find(m_uttInfo[i][0].first) != m_hasUttInCurrentMinibatch.end())
+                {
+                    fprintf(stderr, "WARNING: Utterance \"%S\" already exists "
+                                "in the minibatch, skipping it.\n",
+                        m_uttInfo[i][0].first.c_str());
+                    ReNewBufferForMultiIO(i);
+                }
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+        }
+    }
+
+    m_currentMBSize = m_mbSize;
+    do
+    {
+        // Checks if we have finished all the utterances.
+        if (m_noData)
+        {
+            bool endEpoch = true;
+            for (size_t i = 0; i < m_numSeqsPerMB; i++)
+            {
+                if (m_processedFrame[i] != m_toProcess[i])
+                {
+                    endEpoch = false;
+                }
+            }
+            if (endEpoch)
+            {
+                return false;
+            }
+        }
+        // If <m_truncated> is true, <m_currentMBSize> is <m_mbSize>
+        // If <m_truncated> is false, <m_currentMBSize> equals to the longest
+        // utterance in the minibatch.
+        if (!m_truncated)
+        {
+            m_currentMBSize = 0;
+            for (size_t i = 0; i < m_numSeqsPerMB; i++)
+            {
+                if (m_currentBufferFrames[i] > m_currentMBSize)
+                {
+                    m_currentMBSize = m_currentBufferFrames[i];
+                }
+            }
+        }
+
+        if (!m_CSCtruncated)
+            FormulateOneMinibatchToTrainOrTestDataBuffer(matrices, skip);
+        else
+            FormulateOneMinibatchWithContextToTrainOrTestDataBuffer(matrices, skip);
     } while (skip);
 
     return true;
