@@ -38,6 +38,10 @@ private:
     bool m_needLikelihood;
     bool m_epochEnd;
     size_t m_numUttsPerMinibatch;
+
+    // m_minibatch is the actual number of frames, default is 0, only used for latency control based BLSTM training.
+    size_t m_minibatch;
+
     size_t m_dimension;
     ElemType m_currentObj;
     std::vector<bool> m_uttReady;
@@ -72,6 +76,12 @@ public:
     bool NeedLikelihoodToComputeDerivative() const
     {
         return m_needLikelihood;
+    }
+    
+    // set the actual number of frames in a minibatch
+    void SetMinibatchSize (size_t minibatch)
+    {
+        m_minibatch = minibatch;
     }
 
     bool SetLikelihood(

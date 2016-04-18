@@ -239,6 +239,7 @@ void HTKMLFReader<ElemType>::PrepareForSequenceTraining(const ConfigRecordType& 
                    "sequence with some other metric that using derivative "
                    "buffering?\n");
     }
+
     m_uttDerivBuffer.reset(new UtteranceDerivativeBuffer<ElemType>(
         m_numSeqsPerMB, m_seqTrainDeriv.get()));
 }
@@ -1187,13 +1188,29 @@ void HTKMLFReader<ElemType>::FormulateOneMinibatchToTrainOrTestDataBuffer(
                 else
                 {
                     m_pMBLayout->AddGap(i, currentMBFilled, m_currentMBSize);
-                    for (size_t k = currentMBFilled; k < m_currentMBSize; k++)
+                    if (!m_CSCtruncated)
                     {
-                        // m_pMBLayout->Set(i, k, MinibatchPackingFlags::NoInput);
+                        for (size_t k = currentMBFilled; k < m_currentMBSize; k++)
+                        {
+                            // m_pMBLayout->Set(i, k, MinibatchPackingFlags::NoInput);
 
-                        // Populates <NO_INPUT> with real features, the
-                        // following implementation is not efficient...
-                        PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize, k);
+                            // Populates <NO_INPUT> with real features, the
+                            // following implementation is not efficient...
+                            PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize, k);
+                        }
+                    }
+                    else
+                    {
+                        // if we are in CSC mode, fill one more gap block for the right context
+                        for (size_t k = currentMBFilled; k < m_currentMBSize + m_rightContext; k++)
+                        {
+                            // m_pMBLayout->Set(i, k, MinibatchPackingFlags::NoInput);
+
+                            // Populates <NO_INPUT> with real features, the
+                            // following implementation is not efficient...
+                            PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize + m_rightContext, k);
+                        }
+
                     }
                 }
             }
@@ -1361,6 +1378,7 @@ void HTKMLFReader<ElemType>::FormulateOneMinibatchWithContextToTrainOrTestDataBu
         }
 
     }
+    assert (m_truncated == true);
     m_currentMBSize = m_expandMBSize;
 }
 
@@ -1447,10 +1465,11 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
             }
         }
 
-        if (!m_CSCtruncated)
+        if (!m_CSCtruncated || !m_truncated)
             FormulateOneMinibatchToTrainOrTestDataBuffer(matrices, skip);
         else
             FormulateOneMinibatchWithContextToTrainOrTestDataBuffer(matrices, skip);
+
     } while (skip);
 
     return true;
@@ -1504,20 +1523,61 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
 
         // Sets MBLayout.
         // currentMinibatch.pMBLayout->CopyFromRange(m_pMBLayout, startIndex, numFrames);
-        currentMinibatch.pMBLayout->Init(m_pMBLayout->GetNumParallelSequences(), numFrames);
+        if (!m_CSCtruncated)
+        {
+            assert(m_rightContext == 0);
+        }
+        currentMinibatch.pMBLayout->Init(m_pMBLayout->GetNumParallelSequences(), numFrames + m_rightContext);
         const auto& sequences = m_pMBLayout->GetAllSequences();
         for (const auto& seq : sequences)
         {
             if (seq.tEnd > startIndex && seq.tBegin < (ptrdiff_t)(startIndex + numFrames))
             {
+                // the offset for rightContext
+                size_t rightOffset = 0;
+                if (m_CSCtruncated && seq.tEnd > (numFrames + startIndex))
+                {
+                    // if the left number of frames less than the context, fill the remaining frames otherwise read the number of rightContext frames
+                    rightOffset = min (seq.tEnd - numFrames - startIndex, m_rightContext);
+                }
                 auto shiftedSeq = seq;
                 shiftedSeq.tBegin -= startIndex;
-                shiftedSeq.tEnd -= startIndex;
+                
+                if (m_CSCtruncated && rightOffset > 0)
+                {
+                    // set sentence end boundary at the end of this minibatch
+                    shiftedSeq.tEnd = numFrames + rightOffset;
+                }
+                else
+                {
+                    shiftedSeq.tEnd -= startIndex;
+                }
+
                 currentMinibatch.pMBLayout->AddSequence(shiftedSeq);
+                if (m_CSCtruncated && ((seq.tEnd >= (startIndex + numFrames))) && i != numMinibatches -1 )
+                {
+                    // if this is not the last frames, fill the gaps in the minibatch (m_rightContext - rightOffset). This is only happened when the sequence end exceed the end of this minibatch.
+                    currentMinibatch.pMBLayout->AddGap(seq.s, numFrames + rightOffset, numFrames + m_rightContext);
+                }
             }
         }
+        if (m_CSCtruncated && i == (numMinibatches -1))
+        {
+            // fill the gaps for the last minibatch. Note that for the frames before rightContext, we already have the gap sequence filled previous stage.
+            for (size_t j = 0; j < m_numSeqsPerMB; j++)
+            {
+                currentMinibatch.pMBLayout->AddGap(j, numFrames, numFrames + m_rightContext);
+            }
+        }
+        //fprintf (stderr, "hahah num of samples %zu\n", currentMinibatch.pMBLayout->GetActualNumSamples());
         // Sets the minibatch size for the current minibatch.
-        currentMinibatch.currentMBSize = numFrames;
+        if (!m_CSCtruncated)
+            currentMinibatch.currentMBSize = numFrames;
+        else
+        {
+            // latency control case, add the context for each minibatch.
+            currentMinibatch.currentMBSize = numFrames + m_rightContext;
+        }
 
         // Sets the utterance information for the current minibatch.
         currentMinibatch.minibatchUttInfo.assign(
@@ -1544,6 +1604,11 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
 
         size_t startDataCopy = startIndex * m_numSeqsPerMB;
         size_t endDataCopy = (startIndex + numFrames) * m_numSeqsPerMB;
+        if (m_CSCtruncated)
+        {
+            // for latency control case, reserve the space for the latency
+            endDataCopy = (startIndex + numFrames + m_rightContext) * m_numSeqsPerMB;
+        }
 
         // Copies features.
         currentMinibatch.features.resize(0);
@@ -1579,6 +1644,13 @@ void HTKMLFReader<ElemType>::CopyMinibatchFromBufferToMatrix(
     // Restores the variables related to the minibatch.
     m_pMBLayout->CopyFrom(m_minibatchBuffer[index].pMBLayout);
     m_currentMBSize = m_minibatchBuffer[index].currentMBSize;
+
+    if (m_CSCtruncated && m_doMinibatchBufferTruncation)
+    {
+        // latency control case, tell the DerivBuffer how many frame we have.
+        m_uttDerivBuffer->SetMinibatchSize(m_currentMBSize - m_rightContext);
+    }
+
     m_minibatchUttInfo = m_minibatchBuffer[index].minibatchUttInfo;
 
     // Copies data to the matrix.
