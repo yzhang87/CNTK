@@ -148,47 +148,40 @@ void File::Init(const wchar_t* filename, int fileOptions)
 // (wstring only for now; feel free to make this a template if needed)
 /*static*/ wstring File::DirectoryPathOf(wstring path)
 {
-#if WIN32
-    if (IsWindows8OrGreater())
+#ifdef _WIN32
+    // Win32 accepts forward slashes, but it seems that PathRemoveFileSpec() does not
+    // TODO:
+    // "PathCchCanonicalize does the / to \ conversion as a part of the canonicalization, it’s
+    // probably a good idea to do that anyway since I suspect that the '..' characters might
+    // confuse the other PathCch functions" [Larry Osterman]
+    // "Consider GetFullPathName both for canonicalization and last element finding." [Jay Krell]
+    path = msra::strfun::ReplaceAll<wstring>(path, L"/", L"\\");
+
+    HRESULT hr;
+    if (IsWindows8OrGreater()) // PathCchRemoveFileSpec() only available on Windows 8+
     {
         typedef HRESULT(*PathCchRemoveFileSpecProc)(_Inout_updates_(_Inexpressible_(cchPath)) PWSTR, _In_ size_t);
+        HINSTANCE hinstLib = LoadLibrary(TEXT("api-ms-win-core-path-l1-1-0.dll"));
+        if (hinstLib == nullptr)
+            RuntimeError("DirectoryPathOf: LoadLibrary() unexpectedly failed.");
+        PathCchRemoveFileSpecProc PathCchRemoveFileSpec = reinterpret_cast<PathCchRemoveFileSpecProc>(GetProcAddress(hinstLib, "PathCchRemoveFileSpec"));
+        if (!PathCchRemoveFileSpec)
+            RuntimeError("DirectoryPathOf: GetProcAddress() unexpectedly failed.");
 
-        HINSTANCE hinstLib;
-        PathCchRemoveFileSpecProc ProcAdd;
-        BOOL fFreeResult = FALSE;
+        // this is the actual function call we care about
+        hr = PathCchRemoveFileSpec(&path[0], path.size());
 
-        hinstLib = LoadLibrary(TEXT("api-ms-win-core-path-l1-1-0.dll"));
-        if (hinstLib != nullptr)
-        {
-            ProcAdd = reinterpret_cast<PathCchRemoveFileSpecProc>(GetProcAddress(hinstLib, "PathCchRemoveFileSpec"));
-            if (NULL != ProcAdd)
-            {
-                auto hr = (ProcAdd)(&path[0], path.size());
+        FreeLibrary(hinstLib);
+    }
+    else // on Windows 7-, use older PathRemoveFileSpec() instead
+        hr = PathRemoveFileSpec(&path[0]);
+
                 if (hr == S_OK) // done
                     path.resize(wcslen(&path[0]));
                 else if (hr == S_FALSE) // nothing to remove: use .
                     path = L".";
-            }
-            else
-            {
-                LogicError("DirectoryPathOf: GetProcAddress() unexpectedly failed.");
-            }
-
-            fFreeResult = FreeLibrary(hinstLib);
-        }
         else
-        {
-            LogicError("DirectoryPathOf: LoadLibrary() unexpectedly failed.");
-        }
-    }
-    else
-    {
-        auto hr = PathRemoveFileSpec(&path[0]);
-        if (hr != 0) // done
-            path.resize(wcslen(&path[0]));
-        else
-            path = L".";
-    }
+        RuntimeError("DirectoryPathOf: Path(Cch)RemoveFileSpec() unexpectedly failed with 0x%08x.", (unsigned int)hr);
 #else
     auto pos = path.find_last_of(L"/");
     if (pos != path.npos)
@@ -203,7 +196,7 @@ void File::Init(const wchar_t* filename, int fileOptions)
 // (wstring only for now; feel free to make this a template if needed)
 /*static*/ wstring File::FileNameOf(wstring path)
 {
-#if WIN32
+#ifdef WIN32
     static const wstring delim = L"\\:/";
 #else
     static const wstring delim = L"/";
@@ -218,7 +211,7 @@ void File::Init(const wchar_t* filename, int fileOptions)
 // get path of current executable
 /*static*/ wstring File::GetExecutablePath()
 {
-#if WIN32
+#ifdef WIN32
     wchar_t path[33000];
     if (GetModuleFileNameW(NULL, path, _countof(path)) == 0)
         LogicError("GetExecutablePath: GetModuleFileNameW() unexpectedly failed.");

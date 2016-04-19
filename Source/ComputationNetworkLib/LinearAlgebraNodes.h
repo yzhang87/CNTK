@@ -29,12 +29,8 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 template <class ElemType>
 class PlusNode : public BinaryElementWiseNode<ElemType>
 {
-    typedef BinaryElementWiseNode<ElemType> Base;
-    UsingBinaryElementwiseNodeBaseMembers;
-    static const std::wstring TypeName()
-    {
-        return L"Plus";
-    }
+    typedef BinaryElementWiseNode<ElemType> Base; UsingBinaryElementwiseNodeBaseMembers;
+    static const std::wstring TypeName() { return L"Plus"; }
 
 public:
     DeclareConstructorFromConfigWithNumInputs(PlusNode);
@@ -76,12 +72,8 @@ template class PlusNode<double>;
 template <class ElemType>
 class LogPlusNode : public BinaryElementWiseNode<ElemType>
 {
-    typedef BinaryElementWiseNode<ElemType> Base;
-    UsingBinaryElementwiseNodeBaseMembers;
-    static const std::wstring TypeName()
-    {
-        return L"LogPlus";
-    }
+    typedef BinaryElementWiseNode<ElemType> Base; UsingBinaryElementwiseNodeBaseMembers;
+    static const std::wstring TypeName() { return L"LogPlus"; }
 
 public:
     DeclareConstructorFromConfigWithNumInputs(LogPlusNode);
@@ -113,6 +105,7 @@ public:
         if (Input(inputIndex)->ReducesInTimeWrt(Input(1 - inputIndex)))
             Input(1 - inputIndex)->MaskMissingValueColumnsToZero(fr);
 
+        // TODO: would be nice to state the derivative here in a comment
         inputGradient.AddElementwiseProductWithLogSumDerivativeOf(gradient, input0, input1);
     }
 };
@@ -260,7 +253,7 @@ private:
     TensorView<ElemType> OneSampleTensorFor(int inputIndex/*-1 for output*/, bool gradient/*instead of value*/, const FrameRange& fr)
     {
         auto input = inputIndex < 0 ? this : Input(inputIndex).get();
-        auto& data = gradient ? input->Gradient() : input->Value();
+        auto data = gradient ? input->GradientPtr() : input->ValuePtr();
         size_t rank = input->GetSampleLayout().GetRank();
         if (!Input(0)->HasMBLayout()) // left input is no MB data: run normally
             return input->DataTensorFor(data, rank, fr);
@@ -287,9 +280,9 @@ public:
         // TensorView::DoMatrixProductOf() will reduce each tensor object into a 2D tensor (or fail if it cannot)
         // and recreate actual Matrix objects (in case of sparse, they must be identical to the original tensor storage object).
         // Transposition is applied after flattening into 2D, but only allowed if the input sample is 2D anyway.
-        auto input0 =       OneSampleTensorFor(0,  /*gradient=*/false,                fr.AllowBroadcast());
-        auto input1 =       OneSampleTensorFor(1,  /*gradient=*/false,                fr.AllowBroadcast());
-        auto output =       OneSampleTensorFor(-1, /*gradient=*/false,                fr);
+        auto input0 = OneSampleTensorFor(0,  /*gradient=*/false, fr.AllowBroadcast());
+        auto input1 = OneSampleTensorFor(1,  /*gradient=*/false, fr.AllowBroadcast());
+        auto output = OneSampleTensorFor(-1, /*gradient=*/false, fr);
         output.AssignMatrixProductOf(false/*transC*/, input0, m_transpose/*transA*/, input1, false/*transB*/);
     }
 
@@ -318,16 +311,16 @@ public:
             // If input data is sparse, then gradient is block sparse.
             if (Input(1)->Value().GetMatrixType() == SPARSE && Input(0)->Gradient().GetMatrixType() == DENSE && Gradient().GetMatrixType() == DENSE)
                 Input(0)->Gradient().SwitchToMatrixType(SPARSE, MatrixFormat::matrixFormatSparseBlockCol, false);
-            auto input0Gradient =       OneSampleTensorFor(0, /*gradient=*/true,                  fr.AllowBroadcast());
-            auto input1         =       OneSampleTensorFor(1,  /*gradient=*/false,                fr.AllowBroadcast());
-            auto outputGradient =       OneSampleTensorFor(-1, /*gradient=*/true,                 fr);
+            auto input0Gradient = OneSampleTensorFor(0, /*gradient=*/true,   fr.AllowBroadcast());
+            auto input1         = OneSampleTensorFor(1,  /*gradient=*/false, fr.AllowBroadcast());
+            auto outputGradient = OneSampleTensorFor(-1, /*gradient=*/true,  fr);
             input0Gradient.AddMatrixProductOf(m_transpose/*transC*/, outputGradient, false/*transA*/, input1, true/*transB*/);
         }
         else if (inputIndex == 1) // right derivative
         {
-            auto input0         =          OneSampleTensorFor(0, /*gradient=*/false,                 fr.AllowBroadcast());
-            auto input1Gradient =          OneSampleTensorFor(1, /*gradient=*/true,                  fr.AllowBroadcast());
-            auto outputGradient =          OneSampleTensorFor(-1, /*gradient=*/true,                 fr);
+            auto input0         = OneSampleTensorFor(0, /*gradient=*/false, fr.AllowBroadcast());
+            auto input1Gradient = OneSampleTensorFor(1, /*gradient=*/true,  fr.AllowBroadcast());
+            auto outputGradient = OneSampleTensorFor(-1, /*gradient=*/true, fr);
             input1Gradient.AddMatrixProductOf(false/*transC*/, input0, !m_transpose/*transA*/, outputGradient, false/*transB*/);
         }
     }
@@ -497,8 +490,7 @@ template class TimesNode<double>;
 // This differs from TimesNode in that A is transposed, where A must be a
 // rank-1 or rank-2 tensor.
 // A common use of transposition is trace(X'X) where X is a matrix of samples.
-// This can NOT be implemented with this node. Instead, use
-// SumColumnElements (ElementTimes (X, X))
+// This can be more efficiently implemented as ReducePlus (ElementTimes (X, X))
 // -----------------------------------------------------------------------
 
 template <class ElemType>
@@ -653,6 +645,9 @@ template class DiagTimesNode<double>;
 // When applied to minibatch data, this will sum across all sequences in the
 // minibatch, like a training-criterion node. This is one of the few operations
 // that cross the boundary between input sequences.
+// Note that SGD itself aggregates over samples in a criterion node.
+// So the only proper use of this node is for multi-task learning, where
+// different nodes have different numbers of samples (sequence lenth).
 // -----------------------------------------------------------------------
 
 template <class ElemType>
@@ -696,63 +691,6 @@ public:
 
 template class SumElementsNode<float>;
 template class SumElementsNode<double>;
-
-// -----------------------------------------------------------------------
-// SumColumnElementsNode (input)
-// Sums up all elements in each sample (column) of the input. Every sample
-// will be reduced to a scalar. This is equivalent to multiplying with a row of ones.
-// TODO: This should be deprecated, in favor of a reduce node.
-// TODO: Implement this with the tensor library.
-//       axis=0: all elements; axis>0: only that axis; axis<0: time (implemented in BS)
-// -----------------------------------------------------------------------
-
-template <class ElemType>
-class SumColumnElementsNode : public ComputationNode<ElemType>, public NumInputs<1>
-{
-    typedef ComputationNode<ElemType> Base;
-    UsingComputationNodeMembersBoilerplate;
-    static const std::wstring TypeName()
-    {
-        return L"SumColumnElements";
-    }
-
-public:
-    DeclareConstructorFromConfigWithNumInputs(SumColumnElementsNode);
-    SumColumnElementsNode(DEVICEID_TYPE deviceId, const wstring& name)
-        : Base(deviceId, name)
-    {
-    }
-
-    virtual void /*ComputationNode::*/ BackpropTo(const size_t /*inputIndex*/, const FrameRange& fr) override
-    {
-        auto sliceInputGrad = Input(0)->GradientFor(fr);
-        auto sliceOutputGrad = GradientFor(fr);
-
-        sliceInputGrad += sliceOutputGrad; // here the assumption is that sliceOutputGrad is a row vector
-    }
-
-    virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
-    virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
-
-    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override
-    {
-        auto sliceInputValue = Input(0)->ValueFor(fr);
-        auto sliceOutputValue = ValueFor(fr); // row vector
-
-        Matrix<ElemType>::VectorSum(sliceInputValue, sliceOutputValue, true);
-    }
-
-    virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
-    {
-        Base::Validate(isFinalValidationPass);
-        InferMBLayoutFromInputsForStandardCase(isFinalValidationPass);
-
-        SetDims(TensorShape(1), Input(0)->HasMBLayout()); // each column is reduced to a scalar
-    }
-};
-
-template class SumColumnElementsNode<float>;
-template class SumColumnElementsNode<double>;
 
 // -----------------------------------------------------------------------
 // TransposeDimensions (input, axis1, axis2)
@@ -819,16 +757,16 @@ public:
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override
     {
         size_t rank = DetermineElementwiseTensorRank();
-        auto output = ValueTensorFor(rank, fr);
-        auto input  = TensorView<ElemType>(Input(0)->Value(), GetTransposedTensorSliceFor(rank, fr));
+        auto output =                                ValueTensorFor(                         rank, fr);
+        auto input  = TensorView<ElemType>(Input(0)->ValuePtr(), GetTransposedTensorSliceFor(rank, fr));
         output.AssignCopyOf(input);
     }
 
     virtual void /*ComputationNode::*/ BackpropTo(const size_t inputIndex, const FrameRange& fr) override
     {
         size_t rank = DetermineElementwiseTensorRank();
-        auto outputGradient = GradientTensorFor(rank, fr);
-        auto inputGradient  = TensorView<ElemType>(Input(0)->Gradient(), GetTransposedTensorSliceFor(rank, fr));
+        auto outputGradient =                                GradientTensorFor(                         rank, fr);
+        auto inputGradient  = TensorView<ElemType>(Input(0)->GradientPtr(), GetTransposedTensorSliceFor(rank, fr));
         inputGradient.AddCopyOf(outputGradient);
     }
 

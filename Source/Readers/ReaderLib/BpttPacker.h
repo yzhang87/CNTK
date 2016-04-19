@@ -36,7 +36,17 @@ private:
     void ReadSequencesToSlot(size_t slotIndex);
 
     // Packs a slot into the data buffer.
-    void PackSlot(size_t streamIndex, size_t slotIndex);
+    // SequenceId specifies the starting value to be used as sequence identifier.
+    // For each new input, sequence id is reset to 0, and incremented each time
+    // a sequence is added to the layout. This allows layouts corresponding to different
+    // inputs to have consistent sequence ids.
+    void PackSlot(size_t streamIndex, size_t slotIndex, size_t& sequenceId);
+
+    virtual MBLayoutPtr CreateMBLayout(const StreamBatch& batch)
+    {
+        UNUSED(batch);
+        NOT_IMPLEMENTED;
+    }
 
     // Parallel number of sequences to pack.
     // Calculated based on the truncation size and minibatch size in samples.
@@ -53,13 +63,6 @@ private:
     // Layout per stream.
     // TODO: currently assume that layout is the same between different streams, this will change.
     std::vector<MBLayoutPtr> m_currentLayouts;
-
-    // Buffers for allocated data.
-    std::vector<std::shared_ptr<char>> m_streamBuffers;
-
-    // Size of allocated buffers, m_streamBuffers.size() == m_streamBufferSizes.size().
-    // TODO: this will disappear after Alexey's merge (StreamBuffer class).
-    std::vector<size_t> m_streamBufferSizes;
 };
 
 typedef std::shared_ptr<BpttPacker> BpttPackerPtr;

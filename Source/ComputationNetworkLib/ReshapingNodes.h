@@ -171,7 +171,57 @@ template class ReshapeNode<float>;
 template class ReshapeNode<double>;
 
 // -----------------------------------------------------------------------
-// ReconcileMBLayout (dataInput, layoutInput)
+// ReduceElements (op, axis=, input)
+// Reduces (e.g. sums up) all elements in each sample (column) of the input.
+// The optional axis can be 0 (meaning all elements) or a specific axis.
+// Allowed operations:
+//  - "Plus"
+//  - "LogPlus"   --not implemented yet
+//  - "Mean"      --not implemented yet
+//  - "Max"       --not implemented yet
+//  - "Min"       --not implemented yet
+//  - "All"       --not implemented yet
+//  - "Any"       --not implemented yet
+// -----------------------------------------------------------------------
+
+template <class ElemType>
+class ReduceElementsNode : public ComputationNode<ElemType>, public NumInputs<1>
+{
+    typedef ComputationNode<ElemType> Base; UsingComputationNodeMembersBoilerplate;
+    static const std::wstring TypeName() { return L"ReduceElements"; }
+
+    void ValidateOp();
+public:
+    ReduceElementsNode(DEVICEID_TYPE deviceId, const wstring& name, const std::wstring& operation = std::wstring(), int axis = 0) :
+        Base(deviceId, name), m_operation(operation), m_axis(axis), m_op((ElementWiseOperator)-1/*invalid*/)
+    {
+        if (!m_operation.empty()) // verify validity already here out of courtesy (would otherwise be caught in Validate())
+            ValidateOp();
+    }
+
+    ReduceElementsNode(const ScriptableObjects::IConfigRecordPtr configp) :
+        ReduceElementsNode(configp->Get(L"deviceId"), L"<placeholder>", configp->Get(L"reductionOp"), configp->Get(L"axis"))
+    {
+        AttachInputsFromConfig(configp, this->GetExpectedNumInputs());
+    }
+
+    virtual void /*ComputationNodeBase::*/ CopyTo(ComputationNodeBasePtr nodeP, const std::wstring& newName, const CopyNodeFlags flags) const override;
+    virtual void /*ComputationNodeBase::*/ Load(File& fstream, size_t modelVersion) override;
+    virtual void /*ComputationNodeBase::*/ Save(File& fstream) const override;
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override;
+    virtual void /*ComputationNode::*/ BackpropTo(const size_t inputIndex, const FrameRange& fr) override;
+    virtual bool /*ComputationNodeBase::*/ OutputUsedInComputingInputNodesGradients() const override;
+    virtual bool /*ComputationNodeBase::*/ InputUsedInComputingInputNodesGradients(size_t childIndex) const override;
+    virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override;
+
+private:
+    int m_axis;
+    std::wstring m_operation; // the operation as a string, e.g. "Plus", see GetOpcode()
+    ElementWiseOperator m_op; // the operation mapped to our internal opCode
+};
+
+// -----------------------------------------------------------------------
+// ReconcileDynamicAxis (dataInput, layoutInput)
 // This node copies data from 'dataInput' while it propagates the minibatch-layout information from 'layoutInput'.
 // It does perform a runtime check to enforce that the layout of 'dataInput' is compatible (identical content) to that of 'layoutInput'.
 // This node is meant to be used from BrainScript macros that bracket expand/reduce pairs of nodes. It is not meant to really be used directly.
@@ -179,14 +229,14 @@ template class ReshapeNode<double>;
 // -----------------------------------------------------------------------
 
 template <class ElemType>
-class ReconcileMBLayoutNode : public ComputationNode<ElemType>, public NumInputs<2>
+class ReconcileDynamicAxisNode : public ComputationNode<ElemType>, public NumInputs<2>
 {
     typedef ComputationNode<ElemType> Base; UsingComputationNodeMembersBoilerplate;
-    static const std::wstring TypeName() { return L"ReconcileMBLayout"; }
+    static const std::wstring TypeName() { return L"ReconcileDynamicAxis"; }
 
 public:
-    DeclareConstructorFromConfigWithNumInputs(ReconcileMBLayoutNode);
-    ReconcileMBLayoutNode(DEVICEID_TYPE deviceId, const wstring& name)
+    DeclareConstructorFromConfigWithNumInputs(ReconcileDynamicAxisNode);
+    ReconcileDynamicAxisNode(DEVICEID_TYPE deviceId, const wstring& name)
         : Base(deviceId, name)
     {
     }
@@ -228,8 +278,8 @@ public:
     }
 };
 
-template class ReconcileMBLayoutNode<float>;
-template class ReconcileMBLayoutNode<double>;
+template class ReconcileDynamicAxisNode<float>;
+template class ReconcileDynamicAxisNode<double>;
 
 // -----------------------------------------------------------------------
 // SliceNode (input)
@@ -303,16 +353,16 @@ public:
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override
     {
         size_t rank = DetermineElementwiseTensorRank();
-        auto output =                                ValueTensorFor(rank,         fr);
-        let   input = TensorView<ElemType>(Input(0)->Value(), GetInputSlice(rank, fr.AllowBroadcast()));
+        auto output =                                ValueTensorFor(           rank, fr);
+        let   input = TensorView<ElemType>(Input(0)->ValuePtr(), GetInputSlice(rank, fr.AllowBroadcast()));
         output.AssignCopyOf(input);
     }
 
     virtual void /*ComputationNode::*/ BackpropTo(const size_t /*inputIndex*/, const FrameRange& fr) override
     {
         size_t rank = DetermineElementwiseTensorRank();
-        let outputGrad =                                GradientTensorFor(rank,         fr);
-        auto inputGrad = TensorView<ElemType>(Input(0)->Gradient(), GetInputSlice(rank, fr));
+        let outputGrad =                                GradientTensorFor(           rank, fr);
+        auto inputGrad = TensorView<ElemType>(Input(0)->GradientPtr(), GetInputSlice(rank, fr.AllowBroadcast()));
         inputGrad.AddCopyOf(outputGrad);
     }
 
@@ -413,7 +463,7 @@ public:
         {
             let input = Input(inputIndex)->ValueTensorFor(rank, fr.AllowBroadcast());
             let outputSubSlice = NarrowToStripe(outputSlice, inputIndex);
-            auto output = TensorView<ElemType>(Value(), outputSubSlice);
+            auto output = TensorView<ElemType>(ValuePtr(), outputSubSlice);
             output.AssignCopyOf(input);
         }
     }
@@ -425,7 +475,7 @@ public:
 
         auto inputGrad = Input(inputIndex)->GradientTensorFor(rank, fr.AllowBroadcast());
         let outputSubSlice = NarrowToStripe(outputSlice, inputIndex);
-        let outputGrad = TensorView<ElemType>(Gradient(), outputSubSlice);
+        let outputGrad = TensorView<ElemType>(GradientPtr(), outputSubSlice);
         inputGrad.AddCopyOf(outputGrad);
     }
 
@@ -1074,7 +1124,10 @@ public:
         else if (Input(0)->HasMBLayout())
         {
             if (!m_pMBLayout)
+            {
                 m_pMBLayout = make_shared<MBLayout>(); // mini-batch data: this generates a new layout
+                m_pMBLayout->SetUniqueAxisName(NodeName());
+            }
         }
         else
             assert(!m_pMBLayout); // reshaping non-mini-batch data
@@ -1317,10 +1370,10 @@ reshaping
 reductions
 ----------
 
- - ReduceSum
+ - these are/will be implemented as a node for samples, and as recurrences for sequences
+ - ReducePlus
     - sum over all elements of a dimension, or over time
-    - we already got: SumColumnElements
- - ReduceMax
+ - ReduceMax, ReduceMin
     - max
     - can use MaxPooling?
  - ReduceMean
@@ -1329,12 +1382,12 @@ reductions
  - ArgMax, ArgMin
     - we already have that somewhere, for evaluation
  - All, Any
-    - logical test --must be done over sequences
+    - logical test
  - TF also has:
-    - reduce_prod, reduce_min
+    - reduce_prod
     - segment_sum etc.; we use sequences
     - listdiff
-    - where: indices of 'true' values  -> 2D tensor of coordinates
+    - where: indices of 'true' values  -> 2D tensor of coordinates (unlike our Where)
     - unique (1D only)
     - edit_distance
     - invert_permutation: invert a permutation index vector
