@@ -44,11 +44,6 @@ template <class ElemType>
 template <class ConfigRecordType>
 void HTKMLFReader<ElemType>::InitFromConfig(const ConfigRecordType& readerConfig)
 {
-    m_mbiter = NULL;
-    m_frameSource = NULL;
-    m_lattices = NULL;
-    m_seqTrainDeriv = NULL;
-    m_uttDerivBuffer = NULL;
     m_minibatchBuffer.resize(0);
     m_minibatchBufferIndex = 0;
     m_noData = false;
@@ -63,31 +58,49 @@ void HTKMLFReader<ElemType>::InitFromConfig(const ConfigRecordType& readerConfig
         RuntimeError("legacy mode has been deprecated\n");
     }
 
-    // If <m_framemode> is false, throw away any utterance that is longer
+    // If <m_frameMode> is false, throw away any utterance that is longer
     // than the specified <m_maxUtteranceLength>.
     m_maxUtteranceLength = readerConfig(L"maxUtteranceLength", 10000);
 
     // m_truncated:
     //     If true, truncate utterances to fit the minibatch size. Otherwise
     //     the actual minibatch size will be the length of the utterance.
-    // m_numberOfuttsPerMinibatch:
+    // m_numSeqsPerMB:
     //     If larger than one, then each minibatch contains multiple
     //     utterances.
     m_truncated = readerConfig(L"Truncated", false);
-    m_numberOfuttsPerMinibatch = readerConfig(L"nbruttsineachrecurrentiter", 1);
-    if (m_numberOfuttsPerMinibatch < 1)
+    intargvector numberOfuttsPerMinibatchForAllEpochs = readerConfig(L"nbruttsineachrecurrentiter", ConfigRecordType::Array(intargvector(vector<int>{1})));
+    m_numSeqsPerMBForAllEpochs = numberOfuttsPerMinibatchForAllEpochs;
+    
+    // Checks if we use context-sensitive-chunk BPTT
+    m_CSCtruncated = readerConfig(L"CSCTruncated", false);
+    if (m_CSCtruncated)
     {
-        LogicError("nbrUttsInEachRecurrentIter cannot be less than 1.\n");
+        m_leftContext = readerConfig(L"leftContext", 0);
+        m_rightContext = readerConfig(L"rightContext", 0);
+        m_middleContext = readerConfig(L"middleContext", 20);
+        m_getPast = readerConfig(L"getPast", false);
     }
 
+
+    for (int i = 0; i < m_numSeqsPerMBForAllEpochs.size(); i++)
+    {
+        if (m_numSeqsPerMBForAllEpochs[i] < 1)
+        {
+            LogicError("nbrUttsInEachRecurrentIter cannot be less than 1.");
+        }
+    }
+
+    m_numSeqsPerMB = m_numSeqsPerMBForAllEpochs[0];
+    m_pMBLayout->Init(m_numSeqsPerMB, 0); // (SGD will ask before entering actual reading --TODO: This is hacky.)
+
     // Initializes variables related to multi-utterance.
-    m_actualnumberOfuttsPerMinibatch = m_numberOfuttsPerMinibatch;
-    m_sentenceEnd.assign(m_numberOfuttsPerMinibatch, true);
-    m_processedFrame.assign(m_numberOfuttsPerMinibatch, 0);
-    m_toProcess.assign(m_numberOfuttsPerMinibatch, 0);
-    m_switchFrame.assign(m_numberOfuttsPerMinibatch, 0);
-    m_currentBufferFrames.assign(m_numberOfuttsPerMinibatch, 0);
-    m_uttInfo.resize(m_numberOfuttsPerMinibatch);
+    //m_sentenceEnd.assign(m_numSeqsPerMB, true);
+    //m_processedFrame.assign(m_numSeqsPerMB, 0);
+    //m_toProcess.assign(m_numSeqsPerMB, 0);
+    //m_switchFrame.assign(m_numSeqsPerMB, 0);
+    //m_currentBufferFrames.assign(m_numSeqsPerMB, 0);
+    //m_uttInfo.resize(m_numSeqsPerMB);
 
     // Checks if we need to do sequence training.
     if (readerConfig.Exists(L"seqTrainCriterion"))
@@ -101,8 +114,8 @@ void HTKMLFReader<ElemType>::InitFromConfig(const ConfigRecordType& readerConfig
     }
 
     // Checks if framemode is false in sequence training.
-    m_framemode = readerConfig(L"frameMode", true);
-    if (m_framemode && m_doSeqTrain)
+    m_frameMode = readerConfig(L"frameMode", true);
+    if (m_frameMode && m_doSeqTrain)
     {
         LogicError("frameMode has to be false in sequence training.\n");
     }
@@ -213,10 +226,10 @@ void HTKMLFReader<ElemType>::PrepareForSequenceTraining(const ConfigRecordType& 
     }
 
     // Initializes sequence training interface.
-    m_seqTrainDeriv = new KaldiSequenceTrainingDerivative<ElemType>(
+    m_seqTrainDeriv.reset(new KaldiSequenceTrainingDerivative<ElemType>(
         denlatRspecifier, aliRspecifier, transModelFilename,
         silencePhoneStr, m_seqTrainCriterion, oldAcousticScale,
-        acousticScale, lmScale, oneSilenceClass);
+        acousticScale, lmScale, oneSilenceClass));
 
     // Initializes derivative buffering.
     m_doMinibatchBuffering = true;
@@ -226,8 +239,9 @@ void HTKMLFReader<ElemType>::PrepareForSequenceTraining(const ConfigRecordType& 
                    "sequence with some other metric that using derivative "
                    "buffering?\n");
     }
-    m_uttDerivBuffer = new UtteranceDerivativeBuffer<ElemType>(
-        m_numberOfuttsPerMinibatch, m_seqTrainDeriv);
+
+    m_uttDerivBuffer.reset(new UtteranceDerivativeBuffer<ElemType>(
+        m_numSeqsPerMB, m_seqTrainDeriv.get()));
 }
 
 // Loads input and output data for training and testing. Below we list the
@@ -255,10 +269,10 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
     //     Holds pointers to the data trunk for each utterance.
     // m_featuresBufferAllocatedMultiUtt:
     //     Actual data stores here.
-    m_featuresBufferMultiUtt.assign(m_numberOfuttsPerMinibatch, NULL);
-    m_featuresBufferAllocatedMultiUtt.assign(m_numberOfuttsPerMinibatch, 0);
-    m_labelsBufferMultiUtt.assign(m_numberOfuttsPerMinibatch, NULL);
-    m_labelsBufferAllocatedMultiUtt.assign(m_numberOfuttsPerMinibatch, 0);
+    m_featuresBufferMultiUtt.assign(m_numSeqsPerMB, NULL);
+    m_featuresBufferAllocatedMultiUtt.assign(m_numSeqsPerMB, 0);
+    m_labelsBufferMultiUtt.assign(m_numSeqsPerMB, NULL);
+    m_labelsBufferAllocatedMultiUtt.assign(m_numSeqsPerMB, 0);
 
     // Gets a list of features and labels. Note that we assume feature
     // section has sub-field "scpFile" and label section has sub-field
@@ -275,11 +289,18 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
     size_t iFeat = 0;
     vector<size_t> numContextLeft;
     vector<size_t> numContextRight;
-    vector<msra::asr::FeatureSection*>& scriptpaths = m_trainingOrTestingFeatureSections;
+    size_t numExpandToUtt = 0;
+    vector<std::shared_ptr<msra::asr::FeatureSection>>& scriptpaths = m_trainingOrTestingFeatureSections;
     foreach_index (i, featureNames)
     {
         const ConfigRecordType& thisFeature = readerConfig(featureNames[i]);
         m_featDims.push_back(thisFeature(L"dim"));
+
+        bool expandToUtt = thisFeature(L"expandToUtterance", false); // should feature be processed as an ivector?
+        m_expandToUtt.push_back(expandToUtt);
+        if (expandToUtt)
+            numExpandToUtt++;
+
         intargvector contextWindow = thisFeature(L"contextWindow", ConfigRecordType::Array(intargvector(vector<int>{1})));
         if (contextWindow.size() == 1) // symmetric
         {
@@ -316,7 +337,7 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
         m_featureNameToIdMap[featureNames[i]] = iFeat;
         assert(iFeat == m_featureIdToNameMap.size());
         m_featureIdToNameMap.push_back(featureNames[i]);
-        scriptpaths.push_back(new msra::asr::FeatureSection(thisFeature(L"scpFile"), thisFeature(L"rx"), thisFeature(L"featureTransform", L"")));
+        scriptpaths.push_back(make_shared<msra::asr::FeatureSection>(thisFeature(L"scpFile"), thisFeature(L"rx"), thisFeature(L"featureTransform", L"")));
         m_featureNameToDimMap[featureNames[i]] = m_featDims[i];
 
         m_featuresBufferMultiIO.push_back(NULL);
@@ -473,12 +494,14 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
         // Note, we are actually not using <m_lattices>, the only reason we
         // kept it was because it was required by
         // <minibatchutterancesourcemulti>.
-        m_lattices = new msra::dbn::latticesource(latticetocs, modelsymmap, L"");
-        
+        m_lattices.reset(new msra::dbn::latticesource(latticetocs, modelsymmap, L""));
         // now get the frame source. This has better randomization and doesn't create temp files
-        m_frameSource = new msra::dbn::minibatchutterancesourcemulti(
+        bool minimizeReaderMemoryFootprint = readerConfig(L"minimizeReaderMemoryFootprint", true);
+        // now get the frame source. This has better randomization and doesn't create temp files
+        m_frameSource.reset(new msra::dbn::minibatchutterancesourcemulti(
             scriptpaths, infilesmulti, labelsmulti, m_featDims, m_labelDims,
-            numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, m_framemode);
+            numContextLeft, numContextRight, randomize, *m_lattices, m_latticeMap, m_frameMode,minimizeReaderMemoryFootprint, m_expandToUtt));
+        m_frameSource->setverbosity(m_verbosity);
     }
     else if (EqualCI(readMethod, "rollingWindow"))
     {
@@ -554,7 +577,7 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
         // m_frameSourceMultiIO = new msra::dbn::minibatchframesourcemulti(infilesmulti, labelsmulti, m_featDims, m_labelDims, randomize, pagepath, mayhavenoframe, addEnergy);
         // m_frameSourceMultiIO->setverbosity(verbosity);
         int verbosity = readerConfig(L"verbosity", 2);
-        m_frameSource = new msra::dbn::minibatchframesourcemulti(scriptpaths, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, pagePaths, mayhavenoframe, addEnergy);
+        m_frameSource.reset(new msra::dbn::minibatchframesourcemulti(scriptpaths, infilesmulti, labelsmulti, m_featDims, m_labelDims, numContextLeft, numContextRight, randomize, pagePaths, mayhavenoframe, addEnergy));
         m_frameSource->setverbosity(verbosity);
     }
     else
@@ -583,7 +606,7 @@ void HTKMLFReader<ElemType>::PrepareForWriting(const ConfigRecordType& readerCon
     vector<size_t> numContextLeft;
     vector<size_t> numContextRight;
     vector<size_t> realDims;
-    vector<msra::asr::FeatureSection*>& scriptpaths = m_writingFeatureSections;
+    vector<std::shared_ptr<msra::asr::FeatureSection>>& scriptpaths = m_writingFeatureSections;
     foreach_index (i, featureNames)
     {
         ConfigParameters thisFeature = readerConfig(featureNames[i]);
@@ -627,7 +650,7 @@ void HTKMLFReader<ElemType>::PrepareForWriting(const ConfigRecordType& readerCon
         m_featureNameToIdMap[featureNames[i]] = iFeat;
         assert(iFeat == m_featureIdToNameMap.size());
         m_featureIdToNameMap.push_back(featureNames[i]);
-        scriptpaths.push_back(new msra::asr::FeatureSection(thisFeature("scpFile"), thisFeature("rx"), thisFeature("featureTransform", "")));
+        scriptpaths.push_back(std::make_shared<msra::asr::FeatureSection>(thisFeature("scpFile"), thisFeature("rx"), thisFeature("featureTransform", "")));
         m_featureNameToDimMap[featureNames[i]] = realDims[i];
 
         m_featuresBufferMultiIO.push_back(NULL);
@@ -666,36 +689,13 @@ void HTKMLFReader<ElemType>::PrepareForWriting(const ConfigRecordType& readerCon
         m_inputFilesMultiIO.push_back(filelist);
     }
 
-    m_fileEvalSource = new msra::dbn::FileEvalSource(realDims, numContextLeft, numContextRight, evalchunksize);
+    m_fileEvalSource.reset(new msra::dbn::FileEvalSource(realDims, numContextLeft, numContextRight, evalchunksize));
 }
 
 // destructor - virtual so it gets called properly
 template <class ElemType>
 HTKMLFReader<ElemType>::~HTKMLFReader()
 {
-    delete m_mbiter;
-    delete m_frameSource;
-    delete m_lattices;
-    delete m_seqTrainDeriv;
-    delete m_uttDerivBuffer;
-
-    foreach_index(i, m_featuresBufferMultiIO)
-        delete[] m_featuresBufferMultiIO[i];
-
-    foreach_index(i, m_labelsBufferMultiIO)
-        delete[] m_labelsBufferMultiIO[i];
-
-    for (size_t i = 0; i < m_numberOfuttsPerMinibatch; i++)
-    {
-        delete[] m_featuresBufferMultiUtt[i];
-        delete[] m_labelsBufferMultiUtt[i];
-    }
-
-    foreach_index (i, m_trainingOrTestingFeatureSections)
-        delete m_trainingOrTestingFeatureSections[i];
-
-    foreach_index (i, m_writingFeatureSections)
-        delete m_writingFeatureSections[i];
 }
 
 // StartMinibatchLoop - Startup a minibatch loop
@@ -703,27 +703,69 @@ HTKMLFReader<ElemType>::~HTKMLFReader()
 // epoch - [in] epoch number for this loop
 // requestedEpochSamples - [in] number of samples to randomize, defaults to requestDataSize which uses the number of samples there are in the dataset
 template <class ElemType>
-void HTKMLFReader<ElemType>::StartMinibatchLoop(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
-{
-    m_mbSize = mbSize;
-    m_currentMBSize = mbSize;
+void HTKMLFReader<ElemType>::StartDistributedMinibatchLoop(size_t requestedMBSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples /*= requestDataSize*/)
+{    
+    assert(subsetNum < numSubsets);
+    assert(((subsetNum == 0) && (numSubsets == 1)) || this->SupportsDistributedMBRead());
+
+    m_mbSize = requestedMBSize; // note: ignored in frame mode and full-seuqence mode
+    m_currentMBSize = requestedMBSize;
+
+    m_numSeqsPerMB = m_numSeqsPerMBForAllEpochs[epoch];
+
+    // For distributed reading under utterance mode, we distribute the utterances per minibatch among all the subsets
+    if (m_trainOrTest && !m_frameMode)
+    {
+        if ((numSubsets > 1) && (m_numSeqsPerMB < numSubsets))
+        {
+            LogicError("Insufficient value of 'nbruttsineachrecurrentiter'=%d for distributed reading with %d subsets", (int) m_numSeqsPerMB, (int) numSubsets);
+        }
+
+        m_numSeqsPerMB = (m_numSeqsPerMB / numSubsets) + ((subsetNum < (m_numSeqsPerMB % numSubsets)) ? 1 : 0);
+    }
+
+    m_pMBLayout->Init(m_numSeqsPerMB, 0); // (SGD will ask before entering actual reading --TODO: This is hacky.)
+
+    // resize the arrays
+    // These are sized to the requested number. If not all can be filled, it will still return this many, just with gaps.
+    // In frame mode, m_numSeqsPerMB must be 1. However, the returned layout has one 1-frame sequence per frame.
+    m_sentenceEnd.assign(m_numSeqsPerMB, true);
+    m_processedFrame.assign(m_numSeqsPerMB, 0);
+    m_toProcess.assign(m_numSeqsPerMB, 0);
+    m_switchFrame.assign(m_numSeqsPerMB, 0);
+    m_currentBufferFrames.assign(m_numSeqsPerMB, 0);
+    m_uttInfo.resize(m_numSeqsPerMB);
 
     if (m_trainOrTest)
     {
-        StartMinibatchLoopToTrainOrTest(mbSize, epoch, requestedEpochSamples);
+        // for the multi-utterance process
+        m_featuresBufferMultiUtt.assign(m_numSeqsPerMB, nullptr);
+        m_featuresBufferAllocatedMultiUtt.assign(m_numSeqsPerMB, 0);
+        m_labelsBufferMultiUtt.assign(m_numSeqsPerMB, nullptr);
+        m_labelsBufferAllocatedMultiUtt.assign(m_numSeqsPerMB, 0);
+
+        StartMinibatchLoopToTrainOrTest(requestedMBSize, epoch, subsetNum, numSubsets, requestedEpochSamples);
     }
     else
     {
-        StartMinibatchLoopToWrite(mbSize, epoch, requestedEpochSamples);
+        // No distributed reading of mini-batches for write
+        if ((subsetNum != 0) || (numSubsets != 1))
+        {
+            LogicError("Distributed reading of mini-batches is only supported for training or testing");
+        }
+        m_pMBLayout->Init(requestedMBSize, 0); // (SGD will ask before entering actual reading --TODO: This is hacky.)
+
+        StartMinibatchLoopToWrite(requestedMBSize, epoch, requestedEpochSamples);
     }
     m_checkDictionaryKeys = true;
 }
 
 template <class ElemType>
-void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t requestedEpochSamples)
+void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples)
 {
     size_t datapasses = 1;
     size_t totalFrames = m_frameSource->totalframes();
+
     size_t extraFrames = totalFrames % mbSize;
     size_t minibatches = totalFrames / mbSize;
 
@@ -753,14 +795,21 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size
     }
 
     // Gets a new minibatch iterator.
-    if (m_mbiter != NULL)
+    if (m_mbiter != nullptr)
     {
-        delete m_mbiter;
-        m_mbiter = NULL;
+        m_mbiter = nullptr;
     }
-    msra::dbn::minibatchsource* source = m_frameSource;
-    size_t currentMBSize = (m_framemode == true) ? mbSize : 1;
-    m_mbiter = new msra::dbn::minibatchiterator(*source, epoch, requestedEpochSamples, currentMBSize, datapasses);
+    size_t currentMBSize = (m_frameMode == true) ? mbSize : 1;
+    m_mbiter.reset(new msra::dbn::minibatchiterator(*m_frameSource, epoch, requestedEpochSamples, currentMBSize, subsetNum, numSubsets, datapasses));
+    // Advance the MB iterator until we find some data or reach the end of epoch
+    while ((m_mbiter->currentmbframes() == 0) && *m_mbiter)
+    {
+        (*m_mbiter)++;
+    }
+
+    m_noData = false;
+    if (!(*m_mbiter))
+        m_noData = true;
 
     // Resets utterance derivative buffering class.
     if (m_doMinibatchBuffering)
@@ -781,41 +830,39 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToTrainOrTest(size_t mbSize, size
     {
         foreach_index (i, m_featuresBufferMultiIO)
         {
-            if (m_featuresBufferMultiIO[i] != NULL)
+            if (m_featuresBufferMultiIO[i] != nullptr)
             {
-                delete[] m_featuresBufferMultiIO[i];
-                m_featuresBufferMultiIO[i] = NULL;
+                m_featuresBufferMultiIO[i] = nullptr;
                 m_featuresBufferAllocatedMultiIO[i] = 0;
             }
         }
+        m_featuresStartIndexMultiUtt.assign(m_featuresBufferMultiIO.size() * m_numSeqsPerMB, 0);
+
     }
     if (!m_labelsBufferMultiIO.empty())
     {
         foreach_index (i, m_labelsBufferMultiIO)
         {
-            if (m_labelsBufferMultiIO[i] != NULL)
+            if (m_labelsBufferMultiIO[i] != nullptr)
             {
-                delete[] m_labelsBufferMultiIO[i];
-                m_labelsBufferMultiIO[i] = NULL;
+                m_labelsBufferMultiIO[i] = nullptr;
                 m_labelsBufferAllocatedMultiIO[i] = 0;
             }
         }
+
+        m_labelsStartIndexMultiUtt.assign(m_labelsBufferMultiIO.size() * m_numSeqsPerMB, 0);
     }
-    m_noData = false;
-    m_featuresStartIndexMultiUtt.assign(m_featuresBufferMultiIO.size() * m_numberOfuttsPerMinibatch, 0);
-    m_labelsStartIndexMultiUtt.assign(m_labelsBufferMultiIO.size() * m_numberOfuttsPerMinibatch, 0);
-    for (size_t u = 0; u < m_numberOfuttsPerMinibatch; u++)
+    
+    for (size_t u = 0; u < m_numSeqsPerMB; u++)
     {
-        if (m_featuresBufferMultiUtt[u] != NULL)
+        if (m_featuresBufferMultiUtt[u] != nullptr)
         {
-            delete[] m_featuresBufferMultiUtt[u];
-            m_featuresBufferMultiUtt[u] = NULL;
+            m_featuresBufferMultiUtt[u] = nullptr;
             m_featuresBufferAllocatedMultiUtt[u] = 0;
         }
-        if (m_labelsBufferMultiUtt[u] != NULL)
+        if (m_labelsBufferMultiUtt[u] != nullptr)
         {
-            delete[] m_labelsBufferMultiUtt[u];
-            m_labelsBufferMultiUtt[u] = NULL;
+            m_labelsBufferMultiUtt[u] = nullptr;
             m_labelsBufferAllocatedMultiUtt[u] = 0;
         }
         ReNewBufferForMultiIO(u);
@@ -832,10 +879,9 @@ void HTKMLFReader<ElemType>::StartMinibatchLoopToWrite(size_t mbSize, size_t /*e
 
     foreach_index (i, m_featuresBufferMultiIO)
     {
-        if (m_featuresBufferMultiIO[i] != NULL)
+        if (m_featuresBufferMultiIO[i] != nullptr)
         {
-            delete[] m_featuresBufferMultiIO[i];
-            m_featuresBufferMultiIO[i] = NULL;
+            m_featuresBufferMultiIO[i] = nullptr;
             m_featuresBufferAllocatedMultiIO[i] = 0;
         }
     }
@@ -887,6 +933,7 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
     size_t numOfLabel = m_labelsBufferMultiIO.size();
     for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
     {
+        Matrix<ElemType>& data = matrices.GetInputMatrix<ElemType>(iter->first);
         if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
         { 
             // Features.
@@ -895,15 +942,13 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
 
             if (m_featuresBufferMultiIO[id] == NULL)
             {
-                m_featuresBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
-                m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
+                m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
             }
-            else if (m_featuresBufferAllocatedMultiIO[id] < dim * mbSize * m_numberOfuttsPerMinibatch)
+            else if (m_featuresBufferAllocatedMultiIO[id] < dim * mbSize * m_numSeqsPerMB)
             { 
-                // Buffer too small, we have to increase it.
-                delete[] m_featuresBufferMultiIO[id];
-                m_featuresBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
-                m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
+                m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
             }
 
             if (sizeof(ElemType) == sizeof(float))
@@ -911,9 +956,9 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
                 // For float, we copy entire column.
                 for (size_t j = startFrame, k = 0; j < endFrame; j++, k++)
                 {
-                    memcpy_s(&m_featuresBufferMultiIO[id][((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim],
+                    memcpy_s(&m_featuresBufferMultiIO[id].get()[((k + mbOffset) * m_numSeqsPerMB + uttIndex) * dim],
                              sizeof(ElemType) * dim,
-                             &m_featuresBufferMultiUtt[uttIndex][j * dim + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]],
+                             &m_featuresBufferMultiUtt[uttIndex].get()[j * dim + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]],
                              sizeof(ElemType) * dim);
                 }
             }
@@ -924,8 +969,7 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
                 {
                     for (int d = 0; d < dim; d++)
                     {
-                        m_featuresBufferMultiIO[id][((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim + d] = 
-                            m_featuresBufferMultiUtt[uttIndex][j * dim + d + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]];
+                        m_featuresBufferMultiIO[id].get()[((k + mbOffset) * m_numSeqsPerMB + uttIndex) * dim + d] = m_featuresBufferMultiUtt[uttIndex].get()[j * dim + d + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]];
                     }
                 }
             }
@@ -938,22 +982,20 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
 
             if (m_labelsBufferMultiIO[id] == NULL)
             {
-                m_labelsBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
-                m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
+                m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
             }
-            else if (m_labelsBufferAllocatedMultiIO[id] < dim * mbSize * m_numberOfuttsPerMinibatch)
+            else if (m_labelsBufferAllocatedMultiIO[id] < dim * mbSize * m_numSeqsPerMB)
             {
-                delete[] m_labelsBufferMultiIO[id];
-                m_labelsBufferMultiIO[id] = new ElemType[dim * mbSize * m_numberOfuttsPerMinibatch];
-                m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numberOfuttsPerMinibatch;
+                m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
             }
 
             for (size_t j = startFrame, k = 0; j < endFrame; j++, k++)
             {
                 for (int d = 0; d < dim; d++)
                 {
-                    m_labelsBufferMultiIO[id][((k + mbOffset) * m_numberOfuttsPerMinibatch + uttIndex) * dim + d] = 
-                        m_labelsBufferMultiUtt[uttIndex][j * dim + d + m_labelsStartIndexMultiUtt[id + uttIndex * numOfLabel]];
+                    m_labelsBufferMultiIO[id].get()[((k + mbOffset) * m_numSeqsPerMB + uttIndex) * dim + d] = m_labelsBufferMultiUtt[uttIndex].get()[j * dim + d + m_labelsStartIndexMultiUtt[id + uttIndex * numOfLabel]];
                 }
             }
         }
@@ -962,115 +1004,29 @@ bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
 }
 
 template <class ElemType>
-bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
-    const StreamMinibatchInputs& matrices)
+void HTKMLFReader<ElemType>::FormulateOneMinibatchToTrainOrTestDataBuffer(
+    const StreamMinibatchInputs& matrices, bool& skip)
 {
-    bool skip = false;
-
-    // On first minibatch, check if we have input for given names.
-    if (m_checkDictionaryKeys)
-    {
-        for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
-        {
-            if (m_nameToTypeMap.find(iter->first) == m_nameToTypeMap.end())
-            {
-                throw std::runtime_error(msra::strfun::strprintf(
-                    "minibatch requested for input node %S not found in"
-                    "reader - cannot generate input\n",
-                    iter->first.c_str()));
-            }
-        }
-        m_checkDictionaryKeys = false;
-    }
-
-    // If we are doing utterance derivative buffering, we need to keep the
-    // utterance information.
-    if (m_doMinibatchBuffering)
-    {
-        m_minibatchUttInfo.assign(m_numberOfuttsPerMinibatch,
-                                  std::vector<std::pair<wstring, size_t>>(0));
-
-        // For the moment we don't support same utterance in the same
-        // minibatch.
-        m_hasUttInCurrentMinibatch.clear();
-        for (size_t i = 0; i < m_numberOfuttsPerMinibatch; i++)
-        {
-            while (m_hasUttInCurrentMinibatch.find(m_uttInfo[i][0].first) != m_hasUttInCurrentMinibatch.end())
-            {
-                fprintf(stderr, "WARNING: Utterance \"%S\" already exists "
-                                "in the minibatch, skipping it.\n",
-                        m_uttInfo[i][0].first.c_str());
-                ReNewBufferForMultiIO(i);
-            }
-            if (m_uttInfo[i].size() > 0)
-            {
-                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
-            }
-        }
-    }
-
-    m_currentMBSize = m_mbSize;
-    do
-    {
-        // Checks if we have finished all the utterances.
-        if (m_noData)
-        {
-            bool endEpoch = true;
-            for (size_t i = 0; i < m_numberOfuttsPerMinibatch; i++)
-            {
-                if (m_processedFrame[i] != m_toProcess[i])
-                {
-                    endEpoch = false;
-                }
-            }
-            if (endEpoch)
-            {
-                return false;
-            }
-        }
-
-        // If <m_truncated> is true, <m_currentMBSize> is <m_mbSize>
-        // If <m_truncated> is false, <m_currentMBSize> equals to the longest
-        // utterance in the minibatch.
-        if (!m_truncated)
-        {
-            m_currentMBSize = 0;
-            for (size_t i = 0; i < m_numberOfuttsPerMinibatch; i++)
-            {
-                if (m_currentBufferFrames[i] > m_currentMBSize)
-                {
-                    m_currentMBSize = m_currentBufferFrames[i];
-                }
-            }
-        }
-
         // We initialize the sentence boundary information before we process
         // the utterances.
-        if (m_framemode)
+        if (m_frameMode)
         {
-            assert(m_numberOfuttsPerMinibatch == 1);
+            assert(m_numSeqsPerMB == 1);
             m_pMBLayout->InitAsFrameMode(m_currentMBSize);
         }
         else
         {
-            m_pMBLayout->Init(m_numberOfuttsPerMinibatch, m_currentMBSize);
+            m_pMBLayout->Init(m_numSeqsPerMB, m_currentMBSize);
         }
-        /*for (size_t i = 0; i < m_numberOfuttsPerMinibatch; i++)
-            {
-                for (size_t j = 0; j < m_currentMBSize; j++)
-                {
-                    m_pMBLayout->SetWithoutOr(i, j, MinibatchPackingFlags::None);
-                }
-            }*/
 
-        // Iterates over utterances. m_numberOfuttsPerMinibatch = 1 is a
+        // Iterates over utterances. m_numSeqsPerMB = 1 is a
         // special case.
-        for (size_t i = 0; i < m_numberOfuttsPerMinibatch; i++)
+        for (size_t i = 0; i < m_numSeqsPerMB; i++)
         {
             size_t startFrame = m_processedFrame[i];
             size_t endFrame = 0;
             // Sets the utterance boundary.
-            if (!m_framemode)
+            if (!m_frameMode)
             {
                 if (m_toProcess[i] > startFrame)
                 {
@@ -1082,8 +1038,8 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
             if ((startFrame + m_currentMBSize) < m_toProcess[i])
             {
                 // There is only 1 case:
-                //     1. <m_framemode> is false, and <m_truncated> is true.
-                assert(m_framemode == false);
+                //     1. <m_frameMode> is false, and <m_truncated> is true.
+                assert(m_frameMode == false);
                 assert(m_truncated == true);
 
                 endFrame = startFrame + m_currentMBSize;
@@ -1098,15 +1054,15 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
             else if ((startFrame + m_currentMBSize) == m_toProcess[i])
             {
                 // There are 3 cases:
-                //     1. <m_framemode> is false, and <m_truncated> is true,
+                //     1. <m_frameMode> is false, and <m_truncated> is true,
                 //        and it reaches the end of the utterance.
-                //     2. <m_framemode> is false, and <m_truncated> is false
+                //     2. <m_frameMode> is false, and <m_truncated> is false
                 //        and it reaches the end of the utterance.
-                //     3. <m_framemode> is true, then we do not have to set
+                //     3. <m_frameMode> is true, then we do not have to set
                 //        utterance boundary.
 
                 // Sets the utterance boundary.
-                /*if (m_framemode == false)
+                /*if (m_frameMode == false)
                     {
                         if (startFrame == 0)
                         {
@@ -1132,11 +1088,11 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
             else
             {
                 // There are 3 cases:
-                //     1. <m_framemode> is true, then it must be a partial
+                //     1. <m_frameMode> is true, then it must be a partial
                 //        minibatch.
-                //     2. <m_framemode> is false, <m_truncated> is true,
+                //     2. <m_frameMode> is false, <m_truncated> is true,
                 //        then we have to pull frames from next utterance.
-                //     3. <m_framemode> is false, <m_truncated> is false,
+                //     3. <m_frameMode> is false, <m_truncated> is false,
                 //        then the utterance is too short, we should try to
                 //        pull next utterance.
 
@@ -1155,10 +1111,10 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
                     continue;
                 }
 
-                // First, if <m_framemode> is true, then it must be a
+                // First, if <m_frameMode> is true, then it must be a
                 // partial minibatch, and if that is not allowed, we have to
                 // skip this minibatch.
-                if (m_framemode && !m_partialMinibatch)
+                if (m_frameMode && !m_partialMinibatch)
                 {
                     skip = true;
                     bool reNewSucc = ReNewBufferForMultiIO(i); // Should return false?
@@ -1167,7 +1123,7 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
 
                 // Second, we set utterance boundary for the partial
                 // minibatch, and then load it.
-                /*  if (m_framemode == false)
+                /*  if (m_frameMode == false)
                     {
                         if (startFrame == 0)
                         {
@@ -1195,7 +1151,9 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
                 {
                     // Sets the utterance boundary.
                     assert(currentMBFilled + m_toProcess[i] <= m_pMBLayout->GetNumTimeSteps());
-                    m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, currentMBFilled, currentMBFilled + m_toProcess[i]);
+
+                    if (m_toProcess[i])
+                        m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, currentMBFilled, currentMBFilled + m_toProcess[i]);
                     // m_pMBLayout->Set(i, currentMBFilled, MinibatchPackingFlags::SequenceStart);
                     // m_pMBLayout->Set(i, currentMBFilled + m_toProcess[i] - 1, MinibatchPackingFlags::SequenceEnd);
                     populateSucc = PopulateUtteranceInMinibatch(matrices, i, 0, m_toProcess[i], m_currentMBSize, currentMBFilled);
@@ -1212,7 +1170,7 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
 
                 // Finally, pulls frames from next utterance if the current
                 // minibatch is not full.
-                if (reNewSucc && !m_framemode && m_truncated)
+                if (reNewSucc && !m_frameMode && m_truncated)
                 {
                     populateSucc = PopulateUtteranceInMinibatch(matrices, i, 0, m_currentMBSize - currentMBFilled, m_currentMBSize, currentMBFilled);
                     if (m_doMinibatchBuffering && populateSucc)
@@ -1230,19 +1188,288 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
                 else
                 {
                     m_pMBLayout->AddGap(i, currentMBFilled, m_currentMBSize);
-                    for (size_t k = currentMBFilled; k < m_currentMBSize; k++)
+                    if (!m_CSCtruncated)
                     {
-                        // m_pMBLayout->Set(i, k, MinibatchPackingFlags::NoInput);
+                        for (size_t k = currentMBFilled; k < m_currentMBSize; k++)
+                        {
+                            // m_pMBLayout->Set(i, k, MinibatchPackingFlags::NoInput);
 
-                        // Populates <NO_INPUT> with real features, the
-                        // following implementation is not efficient...
-                        PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize, k);
+                            // Populates <NO_INPUT> with real features, the
+                            // following implementation is not efficient...
+                            PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize, k);
+                        }
+                    }
+                    else
+                    {
+                        // if we are in CSC mode, fill one more gap block for the right context
+                        for (size_t k = currentMBFilled; k < m_currentMBSize + m_rightContext; k++)
+                        {
+                            // m_pMBLayout->Set(i, k, MinibatchPackingFlags::NoInput);
+
+                            // Populates <NO_INPUT> with real features, the
+                            // following implementation is not efficient...
+                            PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize + m_rightContext, k);
+                        }
+
                     }
                 }
             }
         }
 
-        skip = false;
+
+}
+
+template <class ElemType>
+void HTKMLFReader<ElemType>::FormulateOneMinibatchWithContextToTrainOrTestDataBuffer(
+    const StreamMinibatchInputs& matrices, bool& skip)
+{
+    // Context only been supportted by sequence version
+    assert(frameMode == false);
+    
+    // We initialize the sentence boundary information before we process
+    // the utterances.
+    m_expandMBSize = m_leftContext + m_currentMBSize + m_rightContext;
+    m_pMBLayout->Init(m_numSeqsPerMB, m_expandMBSize);
+
+    // Iterates over utterances. m_numSeqsPerMB = 1 is a
+    // special case.
+    for (size_t i = 0; i < m_numSeqsPerMB; i++)
+    {
+        size_t startFrame = m_processedFrame[i];
+        size_t endFrame = 0;
+
+        // left/right Context
+        size_t leftOffset = 0;
+        size_t rightOffset = 0;
+        
+        
+        leftOffset = min (startFrame, m_leftContext);
+        
+        if (!m_getPast)
+        {
+            // if we have enough data to fill
+            if ((m_toProcess[i] - startFrame) >= (m_expandMBSize - leftOffset))
+                m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, 0, m_expandMBSize);
+            else
+                m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, 0, m_toProcess[i] - startFrame);
+        } else
+        {
+            assert (m_leftContext==0);
+            // Sets the utterance boundary.
+            if (m_toProcess[i] > startFrame)
+            {
+                // if we have enough data to fill
+                if ((m_toProcess[i] - startFrame) >= m_expandMBSize)
+                    m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, -(ptrdiff_t) startFrame, m_expandMBSize);
+                else
+                    m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, -(ptrdiff_t) startFrame, m_toProcess[i] - startFrame);
+            }
+        }
+        
+        // fill left context
+        bool populateLeftSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame-leftOffset, startFrame, m_expandMBSize, 0);
+
+        if ((startFrame + m_currentMBSize) < m_toProcess[i])
+        {
+            // There is only 1 case:
+            //     1. <m_frameMode> is false, and <m_truncated> is true.
+            assert(m_frameMode == false);
+            assert(m_truncated == true);
+
+            endFrame = startFrame + m_currentMBSize;
+            // how many right context we need to fill
+            rightOffset = min (m_toProcess[i] - endFrame, m_rightContext);
+                        
+            bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame, endFrame, m_expandMBSize, leftOffset);
+            // fill right context
+            populateSucc = PopulateUtteranceInMinibatch(matrices, i, endFrame, endFrame + rightOffset, m_expandMBSize, leftOffset + m_currentMBSize);
+
+            if (m_doMinibatchBuffering && populateSucc)
+            {
+                m_minibatchUttInfo[i].push_back(m_uttInfo[i][0]);
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+            m_processedFrame[i] += m_currentMBSize;
+
+            // fill the gaps
+            size_t currentMBFilled = leftOffset + m_currentMBSize + rightOffset;
+            m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+            for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+            {
+                PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+            }
+        }
+        else if ((startFrame + m_currentMBSize) == m_toProcess[i])
+        {
+            // There are 3 cases:
+            //     1. <m_frameMode> is false, and <m_truncated> is true,
+            //        and it reaches the end of the utterance.
+            //     2. <m_frameMode> is false, and <m_truncated> is false
+            //        and it reaches the end of the utterance.
+            //     3. <m_frameMode> is true, then we do not have to set
+            //        utterance boundary.
+
+            // Sets the utterance boundary.
+
+            // Now puts the utterance into the minibatch, and loads the
+            // next one.
+            endFrame = startFrame + m_currentMBSize;
+            bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame, endFrame, m_expandMBSize, leftOffset);
+            if (m_doMinibatchBuffering && populateSucc)
+            {
+                m_minibatchUttInfo[i].push_back(m_uttInfo[i][0]);
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+            m_processedFrame[i] += m_currentMBSize;
+            bool reNewSucc = ReNewBufferForMultiIO(i);
+            // fill the gaps
+            size_t currentMBFilled = leftOffset + m_currentMBSize;
+
+            m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+            for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+            {
+                PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+            }
+        }
+        else
+        {
+            // There are 3 cases:
+            //     1. <m_frameMode> is true, then it must be a partial
+            //        minibatch.
+            //     2. <m_frameMode> is false, <m_truncated> is true,
+            //        then we have to pull frames from next utterance.
+            //     3. <m_frameMode> is false, <m_truncated> is false,
+            //        then the utterance is too short, we should try to
+            //        pull next utterance.
+
+            // Checks if we have reached the end of the minibatch.
+            if (startFrame == m_toProcess[i])
+            {
+                m_pMBLayout->AddGap(i, 0, m_expandMBSize);
+                for (size_t k = 0; k < m_expandMBSize; k++)
+                {
+                    PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_currentMBSize, k);
+                }
+                continue;
+            }
+
+            // we set utterance boundary for the partial
+            // minibatch, and then load it.
+            endFrame = m_toProcess[i];
+            bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFrame, endFrame, m_expandMBSize, leftOffset);
+            
+            if (m_doMinibatchBuffering && populateSucc)
+            {
+                m_minibatchUttInfo[i].push_back(m_uttInfo[i][0]);
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+            m_processedFrame[i] += endFrame - startFrame;
+            size_t currentMBFilled = leftOffset + endFrame - startFrame;
+
+            m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+            for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+            {
+                PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+            }
+
+
+            bool reNewSucc = ReNewBufferForMultiIO(i);
+
+        }
+
+    }
+    assert (m_truncated == true);
+    m_currentMBSize = m_expandMBSize;
+}
+
+
+template <class ElemType>
+bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
+    const StreamMinibatchInputs& matrices)
+{
+    bool skip = false;
+
+    // On first minibatch, check if we have input for given names.
+    if (m_checkDictionaryKeys)
+    {
+        for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
+        {
+            if (m_nameToTypeMap.find(iter->first) == m_nameToTypeMap.end())
+            {
+                throw std::runtime_error(msra::strfun::strprintf(
+                    "minibatch requested for input node %S not found in"
+                    "reader - cannot generate input\n",
+                    iter->first.c_str()));
+            }
+        }
+        m_checkDictionaryKeys = false;
+    }
+
+    // If we are doing utterance derivative buffering, we need to keep the
+    // utterance information.
+    if (m_doMinibatchBuffering)
+    {
+        m_minibatchUttInfo.assign(m_numSeqsPerMB,
+                                  std::vector<std::pair<wstring, size_t>>(0));
+
+        // For the moment we don't support same utterance in the same
+        // minibatch.
+        m_hasUttInCurrentMinibatch.clear();
+        for (size_t i = 0; i < m_numSeqsPerMB; i++)
+        {
+            if (m_uttInfo[i].size() > 0)
+            {
+                while (m_hasUttInCurrentMinibatch.find(m_uttInfo[i][0].first) != m_hasUttInCurrentMinibatch.end())
+                {
+                    fprintf(stderr, "WARNING: Utterance \"%S\" already exists "
+                                "in the minibatch, skipping it.\n",
+                        m_uttInfo[i][0].first.c_str());
+                    ReNewBufferForMultiIO(i);
+                }
+                m_hasUttInCurrentMinibatch[m_uttInfo[i][0].first] = true;
+            }
+        }
+    }
+
+    m_currentMBSize = m_mbSize;
+    do
+    {
+        // Checks if we have finished all the utterances.
+        if (m_noData)
+        {
+            bool endEpoch = true;
+            for (size_t i = 0; i < m_numSeqsPerMB; i++)
+            {
+                if (m_processedFrame[i] != m_toProcess[i])
+                {
+                    endEpoch = false;
+                }
+            }
+            if (endEpoch)
+            {
+                return false;
+            }
+        }
+        // If <m_truncated> is true, <m_currentMBSize> is <m_mbSize>
+        // If <m_truncated> is false, <m_currentMBSize> equals to the longest
+        // utterance in the minibatch.
+        if (!m_truncated)
+        {
+            m_currentMBSize = 0;
+            for (size_t i = 0; i < m_numSeqsPerMB; i++)
+            {
+                if (m_currentBufferFrames[i] > m_currentMBSize)
+                {
+                    m_currentMBSize = m_currentBufferFrames[i];
+                }
+            }
+        }
+
+        if (!m_CSCtruncated || !m_truncated)
+            FormulateOneMinibatchToTrainOrTestDataBuffer(matrices, skip);
+        else
+            FormulateOneMinibatchWithContextToTrainOrTestDataBuffer(matrices, skip);
+
     } while (skip);
 
     return true;
@@ -1296,24 +1523,65 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
 
         // Sets MBLayout.
         // currentMinibatch.pMBLayout->CopyFromRange(m_pMBLayout, startIndex, numFrames);
-        currentMinibatch.pMBLayout->Init(m_pMBLayout->GetNumParallelSequences(), numFrames);
+        if (!m_CSCtruncated)
+        {
+            assert(m_rightContext == 0);
+        }
+        currentMinibatch.pMBLayout->Init(m_pMBLayout->GetNumParallelSequences(), numFrames + m_rightContext);
         const auto& sequences = m_pMBLayout->GetAllSequences();
         for (const auto& seq : sequences)
         {
             if (seq.tEnd > startIndex && seq.tBegin < (ptrdiff_t)(startIndex + numFrames))
             {
+                // the offset for rightContext
+                size_t rightOffset = 0;
+                if (m_CSCtruncated && seq.tEnd > (numFrames + startIndex))
+                {
+                    // if the left number of frames less than the context, fill the remaining frames otherwise read the number of rightContext frames
+                    rightOffset = min (seq.tEnd - numFrames - startIndex, m_rightContext);
+                }
                 auto shiftedSeq = seq;
                 shiftedSeq.tBegin -= startIndex;
-                shiftedSeq.tEnd -= startIndex;
+                
+                if (m_CSCtruncated && rightOffset > 0)
+                {
+                    // set sentence end boundary at the end of this minibatch
+                    shiftedSeq.tEnd = numFrames + rightOffset;
+                }
+                else
+                {
+                    shiftedSeq.tEnd -= startIndex;
+                }
+
                 currentMinibatch.pMBLayout->AddSequence(shiftedSeq);
+                if (m_CSCtruncated && ((seq.tEnd >= (startIndex + numFrames))) && i != numMinibatches -1 )
+                {
+                    // if this is not the last frames, fill the gaps in the minibatch (m_rightContext - rightOffset). This is only happened when the sequence end exceed the end of this minibatch.
+                    currentMinibatch.pMBLayout->AddGap(seq.s, numFrames + rightOffset, numFrames + m_rightContext);
+                }
             }
         }
+        if (m_CSCtruncated && i == (numMinibatches -1))
+        {
+            // fill the gaps for the last minibatch. Note that for the frames before rightContext, we already have the gap sequence filled previous stage.
+            for (size_t j = 0; j < m_numSeqsPerMB; j++)
+            {
+                currentMinibatch.pMBLayout->AddGap(j, numFrames, numFrames + m_rightContext);
+            }
+        }
+        //fprintf (stderr, "hahah num of samples %zu\n", currentMinibatch.pMBLayout->GetActualNumSamples());
         // Sets the minibatch size for the current minibatch.
-        currentMinibatch.currentMBSize = numFrames;
+        if (!m_CSCtruncated)
+            currentMinibatch.currentMBSize = numFrames;
+        else
+        {
+            // latency control case, add the context for each minibatch.
+            currentMinibatch.currentMBSize = numFrames + m_rightContext;
+        }
 
         // Sets the utterance information for the current minibatch.
         currentMinibatch.minibatchUttInfo.assign(
-            m_numberOfuttsPerMinibatch,
+            m_numSeqsPerMB,
             std::vector<std::pair<wstring, size_t>>(0));
         for (size_t j = 0; j < m_minibatchUttInfo.size(); ++j)
         {
@@ -1334,16 +1602,21 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
             }
         }
 
-        size_t startDataCopy = startIndex * m_numberOfuttsPerMinibatch;
-        size_t endDataCopy = (startIndex + numFrames) * m_numberOfuttsPerMinibatch;
+        size_t startDataCopy = startIndex * m_numSeqsPerMB;
+        size_t endDataCopy = (startIndex + numFrames) * m_numSeqsPerMB;
+        if (m_CSCtruncated)
+        {
+            // for latency control case, reserve the space for the latency
+            endDataCopy = (startIndex + numFrames + m_rightContext) * m_numSeqsPerMB;
+        }
 
         // Copies features.
         currentMinibatch.features.resize(0);
         for (size_t i = 0; i < m_featuresBufferMultiIO.size(); ++i)
         {
             std::vector<ElemType> tmpFeatures(
-                m_featuresBufferMultiIO[i] + startDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]],
-                m_featuresBufferMultiIO[i] + endDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]]);
+                m_featuresBufferMultiIO[i].get() + startDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]],
+                m_featuresBufferMultiIO[i].get() + endDataCopy * m_featureNameToDimMap[m_featureIdToNameMap[i]]);
             currentMinibatch.features.push_back(tmpFeatures);
         }
 
@@ -1352,8 +1625,8 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
         for (size_t i = 0; i < m_labelsBufferMultiIO.size(); ++i)
         {
             std::vector<ElemType> tmpLabels(
-                m_labelsBufferMultiIO[i] + startDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]],
-                m_labelsBufferMultiIO[i] + endDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]]);
+                m_labelsBufferMultiIO[i].get() + startDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]],
+                m_labelsBufferMultiIO[i].get() + endDataCopy * m_labelNameToDimMap[m_labelIdToNameMap[i]]);
             currentMinibatch.labels.push_back(tmpLabels);
         }
 
@@ -1371,6 +1644,13 @@ void HTKMLFReader<ElemType>::CopyMinibatchFromBufferToMatrix(
     // Restores the variables related to the minibatch.
     m_pMBLayout->CopyFrom(m_minibatchBuffer[index].pMBLayout);
     m_currentMBSize = m_minibatchBuffer[index].currentMBSize;
+
+    if (m_CSCtruncated && m_doMinibatchBufferTruncation)
+    {
+        // latency control case, tell the DerivBuffer how many frame we have.
+        m_uttDerivBuffer->SetMinibatchSize(m_currentMBSize - m_rightContext);
+    }
+
     m_minibatchUttInfo = m_minibatchBuffer[index].minibatchUttInfo;
 
     // Copies data to the matrix.
@@ -1405,7 +1685,7 @@ void HTKMLFReader<ElemType>::CopyMinibatchFromBufferToMatrix(
             {
                 if (m_getMinibatchCopy)
                 {
-                    assert(m_currentMBSize * m_numberOfuttsPerMinibatch == m_pMBLayout->GetNumCols());
+                    assert(m_currentMBSize * m_numSeqsPerMB == m_pMBLayout->GetNumCols());
                     if (data.GetNumCols() != m_pMBLayout->GetNumCols())
                     {
                         data.Resize(data.GetNumRows(), m_pMBLayout->GetNumCols());
@@ -1423,7 +1703,7 @@ void HTKMLFReader<ElemType>::CopyMinibatchFromBufferToMatrix(
             {
                 if (m_getMinibatchCopy)
                 {
-                    assert(m_currentMBSize * m_numberOfuttsPerMinibatch == m_pMBLayout->GetNumCols());
+                    assert(m_currentMBSize * m_numSeqsPerMB == m_pMBLayout->GetNumCols());
                     if (data.GetNumCols() != m_pMBLayout->GetNumCols())
                     {
                         data.Resize(1, m_pMBLayout->GetNumCols());
@@ -1450,8 +1730,8 @@ void HTKMLFReader<ElemType>::CopyMinibatchFromBufferToMatrix(
 template <class ElemType>
 void HTKMLFReader<ElemType>::CopyMinibatchToMatrix(
     size_t size,
-    const vector<ElemType*>& featureBuffer,
-    const vector<ElemType*>& labelBuffer,
+    const vector<std::shared_ptr<ElemType>>& featureBuffer,
+    const vector<std::shared_ptr<ElemType>>& labelBuffer,
     StreamMinibatchInputs& matrices) const
 {
     for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
@@ -1462,20 +1742,20 @@ void HTKMLFReader<ElemType>::CopyMinibatchToMatrix(
             size_t id = m_featureNameToIdMap.at(iter->first);
             size_t dim = m_featureNameToDimMap.at(iter->first);
             assert(id < featureBuffer.size());
-            data.SetValue(dim, size, data.GetDeviceId(), featureBuffer[id], matrixFlagNormal);
+            data.SetValue(dim, size, data.GetDeviceId(), featureBuffer[id].get(), matrixFlagNormal);
         }
         else if (m_nameToTypeMap.at(iter->first) == InputOutputTypes::category)
         {
             size_t id = m_labelNameToIdMap.at(iter->first);
             size_t dim = m_labelNameToDimMap.at(iter->first);
             assert(id < labelBuffer.size());
-            data.SetValue(dim, size, data.GetDeviceId(), labelBuffer[id], matrixFlagNormal);
+            data.SetValue(dim, size, data.GetDeviceId(), labelBuffer[id].get(), matrixFlagNormal);
         }
         else if (m_doMinibatchBuffering)
         {
             if (m_nameToTypeMap.at(iter->first) == InputOutputTypes::readerDeriv)
             {
-                assert(m_currentMBSize * m_numberOfuttsPerMinibatch == m_pMBLayout->GetNumCols());
+                assert(m_currentMBSize * m_numSeqsPerMB == m_pMBLayout->GetNumCols());
                 if (data.GetNumCols() != m_pMBLayout->GetNumCols())
                 {
                     data.Resize(data.GetNumRows(), m_pMBLayout->GetNumCols());
@@ -1484,7 +1764,7 @@ void HTKMLFReader<ElemType>::CopyMinibatchToMatrix(
             }
             else if (m_nameToTypeMap.at(iter->first) == InputOutputTypes::readerObj)
             {
-                assert(m_currentMBSize * m_numberOfuttsPerMinibatch == m_pMBLayout->GetNumCols());
+                assert(m_currentMBSize * m_numSeqsPerMB == m_pMBLayout->GetNumCols());
                 if (data.GetNumCols() != m_pMBLayout->GetNumCols())
                 {
                     data.Resize(1, m_pMBLayout->GetNumCols());
@@ -1522,7 +1802,7 @@ bool HTKMLFReader<ElemType>::GetMinibatchToTrainOrTest(
             else
             {
                 CopyMinibatchToMatrix(
-                    m_currentMBSize * m_numberOfuttsPerMinibatch,
+                    m_currentMBSize * m_numSeqsPerMB,
                     m_featuresBufferMultiIO, m_labelsBufferMultiIO, matrices);
             }
         }
@@ -1573,7 +1853,7 @@ bool HTKMLFReader<ElemType>::GetMinibatchToWrite(StreamMinibatchInputs& matrices
         {
             msra::asr::htkfeatreader reader;
 
-            const auto path = reader.parse(m_inputFilesMultiIO[i][m_inputFileIndex], m_writingFeatureSections[i]);
+            const auto path = reader.parse(m_inputFilesMultiIO[i][m_inputFileIndex], m_writingFeatureSections[i].get());
             // read file
             msra::dbn::matrix feat;
             string featkind;
@@ -1616,15 +1896,14 @@ bool HTKMLFReader<ElemType>::GetMinibatchToWrite(StreamMinibatchInputs& matrices
                 assert(feat.rows() == dim);
                 dim; // check feature dimension matches what's expected
 
-                if (m_featuresBufferMultiIO[id] == NULL)
+                if (m_featuresBufferMultiIO[id] == nullptr)
                 {
-                    m_featuresBufferMultiIO[id] = new ElemType[feat.rows() * feat.cols()];
+                    m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), feat.rows() * feat.cols());
                     m_featuresBufferAllocatedMultiIO[id] = feat.rows() * feat.cols();
                 }
                 else if (m_featuresBufferAllocatedMultiIO[id] < feat.rows() * feat.cols()) // buffer size changed. can be partial minibatch
                 {
-                    delete[] m_featuresBufferMultiIO[id];
-                    m_featuresBufferMultiIO[id] = new ElemType[feat.rows() * feat.cols()];
+                    m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(), feat.rows() * feat.cols());
                     m_featuresBufferAllocatedMultiIO[id] = feat.rows() * feat.cols();
                 }
                 // shouldn't need this since we fill up the entire buffer below
@@ -1635,7 +1914,7 @@ bool HTKMLFReader<ElemType>::GetMinibatchToWrite(StreamMinibatchInputs& matrices
                     for (int j = 0; j < feat.cols(); j++) // column major, so iterate columns
                     {
                         // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
-                        memcpy_s(&m_featuresBufferMultiIO[id][j * feat.rows()], sizeof(ElemType) * feat.rows(), &feat(0, j), sizeof(ElemType) * feat.rows());
+                        memcpy_s(&m_featuresBufferMultiIO[id].get()[j * feat.rows()], sizeof(ElemType) * feat.rows(), &feat(0, j), sizeof(ElemType) * feat.rows());
                     }
                 }
                 else
@@ -1644,11 +1923,11 @@ bool HTKMLFReader<ElemType>::GetMinibatchToWrite(StreamMinibatchInputs& matrices
                     {
                         for (int i = 0; i < feat.rows(); i++)
                         {
-                            m_featuresBufferMultiIO[id][j * feat.rows() + i] = feat(i, j);
+                            m_featuresBufferMultiIO[id].get()[j * feat.rows() + i] = feat(i, j);
                         }
                     }
                 }
-                data.SetValue(feat.rows(), feat.cols(), data.GetDeviceId(), m_featuresBufferMultiIO[id], matrixFlagNormal);
+                data.SetValue(feat.rows(), feat.cols(), data.GetDeviceId(), m_featuresBufferMultiIO[id].get(), matrixFlagNormal);
             }
             else
             { // Resizes other inputs so they won't affect actual minibatch size.
@@ -1683,7 +1962,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
     m_currentBufferFrames[i] = m_mbiter->currentmbframes();
 
     // If we operate at utterance level, we get the utterance information.
-    if (!m_framemode)
+    if (!m_frameMode)
     {
         m_uttInfo[i] = m_mbiter->getutteranceinfo();
         assert(m_uttInfo[i].size() > 0);
@@ -1699,7 +1978,11 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
 
         if (!m_truncated && (m_currentBufferFrames[i] > m_maxUtteranceLength))
         {
-            (*m_mbiter)++;
+            // Advance the MB iterator until we find some data or reach the end of epoch
+            do
+            {
+                (*m_mbiter)++;
+            } while ((m_mbiter->currentmbframes() == 0) && *m_mbiter);
             if (!(*m_mbiter))
             {
                 m_noData = true;
@@ -1712,7 +1995,11 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
 
         if (m_doMinibatchBuffering && !m_uttDerivBuffer->HasResourceForDerivative(m_uttInfo[i][0].first))
         {
-            (*m_mbiter)++;
+            // Advance the MB iterator until we find some data or reach the end of epoch
+            do
+            {
+                (*m_mbiter)++;
+            } while ((m_mbiter->currentmbframes() == 0) && *m_mbiter);
             if (!(*m_mbiter))
             {
                 m_noData = true;
@@ -1726,7 +2013,11 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
         // We don't support having two utterances in the same buffer.
         if (m_doMinibatchBuffering && m_hasUttInCurrentMinibatch.find(m_uttInfo[i][0].first) != m_hasUttInCurrentMinibatch.end())
         {
-            (*m_mbiter)++;
+            // Advance the MB iterator until we find some data or reach the end of epoch
+            do
+            {
+                (*m_mbiter)++;
+            } while ((m_mbiter->currentmbframes() == 0) && *m_mbiter);
             if (!(*m_mbiter))
             {
                 m_noData = true;
@@ -1752,13 +2043,12 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
     }
     if (m_featuresBufferMultiUtt[i] == NULL)
     {
-        m_featuresBufferMultiUtt[i] = new ElemType[totalFeatNum];
+        m_featuresBufferMultiUtt[i] =AllocateIntermediateBuffer(-1, totalFeatNum);
         m_featuresBufferAllocatedMultiUtt[i] = totalFeatNum;
     }
     else if (m_featuresBufferAllocatedMultiUtt[i] < totalFeatNum) // buffer size changed. can be partial minibatch
     {
-        delete[] m_featuresBufferMultiUtt[i];
-        m_featuresBufferMultiUtt[i] = new ElemType[totalFeatNum];
+        m_featuresBufferMultiUtt[i] = AllocateIntermediateBuffer(-1,totalFeatNum);
         m_featuresBufferAllocatedMultiUtt[i] = totalFeatNum;
     }
 
@@ -1776,16 +2066,15 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
     }
     if (m_labelsBufferMultiUtt[i] == NULL)
     {
-        m_labelsBufferMultiUtt[i] = new ElemType[totalLabelsNum];
+        m_labelsBufferMultiUtt[i] = AllocateIntermediateBuffer(-1,totalLabelsNum);
         m_labelsBufferAllocatedMultiUtt[i] = totalLabelsNum;
     }
     else if (m_labelsBufferAllocatedMultiUtt[i] < totalLabelsNum)
     {
-        delete[] m_labelsBufferMultiUtt[i];
-        m_labelsBufferMultiUtt[i] = new ElemType[totalLabelsNum];
+        m_labelsBufferMultiUtt[i] = AllocateIntermediateBuffer(-1,totalLabelsNum);
         m_labelsBufferAllocatedMultiUtt[i] = totalLabelsNum;
     }
-    memset(m_labelsBufferMultiUtt[i], 0, sizeof(ElemType) * totalLabelsNum);
+    memset(m_labelsBufferMultiUtt[i].get(), 0, sizeof(ElemType) * totalLabelsNum);
 
     // Copies features to buffer.
     // foreach_index(id, m_featuresBufferMultiIO)
@@ -1815,7 +2104,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
             for (int k = 0; k < actualmbsizeOri; k++) // column major, so iterate columns
             {
                 // copy over the entire column at once, need to do this because SSEMatrix may have gaps at the end of the columns
-                memcpy_s(&m_featuresBufferMultiUtt[i][k * fdim + m_featuresStartIndexMultiUtt[id + i * numOfFea]], sizeof(ElemType) * fdim, &featOri(0, k), sizeof(ElemType) * fdim);
+                memcpy_s(&m_featuresBufferMultiUtt[i].get()[k * fdim + m_featuresStartIndexMultiUtt[id + i * numOfFea]], sizeof(ElemType) * fdim, &featOri(0, k), sizeof(ElemType) * fdim);
             }
         }
         else
@@ -1824,7 +2113,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
             {
                 for (int d = 0; d < featOri.rows(); d++)
                 {
-                    m_featuresBufferMultiUtt[i][k * fdim + d + m_featuresStartIndexMultiUtt[id + i * numOfFea]] = featOri(d, k);
+                    m_featuresBufferMultiUtt[i].get()[k * fdim + d + m_featuresStartIndexMultiUtt[id + i * numOfFea]] = featOri(d, k);
                 }
             }
         }
@@ -1848,7 +2137,7 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
                 size_t labelId = uids[k];
                 for (int j = 0; j < dim; j++)
                 {
-                    m_labelsBufferMultiUtt[i][k * dim + j + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = m_labelToTargetMapMultiIO[id][labelId][j];
+                    m_labelsBufferMultiUtt[i].get()[k * dim + j + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = m_labelToTargetMapMultiIO[id][labelId][j];
                 }
             }
         }
@@ -1860,13 +2149,18 @@ bool HTKMLFReader<ElemType>::ReNewBufferForMultiIO(size_t i)
             {
                 assert(uids[k] < dim);
                 // labels(uids[i], i) = (ElemType)1;
-                m_labelsBufferMultiUtt[i][k * dim + uids[k] + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = (ElemType) 1;
+                m_labelsBufferMultiUtt[i].get()[k * dim + uids[k] + m_labelsStartIndexMultiUtt[id + i * numOfLabel]] = (ElemType) 1;
             }
         }
     }
     m_processedFrame[i] = 0;
 
-    (*m_mbiter)++;
+    // Advance the MB iterator until we find some data or reach the end of epoch
+    do
+    {
+        (*m_mbiter)++;
+    } while ((m_mbiter->currentmbframes() == 0) && *m_mbiter);
+
     if (!(*m_mbiter))
         m_noData = true;
 
@@ -1885,7 +2179,7 @@ bool HTKMLFReader<ElemType>::GetMinibatchCopy(
     // computation for sequence training.
     if (m_doMinibatchBuffering)
     {
-        assert(m_framemode == false);
+        assert(m_frameMode == false);
         if (m_uttDerivBuffer->NeedLikelihoodToComputeDerivative())
         {
             m_getMinibatchCopy = true;
@@ -1916,7 +2210,7 @@ bool HTKMLFReader<ElemType>::SetNetOutput(
     // together.
     if (m_doMinibatchBuffering)
     {
-        assert(m_framemode == false);
+        assert(m_frameMode == false);
         return m_uttDerivBuffer->SetLikelihood(uttInfo, outputs, pMBLayout);
     }
     return false;
@@ -2053,6 +2347,50 @@ void HTKMLFReader<ElemType>::GetDataNamesFromConfig(const ConfigRecordType& read
     }
 }
 
+template <class ElemType>
+unique_ptr<CUDAPageLockedMemAllocator>& HTKMLFReader<ElemType>::GetCUDAAllocator(int deviceID)
+{
+    if (m_cudaAllocator != nullptr)
+    {
+        if (m_cudaAllocator->GetDeviceId() != deviceID)
+        {
+            m_cudaAllocator.reset(nullptr);
+        }
+    }
+
+    if (m_cudaAllocator == nullptr)
+    {
+        m_cudaAllocator.reset(new CUDAPageLockedMemAllocator(deviceID));
+    }
+
+    return m_cudaAllocator;
+}
+
+
+
+template <class ElemType>
+std::shared_ptr<ElemType> HTKMLFReader<ElemType>::AllocateIntermediateBuffer(int deviceID, size_t numElements)
+{
+    if (deviceID >= 0)
+    {
+        // Use pinned memory for GPU devices for better copy performance
+        size_t totalSize = sizeof(ElemType) * numElements;
+        return std::shared_ptr<ElemType>((ElemType*) GetCUDAAllocator(deviceID)->Malloc(totalSize), [this, deviceID](ElemType* p)
+                                         {
+                                             this->GetCUDAAllocator(deviceID)->Free((char*) p);
+                                         });
+    }
+    else
+    {
+        return std::shared_ptr<ElemType>(new ElemType[numElements], [](ElemType* p)
+                                         {
+                                             delete[] p;
+                                         });
+    }
+}
+
+
 template class HTKMLFReader<float>;
 template class HTKMLFReader<double>;
-} } }
+
+}}}

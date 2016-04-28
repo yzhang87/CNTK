@@ -58,6 +58,30 @@ public:
                           std::vector<std::pair<wstring, size_t>> &utteranceinfo,
                           std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> &transcripts,
                           std::vector<shared_ptr<const latticesource::latticepair>> &lattices) = 0;
+    // getbatch() overload to support subsetting of mini-batches for parallel training
+    // Default implementation does not support subsetting and throws an exception on
+    // calling this overload with a numsubsets value other than 1.
+    virtual bool getbatch(const size_t globalts,
+                          const size_t framesrequested, const size_t subsetnum, const size_t numsubsets, size_t &framesadvanced,
+                          std::vector<msra::dbn::matrix> &feat, std::vector<std::vector<size_t>> &uids,
+                          std::vector<std::pair<wstring, size_t>> &utteranceinfo,
+                          std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> &transcripts,
+                          std::vector<shared_ptr<const latticesource::latticepair>> &lattices)
+    {
+        assert((subsetnum == 0) && (numsubsets == 1) && !supportsbatchsubsetting());
+        subsetnum;
+        numsubsets;
+        bool retVal = getbatch(globalts, framesrequested, feat, uids, utteranceinfo, transcripts, lattices);
+        framesadvanced = feat[0].cols();
+
+        return retVal;
+    }
+
+    virtual bool supportsbatchsubsetting() const
+    {
+        return false;
+    }
+
     virtual size_t totalframes() const = 0;
 
     virtual double gettimegetbatch() = 0;                         // used to report runtime
@@ -86,14 +110,21 @@ class minibatchiterator
 
     msra::dbn::minibatchsource &source; // feature source to read from
 
+    // subset to read during distributed data-parallel training (no subsetting: (0,1))
+    size_t subsetnum;
+    size_t numsubsets;
+
     std::vector<msra::dbn::matrix> featbuf;                                                      // buffer for holding curernt minibatch's frames
     std::vector<std::vector<size_t>> uids;                                                       // buffer for storing current minibatch's frame-level label sequence
     std::vector<std::pair<wstring, size_t>> utteranceinfo;                                       // buffer for current minibatch's utterance ID information.
     std::vector<const_array_ref<msra::lattices::lattice::htkmlfwordsequence::word>> transcripts; // buffer for storing current minibatch's word-level label sequences (if available and used; empty otherwise)
     std::vector<shared_ptr<const latticesource::latticepair>> lattices;                          // lattices of the utterances in current minibatch (empty in frame mode)
 
+    
+    
     size_t mbstartframe;   // current start frame into generalized time line (used for frame-wise mode and for diagnostic messages)
     size_t actualmbframes; // actual number of frames in current minibatch
+    size_t mbframesadvanced;                          // logical number of frames the current MB represents (to advance time; > featbuf.cols() possible, intended for the case of distributed data-parallel training)
     size_t datapass;       // current datapass = pass through the data
     double timegetbatch;   // [v-hansu] for time measurement
     double timechecklattice;
@@ -119,13 +150,14 @@ private:
         assert(requestedmbframes > 0);
         const size_t requestedframes = min(requestedmbframes, epochendframe - mbstartframe); // (< mbsize at end)
         assert(requestedframes > 0);
-        source.getbatch(mbstartframe, requestedframes, featbuf, uids, utteranceinfo, transcripts, lattices);
+        source.getbatch(mbstartframe, requestedframes, subsetnum, numsubsets, mbframesadvanced, featbuf, uids, utteranceinfo, transcripts, lattices);
         timegetbatch = source.gettimegetbatch();
         actualmbframes = featbuf[0].cols(); // for single i/o, there featbuf is length 1
         // note:
         //  - in frame mode, actualmbframes may still return less if at end of sweep
         //  - in utterance mode, it likely returns less than requested, and
         //    it may also be > epochendframe (!) for the last utterance, which, most likely, crosses the epoch boundary
+        //  - in case of data parallelism, featbuf.cols() < mbframesadvanced
         auto_timer timerchecklattice;
         if (!lattices.empty())
         {
@@ -133,7 +165,7 @@ private:
             foreach_index (i, lattices)
                 totalframes += lattices[i]->getnumframes();
             if (totalframes != actualmbframes)
-                throw std::logic_error("fillorclear: frames in lattices do not match minibatch size");
+                LogicError("fillorclear: frames in lattices do not match minibatch size");
         }
         timechecklattice = timerchecklattice;
     }
@@ -144,23 +176,25 @@ private:
     void checkhasdata() const
     {
         if (!hasdata())
-            throw std::logic_error("minibatchiterator: access beyond end of epoch");
+            LogicError("minibatchiterator: access beyond end of epoch");
     }
 
 public:
     // interface: for (minibatchiterator i (...), i, i++) { ... }
-    minibatchiterator(msra::dbn::minibatchsource &source, size_t epoch, size_t epochframes, size_t requestedmbframes, size_t datapasses)
+    minibatchiterator(msra::dbn::minibatchsource &source, size_t epoch, size_t epochframes, size_t requestedmbframes, size_t subsetnum, size_t numsubsets, size_t datapasses)
         : source(source),
           epochstartframe(epoch * epochframes),
           epochendframe(epochstartframe + epochframes),
           requestedmbframes(requestedmbframes),
+          subsetnum(subsetnum),
+          numsubsets(numsubsets),
           datapasses(datapasses),
           timegetbatch(0),
           timechecklattice(0)
     {
         firstvalidepochstartframe = source.firstvalidglobalts(epochstartframe); // epochstartframe may fall between utterance boundaries; this gets us the first valid boundary
-        fprintf(stderr, "minibatchiterator: epoch %zu: frames [%zu..%zu] (first utterance at frame %zu) with %zu datapasses\n",
-                epoch, epochstartframe, epochendframe, firstvalidepochstartframe, datapasses);
+        fprintf(stderr, "minibatchiterator: epoch %d: frames [%d..%d] (first utterance at frame %d), data subset %d of %d, with %d datapasses\n",
+                (int) epoch, (int) epochstartframe, (int) epochendframe, (int) firstvalidepochstartframe, (int) subsetnum, (int) numsubsets, (int) datapasses);
         mbstartframe = firstvalidepochstartframe;
         datapass = 0;
         fillorclear(); // get the first batch
@@ -168,18 +202,20 @@ public:
 
     // TODO not nice, but don't know how to access these frames otherwise
     // mbiterator constructor, set epochstart and -endframe explicitly
-    minibatchiterator(msra::dbn::minibatchsource &source, size_t epoch, size_t epochstart, size_t epochend, size_t requestedmbframes, size_t datapasses)
+    minibatchiterator(msra::dbn::minibatchsource &source, size_t epoch, size_t epochstart, size_t epochend, size_t requestedmbframes, size_t subsetnum, size_t numsubsets, size_t datapasses)
         : source(source),
           epochstartframe(epochstart),
           epochendframe(epochend),
           requestedmbframes(requestedmbframes),
+          subsetnum(subsetnum),
+          numsubsets(numsubsets),
           datapasses(datapasses),
           timegetbatch(0),
           timechecklattice(0)
     {
         firstvalidepochstartframe = source.firstvalidglobalts(epochstartframe); // epochstartframe may fall between utterance boundaries; this gets us the first valid boundary
-        fprintf(stderr, "minibatchiterator: epoch %zu: frames [%zu..%zu] (first utterance at frame %zu) with %zu datapasses\n",
-                epoch, epochstartframe, epochendframe, firstvalidepochstartframe, datapasses);
+        fprintf(stderr, "minibatchiterator: epoch %d: frames [%d..%d] (first utterance at frame %d), data subset %d of %d, with %d datapasses\n",
+                (int) epoch, (int) epochstartframe, (int) epochendframe, (int) firstvalidepochstartframe, (int) subsetnum, (int) numsubsets, (int) datapasses);
         mbstartframe = firstvalidepochstartframe;
         datapass = 0;
         fillorclear(); // get the first batch
@@ -200,7 +236,7 @@ public:
     void operator++(int /*denotes postfix version*/)
     {
         checkhasdata();
-        mbstartframe += actualmbframes;
+        mbstartframe += mbframesadvanced;
         // if we hit the end, we will get mbstartframe >= epochendframe <=> !hasdata()
         // (most likely actually mbstartframe > epochendframe since the last utterance likely crosses the epoch boundary)
         // in case of multiple datapasses, reset to start when hitting the end
@@ -221,6 +257,10 @@ public:
     size_t currentmbframes() const
     {
         return actualmbframes;
+    }
+    size_t currentmbframesadvanced() const
+    {
+        return mbframesadvanced;
     }
     size_t currentmblattices() const
     {
@@ -253,7 +293,7 @@ public:
     float progress() const // (note: 100%+eps possible for last utterance)
     {
         const float epochframes = (float) (epochendframe - epochstartframe);
-        return (mbstartframe + actualmbframes - epochstartframe + datapass * epochframes) / (datapasses * epochframes);
+        return (mbstartframe + mbframesadvanced - epochstartframe + datapass * epochframes) / (datapasses * epochframes);
     }
     std::pair<size_t, size_t> range() const
     {

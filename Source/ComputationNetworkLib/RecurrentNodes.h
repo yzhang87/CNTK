@@ -477,8 +477,8 @@ protected:
     UsingComputationNodeMembersBoilerplate; \
     using Base::m_initialActivationValue;   \
     using Base::m_delayedValue;             \
-    using Base::m_timeStep;
-
+    using Base::m_timeStep;                 \
+    using Base::m_delayedActivationMBLayout;
 // -----------------------------------------------------------------------
 // PastValueNode (input) -- delay node
 // TODO: Can this just be a typedef?
@@ -515,6 +515,167 @@ public:
 
 template class PastValueNode<float>;
 template class PastValueNode<double>;
+
+// -----------------------------------------------------------------------
+// LCPastValueNode (input) -- latency controlled delay node
+// TODO: Can this just be a typedef?
+// -----------------------------------------------------------------------
+
+template <class ElemType>
+class LCPastValueNode : public DelayedValueNodeBase<ElemType, -1 /*, MinibatchPackingFlags::SequenceStart*/>
+{
+    typedef DelayedValueNodeBase<ElemType, -1 /*, MinibatchPackingFlags::SequenceStart*/> Base;
+    UsingDelayedValueNodeMembers;
+    static const std::wstring TypeName()
+    {
+        return L"LCPastValue";
+    }
+
+public:
+    void Save(File& fstream) const
+    {
+        Base::Save(fstream);
+        fstream << m_latency;
+    }
+
+    virtual void Load(File& fstream, size_t modelVersion) override
+    {
+        // the node has already been initialized e.g. w.r.t. direction
+        Base::Load(fstream, modelVersion);
+        fstream >> m_latency;
+    }
+    LCPastValueNode(DEVICEID_TYPE deviceId, const wstring& name)
+        : Base(deviceId, name)
+    {
+        m_latency = 0;
+    }
+    LCPastValueNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType initialActivationValue, const TensorShape& sampleLayout, size_t timeStep, size_t latency)
+        : Base(deviceId, name, initialActivationValue, sampleLayout, timeStep)
+    {
+        m_latency = latency;
+    }
+    LCPastValueNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType initialActivationValue, size_t numRows, size_t timeStep, size_t latency)
+        : LCPastValueNode(deviceId, name, initialActivationValue, TensorShape(numRows), timeStep, latency)
+    {
+    }
+    LCPastValueNode(const ScriptableObjects::IConfigRecordPtr configp)
+        : Base(configp)
+    {
+    }
+    // This function assumes BeginForwardProp/EndForwardProp() to be called before/after the iteration loop.
+    // TODO: In the future, there may be value for one more way of handling the boundary condition: Fill as 'NoInput'. Then we can use this to implement rolling windows (albeit inefficiently). Would require to unshare the layout.
+    virtual void ForwardProp(const FrameRange& fr) override
+    {
+        assert(m_pMBLayout);
+
+        // special case: DelayedValueNodes may be used outside of loops
+        // TODO: this should be a bulk operation; this implementation is a quick hack
+        int dir = -1; // (this avoids a 'conditional expression is constant' warning)
+        if (fr.IsAllFrames())
+        {
+            // recursive call to ourselves
+            FrameRangeIteration range(m_pMBLayout, -dir);
+            for (auto t = range.begin(); t != range.end(); t++)
+                ForwardProp(t);
+            return;
+        }
+
+        // we forward prop from the previous frame to this frame
+        FrameRange frDelayed = fr.WithTimeOffset(dir * m_timeStep);
+
+        size_t T = GetNumTimeSteps();
+        size_t T_delayedActivation = m_delayedActivationMBLayout ? m_delayedActivationMBLayout->GetNumTimeSteps() : 0; // (note: should never happen in full-sequence mode)
+
+        // compute logical position of delayed value
+        assert(m_timeStep > 0);
+
+        size_t t = fr.t();
+        int t_delayed = (int) (t + dir * m_timeStep); // this might end up outside the current window
+        int t_latency = (int) (dir * m_latency);
+
+        Matrix<ElemType> inp((DEVICEID_TYPE)m_value->GetDeviceId());
+
+        // if any sequence at this time step has a boundary flag, then process one by one
+        // TODO: Would there be an efficiency gain from grouping consecutive sequences with identical flags?
+        // assert(m_pShiftedMBLayout->Is(t, SequenceStart_or_End) == m_pMBLayout->IsBeyondStartOrEnd(frDelayed));
+        if (m_pMBLayout->IsBeyondStartOrEnd(frDelayed))
+        {
+            for (size_t id = 0; id < GetNumParallelSequences(); id++)
+            {
+                if (m_pMBLayout->IsGap(fr.Sequence(id))) // if output is in a gap then don't bother filling it
+                    continue;
+
+                Matrix<ElemType> out = ValueFor(fr.Sequence(id));
+
+                // assert(m_pShiftedMBLayout->Is(id, t, SequenceStart_or_End) == m_pMBLayout->IsBeyondStartOrEnd(frDelayed.Sequence(id)));
+                if (m_pMBLayout->IsBeyondStartOrEnd(frDelayed.Sequence(id)))
+                    out.SetValue(m_initialActivationValue); // crossed a boundary
+                else                                        // not a boundary: just copy the delayed value
+                {
+                    // inside the sequence: access delayed value
+                    if (t_delayed < 0)
+                    {
+                        inp = DataWithMBLayoutFor(m_delayedValue, FrameRange(m_delayedActivationMBLayout, t_delayed + t_latency + T_delayedActivation).Sequence(id), m_delayedActivationMBLayout); // delay reaches in previous minibatch
+                    }
+                    else if (t_delayed >= T)
+                        inp = DataWithMBLayoutFor(m_delayedValue, FrameRange(m_delayedActivationMBLayout, t_delayed - T).Sequence(id), m_delayedActivationMBLayout); // delay reaches in previous minibatch
+                    else
+                        inp = Input(0)->ValueFor(frDelayed.Sequence(id));
+                    // inp = Input(0)->ValueFor(FrameRange(m_pMBLayout, t_delayed).Sequence(id));
+
+                    out.SetValue(inp);
+                }
+            }
+        }
+        else // frame has no boundary flags: use ValueFor directly (still may have a gap here)
+        {
+            Matrix<ElemType> out = ValueFor(fr);
+
+            if (t_delayed < 0)
+            {
+                if (m_delayedValue.IsEmpty()) 
+                {
+                    if (IsPartOfLoop())
+                        InvalidArgument("The delay node tries to access past values that are out of bound, possibly because there is no sentence start marker in the MBLayout.");
+                    else //use first frame
+                        inp = Input(0)->ValueFor(FrameRange(m_pMBLayout, 0));
+                }
+                else
+                {
+                    inp = DataWithMBLayoutFor(m_delayedValue, FrameRange(m_delayedActivationMBLayout, t_delayed + t_latency + T_delayedActivation), m_delayedActivationMBLayout);
+                }
+            }
+
+            else if (t_delayed >= T)
+            {
+                if (m_delayedValue.IsEmpty())  
+                {
+                    if (IsPartOfLoop())
+                        InvalidArgument("The delay node tries to access future values that are out of bound, possibly because there is no sentence end marker in the MBLayout.");
+                    else //use last frame
+                        inp = Input(0)->ValueFor(FrameRange(m_pMBLayout, T - 1));
+                }
+                else
+                    inp = DataWithMBLayoutFor(m_delayedValue, FrameRange(m_delayedActivationMBLayout, t_delayed - T), m_delayedActivationMBLayout);
+            }
+            else
+                inp = Input(0)->ValueFor(frDelayed);
+            // inp = Input(0)->ValueFor(FrameRange(m_pMBLayout, t_delayed));
+
+            out.SetValue(inp);
+        }
+    }
+
+ 
+protected:
+    int m_latency;                          // delay in frames (typ. 1)
+};
+
+template class LCPastValueNode<float>;
+template class LCPastValueNode<double>;
+
+
+
 
 // -----------------------------------------------------------------------
 // FutureValueNode (input) -- delay node in future direction

@@ -273,7 +273,7 @@ class minibatchframesourcemulti : public minibatchsource
 public:
     // constructor
     // Pass empty labels to denote unsupervised training (so getbatch() will not return uids).
-    minibatchframesourcemulti(std::vector<msra::asr::FeatureSection *> &featuresections, const std::vector<std::vector<wstring>> &infiles, const std::vector<map<std::wstring, std::vector<msra::asr::htkmlfentry>>> &labels,
+    minibatchframesourcemulti(std::vector<std::shared_ptr<msra::asr::FeatureSection>> &featuresections, const std::vector<std::vector<wstring>> &infiles, const std::vector<map<std::wstring, std::vector<msra::asr::htkmlfentry>>> &labels,
                               std::vector<size_t> vdim, std::vector<size_t> udim, std::vector<size_t> leftcontext, std::vector<size_t> rightcontext, size_t randomizationrange, const std::vector<wstring> &pagepath, const bool mayhavenoframe = false, int addEnergy = 0)
         : vdim(vdim), leftcontext(leftcontext), rightcontext(rightcontext), sampperiod(0), featdim(0), numframes(0), timegetbatch(0), verbosity(2), maxvdim(0)
     {
@@ -331,7 +331,7 @@ public:
                     fflush(stderr);
                 }
                 msra::basetypes::matrix<float> feat;
-                msra::asr::htkfeatreader::parsedpath ppath(infiles[m][i], featuresections[m]);
+                msra::asr::htkfeatreader::parsedpath ppath(infiles[m][i], featuresections[m].get());
 
                 // skip files for which labels don't exist (assuming bad alignment)
                 wstring key;

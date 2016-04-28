@@ -258,7 +258,8 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
         }
     }
     else if (cnNodeType == OperationNameOf(PastValueNode) ||
-             cnNodeType == OperationNameOf(FutureValueNode))
+             cnNodeType == OperationNameOf(FutureValueNode) ||
+             cnNodeType == OperationNameOf(LCPastValueNode))
     {
         if (parameter.size() < 2 || parameter.size() > 3) // we allow 3 for legacy (cols parameter which is now unused)
             RuntimeError("PastValue or FutureValue should have two to three fixed parameters. Usage: PastValue(rows, input, [timeStep=1, defaultHiddenActivity=0.1]).");
@@ -279,11 +280,18 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
 
             // for backward compatibility we check 'timeStep' first
             size_t timeStep = node->GetOptionalParameter("timeStep", "1");
+
+            // Check if it is PastValueNode with latency
+            size_t latencyStep = node->GetOptionalParameter("latencyStep", "0");
+
+
             if (timeStep == 1)
                 timeStep = node->GetOptionalParameter("delayTime", "1");
 
             if (cnNodeType == OperationNameOf(PastValueNode))
                 nodePtr = builder.PastValue(NULL, defaultHiddenActivity, rows, timeStep, name);
+            else if (cnNodeType == OperationNameOf(LCPastValueNode))
+                nodePtr = builder.LCPastValue(NULL, defaultHiddenActivity, rows, timeStep, latencyStep, name);
             else
                 nodePtr = builder.FutureValue(NULL, defaultHiddenActivity, rows, timeStep, name);
         }

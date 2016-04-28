@@ -13,6 +13,7 @@ UtteranceDerivativeBuffer<ElemType>::UtteranceDerivativeBuffer(
     assert(derivativeInterface != NULL);
     m_derivativeInterface = derivativeInterface;
     m_numUttsPerMinibatch = numberOfuttsPerMinibatch;
+    m_minibatch = 0;
     m_needLikelihood = true;
     m_currentObj = 0;
     m_uttReady.assign(m_numUttsPerMinibatch, false);
@@ -40,10 +41,6 @@ void UtteranceDerivativeBuffer<ElemType>::ProcessUttInfo(
 
         for (size_t j = 0; j < pMBLayout->GetNumTimeSteps(); ++j)
         {
-            /*  if (pMBLayout->Is(i, j, MinibatchPackingFlags::NoLabel))
-                {
-                    continue;
-                }*/
             FrameRange fr(pMBLayout, j);
 
             if (pMBLayout->IsGap(fr.Sequence(i)))
@@ -55,6 +52,17 @@ void UtteranceDerivativeBuffer<ElemType>::ProcessUttInfo(
             {
                 size_t uttIndex = (*uttInfoInMinibatch)[i].size();
                 wstring uttID = uttInfo[i][uttIndex].first;
+
+                // This is a hacky way to do glue the posterios for LC-BLSTM
+                // if (m_minibatch > 0), it means we are in CSC mode
+                // if j >= minibatch, it means there are some context
+                // so the number of effective frames was:
+                // numFrames - context
+                // context = (j+1 - m_minibatch)
+                if (j >= m_minibatch && m_minibatch > 0)
+                {
+                    numFrames -= (j + 1 - m_minibatch);
+                }
                 (*uttInfoInMinibatch)[i].push_back(
                     make_pair(uttID, make_pair(startFrameIndexInMinibatch,
                                                numFrames)));
@@ -143,7 +151,9 @@ bool UtteranceDerivativeBuffer<ElemType>::SetLikelihood(
                         m_uttPool[uttID].logLikelihood,
                         &m_uttPool[uttID].derivative,
                         &m_uttPool[uttID].objective);
+
                     m_uttPool[uttID].hasDerivative = true;
+
                     m_uttPool[uttID].progress = 0;
                     m_uttReady[m_uttPool[uttID].streamID] = true;
                 }

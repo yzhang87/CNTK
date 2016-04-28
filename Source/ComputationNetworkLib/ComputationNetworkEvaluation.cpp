@@ -316,6 +316,7 @@ bool ComputationNetwork::SEQTraversalFlowControlNode::IsOutOfDateWrtInputs() con
     {
         if (ptr->IsOutOfDateWrtInputs() &&
             ptr->OperationName() != OperationNameOf(PastValueNode) &&
+            ptr->OperationName() != OperationNameOf(LCPastValueNode) &&
             ptr->OperationName() != OperationNameOf(FutureValueNode))
             // TODO: when ShiftNode lands, check this as well. Ideally just test whether ptr is a IRecurrentNode
         {
