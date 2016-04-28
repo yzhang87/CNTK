@@ -49,6 +49,16 @@ private:
     vector<size_t> m_extraSeqsPerMB;
     size_t m_extraNumSeqs;
     bool m_noData;
+
+    // Parameter for LC-BlSTM
+    bool m_CSCtruncated;
+    size_t m_leftContext;
+    size_t m_middleContext;
+    size_t m_rightContext;
+    bool m_getPast;
+    size_t m_expandMBSize;
+
+
     bool m_trainOrTest; // if false, in file writing mode
     using IDataReader::LabelType;
     using IDataReader::LabelIdType;
@@ -111,7 +121,7 @@ private:
     bool GetMinibatch4SEToTrainOrTest(std::vector<shared_ptr<const msra::dbn::latticepair>>& latticeinput, vector<size_t>& uids, vector<size_t>& boundaries, std::vector<size_t>& extrauttmap);
     void fillOneUttDataforParallelmode(StreamMinibatchInputs& matrices, size_t startFr, size_t framenum, size_t channelIndex, size_t sourceChannelIndex); // TODO: PascalCase()
     bool GetMinibatchToWrite(StreamMinibatchInputs& matrices);
-
+    bool PopulateUtteranceInMinibatch(const StreamMinibatchInputs& matrices, size_t uttIndex, size_t startFrame, size_t endFrame, size_t mbSize, size_t mbOffset = 0);
     void StartMinibatchLoopToTrainOrTest(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize);
     void StartMinibatchLoopToWrite(size_t mbSize, size_t epoch, size_t requestedEpochSamples = requestDataSize);
 

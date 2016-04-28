@@ -86,6 +86,17 @@ void HTKMLFReader<ElemType>::InitFromConfig(const ConfigRecordType& readerConfig
     if (readerConfig.Exists(L"legacyMode"))
         RuntimeError("legacy mode has been deprecated\n");
 
+    // Checks if we use context-sensitive-chunk BPTT
+    m_CSCtruncated = readerConfig(L"CSCTruncated", false);
+    if (m_CSCtruncated)
+    {
+        m_leftContext = readerConfig(L"leftContext", 0);
+        m_rightContext = readerConfig(L"rightContext", 0);
+        m_middleContext = readerConfig(L"middleContext", 20);
+        m_getPast = readerConfig(L"getPast", false);
+    }
+
+
     if (command == L"write")
     {
         m_trainOrTest = false;
@@ -943,6 +954,106 @@ bool HTKMLFReader<ElemType>::TryGetMinibatch(StreamMinibatchInputs& matrices)
     }
 }
 
+// The notation of "utterance" here is a little bit tricky:
+//     If <frameMode> is true, then it is just a trunk of data we read from
+//     minibatch iterator.
+//     If <frameMode> is false, then it is a real utterance we read from
+//     minibatch iterator.
+// Note, startFr and endFrame are left close and right open. For example,
+// if startFr = 5, endFrame = 10, then we copy frames 5, 6, 7, 8, 9.
+template <class ElemType>
+bool HTKMLFReader<ElemType>::PopulateUtteranceInMinibatch(
+    const StreamMinibatchInputs& matrices,
+    size_t uttIndex, size_t startFr,
+    size_t endFrame, size_t mbSize, size_t mbOffset)
+{
+    bool success = true;
+
+    // Sanity check.
+    if (startFr >= endFrame)
+    {
+        return false;
+    }
+    if (endFrame - startFr > mbSize)
+    {
+        return false;
+    }
+
+    size_t numOfFea = m_featuresBufferMultiIO.size();
+    size_t numOfLabel = m_labelsBufferMultiIO.size();
+    for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
+    {
+        Matrix<ElemType>& data = matrices.GetInputMatrix<ElemType>(iter->first);
+        if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
+        { 
+            // Features.
+            size_t id = m_featureNameToIdMap[iter->first];
+            size_t dim = m_featureNameToDimMap[iter->first];
+
+            if (m_featuresBufferMultiIO[id] == NULL)
+            {
+                m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
+            }
+            else if (m_featuresBufferAllocatedMultiIO[id] < dim * mbSize * m_numSeqsPerMB)
+            { 
+                m_featuresBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_featuresBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
+            }
+
+            if (sizeof(ElemType) == sizeof(float))
+            { 
+                // For float, we copy entire column.
+                for (size_t j = startFr, k = 0; j < endFrame; j++, k++)
+                {
+                    memcpy_s(&m_featuresBufferMultiIO[id].get()[((k + mbOffset) * m_numSeqsPerMB + uttIndex) * dim],
+                             sizeof(ElemType) * dim,
+                             &m_featuresBufferMultiUtt[uttIndex].get()[j * dim + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]],
+                             sizeof(ElemType) * dim);
+                }
+            }
+            else
+            { 
+                // For double, we have to copy element by element.
+                for (size_t j = startFr, k = 0; j < endFrame; j++, k++)
+                {
+                    for (int d = 0; d < dim; d++)
+                    {
+                        m_featuresBufferMultiIO[id].get()[((k + mbOffset) * m_numSeqsPerMB + uttIndex) * dim + d] = m_featuresBufferMultiUtt[uttIndex].get()[j * dim + d + m_featuresStartIndexMultiUtt[id + uttIndex * numOfFea]];
+                    }
+                }
+            }
+        }
+        else if (m_nameToTypeMap[iter->first] == InputOutputTypes::category)
+        { 
+            // Labels.
+            size_t id = m_labelNameToIdMap[iter->first];
+            size_t dim = m_labelNameToDimMap[iter->first];
+
+            if (m_labelsBufferMultiIO[id] == NULL)
+            {
+                m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
+            }
+            else if (m_labelsBufferAllocatedMultiIO[id] < dim * mbSize * m_numSeqsPerMB)
+            {
+                m_labelsBufferMultiIO[id] = AllocateIntermediateBuffer(data.GetDeviceId(),dim * mbSize * m_numSeqsPerMB);
+                m_labelsBufferAllocatedMultiIO[id] = dim * mbSize * m_numSeqsPerMB;
+            }
+
+            for (size_t j = startFr, k = 0; j < endFrame; j++, k++)
+            {
+                for (int d = 0; d < dim; d++)
+                {
+                    m_labelsBufferMultiIO[id].get()[((k + mbOffset) * m_numSeqsPerMB + uttIndex) * dim + d] = m_labelsBufferMultiUtt[uttIndex].get()[j * dim + d + m_labelsStartIndexMultiUtt[id + uttIndex * numOfLabel]];
+                }
+            }
+        }
+    }
+    return success;
+}
+
+
 template <class ElemType>
 bool HTKMLFReader<ElemType>::GetMinibatchToTrainOrTest(StreamMinibatchInputs& matrices)
 {
@@ -1146,6 +1257,190 @@ bool HTKMLFReader<ElemType>::GetMinibatchToTrainOrTest(StreamMinibatchInputs& ma
                     }
                 }
             }
+        }
+        else if (m_CSCtruncated)
+        {
+            // -------------------------------------------------------
+            // truncated BPTT
+            // -------------------------------------------------------
+
+            // In truncated BPTT mode, a minibatch only consists of the truncation length, e.g. 20 frames.
+            // The reader maintains a set of current utterances, and each next minibatch contains the next 20 frames.
+            // When the end of an utterance is reached, the next available utterance is begin in the same slot.
+            if (m_noData) // we are returning the last utterances for this epoch
+            {
+                // return false if all cursors for all parallel sequences have reached the end
+                bool endEpoch = true;
+                for (size_t i = 0; i < m_numSeqsPerMB; i++)
+                {
+                    if (m_processedFrame[i] != m_numFramesToProcess[i])
+                        endEpoch = false;
+                }
+
+                if (endEpoch)
+                    return false;
+            }
+
+            size_t numOfFea = m_featuresBufferMultiIO.size();
+            size_t numOfLabel = m_labelsBufferMultiIO.size();
+            
+            m_expandMBSize = m_leftContext + m_mbNumTimeSteps + m_rightContext;
+            // create the feature matrix
+            m_pMBLayout->Init(m_numSeqsPerMB, m_expandMBSize);
+
+            vector<size_t> actualmbsize(m_numSeqsPerMB, 0);
+            for (size_t i = 0; i < m_numSeqsPerMB; i++)
+            {
+                // fill one parallel-sequence slot
+                const size_t startFr = m_processedFrame[i]; // start frame (cursor) inside the utterance that corresponds to time step [0]
+                size_t endFrame = 0;
+
+                size_t leftOffset = 0;
+                size_t rightOffset = 0;
+
+                leftOffset = min (startFr, m_leftContext);
+        
+                if (!m_getPast)
+                {
+                    // if we have enough data to fill
+                    if ((m_numFramesToProcess[i] - startFr) >= (m_expandMBSize - leftOffset))
+                        m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, 0, m_expandMBSize);
+                    else
+                        m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, 0, m_numFramesToProcess[i] - startFr);
+                } else
+                {
+                    assert (m_leftContext==0);
+                    // Sets the utterance boundary.
+                    if (m_numFramesToProcess[i] > startFr)
+                    {
+                        // if we have enough data to fill
+                        if ((m_numFramesToProcess[i] - startFr) >= m_expandMBSize)
+                            m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, -(ptrdiff_t) startFr, m_expandMBSize);
+                        else
+                            m_pMBLayout->AddSequence(NEW_SEQUENCE_ID, i, -(ptrdiff_t) startFr, m_numFramesToProcess[i] - startFr);
+                    }
+                }
+ 
+                // add utterance to MBLayout
+                assert(m_numFramesToProcess[i] > startFr || (m_noData && m_numFramesToProcess[i] == startFr));
+                // fill left context
+                bool populateLeftSucc = PopulateUtteranceInMinibatch(matrices, i, startFr-leftOffset, startFr, m_expandMBSize, 0);
+
+                if ((startFr + m_mbNumTimeSteps) < m_numFramesToProcess[i])
+                {
+                    // There is only 1 case:
+                    //     1. <m_frameMode> is false, and <m_truncated> is true.
+                    assert(m_frameMode == false);
+                    assert(m_truncated == true);
+
+                    endFrame = startFr + m_mbNumTimeSteps;
+                    // how many right context we need to fill
+                    rightOffset = min (m_numFramesToProcess[i] - endFrame, m_rightContext);
+                        
+                    bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFr, endFrame, m_expandMBSize, leftOffset);
+                    // fill right context
+                    populateSucc = PopulateUtteranceInMinibatch(matrices, i, endFrame, endFrame + rightOffset, m_expandMBSize, leftOffset + m_mbNumTimeSteps);
+
+                    m_processedFrame[i] += m_mbNumTimeSteps;
+
+                    // fill the gaps
+                    size_t currentMBFilled = leftOffset + m_mbNumTimeSteps + rightOffset;
+                    m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+                    for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+                    {
+                        PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+                    }
+                }
+                else if ((startFr + m_mbNumTimeSteps) == m_numFramesToProcess[i])
+                {
+                    // There are 3 cases:
+                    //     1. <m_frameMode> is false, and <m_truncated> is true,
+                    //        and it reaches the end of the utterance.
+                    //     2. <m_frameMode> is false, and <m_truncated> is false
+                    //        and it reaches the end of the utterance.
+                    //     3. <m_frameMode> is true, then we do not have to set
+                    //        utterance boundary.
+
+                    // Sets the utterance boundary.
+
+                    // Now puts the utterance into the minibatch, and loads the
+                    // next one.
+                    endFrame = startFr + m_mbNumTimeSteps;
+                    bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFr, endFrame, m_expandMBSize, leftOffset);
+                    m_processedFrame[i] += m_mbNumTimeSteps;
+                    bool reNewSucc = ReNewBufferForMultiIO(i);
+                    // fill the gaps
+                    size_t currentMBFilled = leftOffset + m_mbNumTimeSteps;
+
+                    m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+                    for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+                    {
+                        PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+                    }
+                }
+                else
+                {
+                    // There are 3 cases:
+                    //     1. <m_frameMode> is true, then it must be a partial
+                    //        minibatch.
+                    //     2. <m_frameMode> is false, <m_truncated> is true,
+                    //        then we have to pull frames from next utterance.
+                    //     3. <m_frameMode> is false, <m_truncated> is false,
+                    //        then the utterance is too short, we should try to
+                    //        pull next utterance.
+
+                    // Checks if we have reached the end of the minibatch.
+                    if (startFr == m_numFramesToProcess[i])
+                    {
+                        m_pMBLayout->AddGap(i, 0, m_expandMBSize);
+                        for (size_t k = 0; k < m_expandMBSize; k++)
+                        {
+                            PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_mbNumTimeSteps, k);
+                        }
+                        continue;
+                    }
+
+                    // we set utterance boundary for the partial
+                    // minibatch, and then load it.
+                    endFrame = m_numFramesToProcess[i];
+                    bool populateSucc = PopulateUtteranceInMinibatch(matrices, i, startFr, endFrame, m_expandMBSize, leftOffset);
+            
+                    m_processedFrame[i] += endFrame - startFr;
+                    size_t currentMBFilled = leftOffset + endFrame - startFr;
+
+                    m_pMBLayout->AddGap(i, currentMBFilled, m_expandMBSize);
+                    for (size_t k = currentMBFilled; k < m_expandMBSize; k++)
+                    {
+                        PopulateUtteranceInMinibatch(matrices, i, 0, 1, m_expandMBSize, k);
+                    }
+
+
+                    bool reNewSucc = ReNewBufferForMultiIO(i);
+
+                }
+
+            }
+            assert (m_truncated == true);
+            for (auto iter = matrices.begin(); iter != matrices.end(); iter++)
+            {
+                // dereference matrix that corresponds to key (input/output name) and
+                // populate based on whether its a feature or a label
+                Matrix<ElemType>& data = matrices.GetInputMatrix<ElemType>(iter->first); // can be features or labels
+                if (m_nameToTypeMap[iter->first] == InputOutputTypes::real)
+                {
+                    id = m_featureNameToIdMap[iter->first];
+                    dim = m_featureNameToDimMap[iter->first];
+                    data.SetValue(dim, m_expandMBSize * m_numSeqsPerMB, data.GetDeviceId(), m_featuresBufferMultiIO[id].get(), matrixFlagNormal);
+                }
+                else if (m_nameToTypeMap[iter->first] == InputOutputTypes::category)
+                {
+                    id = m_labelNameToIdMap[iter->first];
+                    dim = m_labelNameToDimMap[iter->first];
+                    data.SetValue(dim, m_expandMBSize * m_numSeqsPerMB, data.GetDeviceId(), m_labelsBufferMultiIO[id].get(), matrixFlagNormal);
+                }
+            }
+
+            skip = false;
         }
         else // if m_truncated
         {
