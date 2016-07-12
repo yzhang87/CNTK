@@ -1,16 +1,18 @@
 # CNTK
 
 ## Latest news
-*2016-04-12.* CNTK is available as [Azure Virtual Machines](https://github.com/Microsoft/CNTK/wiki/CNTK-on-Azure) and [Docker Containers](https://github.com/Microsoft/CNTK/wiki/CNTK-Docker-Containers)
+*2016-07-05.* CNTK now supports *Deconvolution* and *Unpooling*. See the usage example in the Network number 4 in [MNIST Sample](https://github.com/Microsoft/CNTK/blob/master/Examples/Image/MNIST/README.md).
 
-*2016-04-12.* Added support for ND convolution and ND pooling and CPU support for `cudnn` layout in convolution, pooling and batch normalization nodes.
-Read [documentation](https://github.com/Microsoft/CNTK/wiki/Full-NDL-Function-Reference) on convolution, pooling and batch normalization nodes.
+*2016-06-23.* New License Terms for CNTK 1bit-SGD and related components.  
+Effective immediately the License Terms for CNTK 1bit-SGD and related components have changed. The new Terms provide more flexibility and enable new usage scenarios, especially in commercial environments. Read the new Terms at the [standard location](https://cntk1bitsgd.codeplex.com/license). Please note, that while the new Terms are significantly more flexible comparing to the previous ones, they are still **more restrictive** than the main CNTK License. Consequently everything described in [Enabling 1bit-SGD](https://github.com/Microsoft/CNTK/wiki/Enabling-1bit-SGD) section of the Wiki remains valid.
 
-*2016-04-05.* CUDA7.5 support for Windows Build: Windows project files have been updated to automatically utilize CUDA 7.5 if present
+*2016-06-20.* A [post](http://itpeernetwork.intel.com/accelerating-the-computational-network-tool-kit-with-intel-mkl/) on Intel MKL and CNTK is published in the [Intel IT Peer Network](http://itpeernetwork.intel.com/accelerating-the-computational-network-tool-kit-with-intel-mkl/)
 
-## March 2016
-*2016-03-24.* New Text Reader (CNTKTextFormatReader) is available
-Read description here https://github.com/Microsoft/CNTK/wiki/CNTKTextFormat-Reader
+*2016-06-16.* V 1.5 Binary release. NuGet Package with CNTK Model Evaluation Libraries.  
+NuGet Package is added to CNTK v.1.5 binaries. See [CNTK Releases page](https://github.com/Microsoft/CNTK/releases) and [NuGet Package description](https://github.com/Microsoft/CNTK/wiki/Nuget-Package-for-Evaluation).
+
+*2016-06-15.*  CNTK now supports building against a custom Intel® Math Kernel Library (MKL).
+See [setup instructions](https://github.com/Microsoft/CNTK/wiki/Setup-CNTK-on-your-machine) on how to set this up for your platform.
 
 See [all news](https://github.com/Microsoft/CNTK/wiki/News).
 
@@ -43,3 +45,8 @@ Amit Agarwal, Eldar Akchurin, Chris Basoglu, Guoguo Chen, Scott Cyphers, Jasha D
 ## Disclaimer 
 
 CNTK is in active use at Microsoft and constantly evolving. There will be bugs.
+
+
+## Microsoft Open Source Code of Conduct
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.

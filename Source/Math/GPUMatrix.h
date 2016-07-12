@@ -11,6 +11,7 @@
 #include "TensorShape.h" // only for SmallVector; I was hoping to keep this out
 #include "BestGpu.h" // for CPUONLY macro
 #include "ConcStack.h"
+#include "GPURNGHandle.h"
 #include <string>
 #include <vector>
 #include <array>
@@ -18,6 +19,10 @@
 #include <iostream> // for cout/cerr
 #include <memory>   // for unique_ptr
 #include <limits.h> // for ULONG_MAX
+
+//#include "CPUMatrix.h"
+//#include "CPUSparseMatrix.h"
+//#include "GPUSparseMatrix.h"
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -223,14 +228,17 @@ public:
 
     void MaskColumnsValue(const GPUMatrix<char>& columnsMask, ElemType val);
 
+    //void SetValue(const CPUMatrix<ElemType>& deepCopyFrom);
     void SetValue(const GPUMatrix<ElemType>& deepCopyFrom);
+    //void SetValue(const CPUSparseMatrix<ElemType>& deepCopyFrom);
+    //void SetValue(const GPUSparseMatrix<ElemType>& deepCopyFrom);
     void SetValue(const size_t numRows, const size_t numCols, int deviceId, ElemType* pArray, size_t matrixFlags = matrixFlagNormal);
 
     void SetDiagonalValue(const ElemType v);
     void SetDiagonalValue(const GPUMatrix<ElemType>& vector);
     void SetUniformRandomValue(const ElemType low, const ElemType high, unsigned long seed = USE_TIME_BASED_SEED);
     void SetGaussianRandomValue(const ElemType mean, const ElemType sigma, unsigned long seed = USE_TIME_BASED_SEED);
-    void SetUniformRandomMask(const ElemType maskRate, const ElemType scaleValue, unsigned long seed = USE_TIME_BASED_SEED);
+    void SetUniformRandomMask(const ElemType maskRate, const ElemType scaleValue, RNGHandle& rngHandle);
 
     GPUMatrix<ElemType> Transpose() const;
     GPUMatrix<ElemType>& AssignTransposeOf(const GPUMatrix<ElemType>& a);
@@ -437,6 +445,7 @@ public:
     void MaxPoolingBackward(const GPUMatrix<ElemType>& out, const GPUMatrix<ElemType>& in,
                             const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices,
                             GPUMatrix<ElemType>& grad) const;
+    void MaxUnpooling(const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices, const GPUMatrix<ElemType>& poolInput, GPUMatrix<ElemType>& input) const;
 
     void AveragePoolingForward(const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices, GPUMatrix<ElemType>& output) const;
     void AveragePoolingBackward(const GPUMatrix<int>& mpRowCol, const GPUMatrix<int>& mpRowIndices, const GPUMatrix<int>& indices, GPUMatrix<ElemType>& grad) const;
@@ -635,7 +644,10 @@ public:
     {
         m_done = nullptr;
         if (DoSync())
+        {
+            CUDA_CALL(cudaGetLastError());
             CUDA_CALL(cudaEventCreate(&m_done));
+        }
     }
     ~SyncGuard()
     {

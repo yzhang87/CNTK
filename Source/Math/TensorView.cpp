@@ -306,35 +306,8 @@ static void FlattenToMatrix(TensorShape& shape, bool trans, size_t splitPoint)
 {
     if (trans)
         splitPoint = shape.GetRank() - splitPoint;
-    // check & print meaningful error message
-    SmallVector<bool> dimsToDrop(shape.GetRank(), false);
-    for (size_t k = 1; k < shape.GetRank(); k++)
-        if (k != splitPoint)
-            if (!shape.CanFlatten(k))
-                InvalidArgument("DoMatrixProductOf: Shape [%s] is not dense at dimension %d.", string(shape).c_str(), (int)k);
-            else
-                dimsToDrop[k - 1] = true;
-    // handle case where last dimension missing, e.g. u'v where u and v are column vectors
-    if (splitPoint == shape.GetRank())
-    {
-        shape.PadRankInPlace(splitPoint + 1);
-        dimsToDrop.resize(splitPoint + 1, false);
-    }
-    // flatten the dimensions
-    for (size_t k = 1; k < shape.GetRank(); k++)
-        if (dimsToDrop[k - 1])
-            shape.FlattenInPlace(k);
-    shape.DropDimsInPlace(dimsToDrop);
-    // handle edge case where first dimension missing, e.g. u'v where both are scalars
-    if (splitPoint == 0)
-    {
-        // we must insert a 1 dimension at the start
-        assert(shape.GetRank() == 1); // we have reduced everything after the split point at this point
-        shape.PadRankInPlace(2);      // append a 1
-        shape.SwapDimsInPlace(0, 1);  // and swap--this preserves the stride of the second dimension
-    }
-    // now we have a matrix
-    assert(shape.GetRank() == 2);
+
+    shape.FlattenTo2DInPlace(splitPoint, "DoMatrixProductOf");
 }
 
 // convert tensor into a Matrix object
@@ -363,7 +336,7 @@ shared_ptr<Matrix<ElemType>> TensorView<ElemType>::AsMatrix() const
     //    which gets reinterpreted back as a [K x J x S x T] tensor
     // In the special case of sparse matrices, this split cannot be done. E.g. in the above example, we could only multiply with a [K x I x J] tensor.
     let needsSlicing = firstColumn != 0 || numColumns != m_sob->GetNumCols();
-    let needsReshaping = m_shape[0] != m_sob->GetNumRows() || m_shape[1] != m_sob->GetNumCols();
+    let needsReshaping = m_shape[0] != m_sob->GetNumRows() || m_shape[1] != numColumns;
 
     // Note: If an output matrix is a view and needs to move to a different device, we will fail later, since the current structure cannot support that.
     // As a consequence, some configurations will simply not work currently.

@@ -138,9 +138,16 @@ public:
         }
 
         // Must use CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING to get the same results as in reference engine.
+#if CUDNN_MAJOR >= 5
+        CUDNN_CALL(cudnnSetPoolingNdDescriptor(m_pool,
+                                               kind == PoolKind::Max ? CUDNN_POOLING_MAX : CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING,
+                                               CUDNN_PROPAGATE_NAN,
+                                               (int)dims.size(), dims.data(), pad.data(), stride.data()));
+#else
         CUDNN_CALL(cudnnSetPoolingNdDescriptor(m_pool,
                                                kind == PoolKind::Max ? CUDNN_POOLING_MAX : CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING,
                                                (int)dims.size(), dims.data(), pad.data(), stride.data()));
+#endif
     }
 
     ~CuDnnPool()
@@ -299,6 +306,15 @@ protected:
                                         m_inT, ptr(in), &C::One, m_inT, ptr(grad)));
     }
 
+    void MaxUnpoolingCore(const Mat& out, const Mat& poolIn, Mat& in) override
+    {
+        UNUSED(out);
+        UNUSED(poolIn);
+        UNUSED(in);
+        // Not implemented but potentially can make a fallback to reference engine.
+        LogicError("MaxUnpooling is not implemented for cuDNN engine.");
+    }
+
 private:
     using C = Consts<ElemType>;
 
@@ -307,10 +323,12 @@ private:
     template <typename TAlgo, typename TFinder, typename TStaticFinder>
     void FindBestAlgo(size_t batchSize, TAlgo& algo, TFinder finder, TStaticFinder staticFinder)
     {
-        if (!algo.NeedAutotuning(batchSize))
-            return;
         m_inT.UpdateBatchSize(batchSize);
         m_outT.UpdateBatchSize(batchSize);
+
+        if (!algo.NeedAutotuning(batchSize))
+            return;
+
         using CuDnnAlgoT = decltype(TAlgo::Algo);
         CuDnnAlgoT algoPerf[MaxAlgoCount];
         int calgo = 0;
@@ -321,7 +339,7 @@ private:
         {
             decltype(CuDnnAlgoT::algo) noMemAlgo;
             CUDNN_CALL(staticFinder(noMemAlgo));
-            algo.CurMBSize = batchSize;
+            algo.MaxAllowedMBSizeForCurrentAlgo = batchSize;
             algo.Algo = algoPerf[0];
             algo.Algo.algo = noMemAlgo;
             algo.Algo.memory = 0;
@@ -341,7 +359,7 @@ private:
             });
         if (res == algoPerf + calgo)
             RuntimeError("cuDNN could not find suitable algorithm for the current convolution configuration.");
-        algo.CurMBSize = batchSize;
+        algo.MaxAllowedMBSizeForCurrentAlgo = batchSize;
         algo.Algo = *res;
         // Find fastest algorithm that does NOT require workspace. It is used as a fallback algo in Forward function.
         res = std::find_if(algoPerf, algoPerf + calgo,
@@ -374,13 +392,14 @@ private:
         using CuDnnAlgoT = decltype(T::algo);
 
         ConvAlgoInfo()
-            : CurMBSize(0)
+            : MaxAllowedMBSizeForCurrentAlgo(0)
         {
             Algo.status = CUDNN_STATUS_NOT_INITIALIZED;
             NoWorkspaceAlgo = (CuDnnAlgoT)-1;
         }
         // Current mini-batch size, needed for re-computing statistics in auto-tuner.
-        size_t CurMBSize;
+        size_t MaxAllowedMBSizeForCurrentAlgo;
+
         T Algo;
         CuDnnAlgoT NoWorkspaceAlgo;
 
@@ -393,7 +412,7 @@ private:
             // We also need to reset auto-tuning status at the beginning of each epoch but ComputationNode currently does not provide such notification.
             // We assume no other dimensions of tensors can change so we don't check it.
             // REVIEW alexeyk: review once we get response from NVIDIA.
-            return (Algo.status != CUDNN_STATUS_SUCCESS || batchSize > CurMBSize);
+            return (Algo.status != CUDNN_STATUS_SUCCESS || batchSize > MaxAllowedMBSizeForCurrentAlgo);
         }
     };
 
@@ -426,7 +445,8 @@ bool CuDnnConvolutionEngineFactory<ElemType>::IsSupported(DEVICEID_TYPE deviceId
     // REVIEW alexeyk: IsSupported check should be performed by cuDNN itself. Is there a good way to do that?
 
     cudaDeviceProp props = {0};
-    if (cudaGetDeviceProperties(&props, deviceId) != cudaSuccess || props.major < 3)
+    // Note that cudaGetDeviceProperties also sets CUDA last error so need to check/clear both.
+    if (deviceId < 0 || (cudaGetDeviceProperties(&props, deviceId) | cudaGetLastError()) != cudaSuccess || props.major < 3)
         return false;
 
     const auto& input = geometry->InputShape();

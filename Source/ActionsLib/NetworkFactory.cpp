@@ -89,7 +89,7 @@ bool TryGetNetworkFactory(const ConfigRecordType& config, function<ComputationNe
             L"precision = '%ls'\n"        // 'float' or 'double'
             L"network = %ls",             // source code of expression that evaluates to a ComputationNetwork
             (int)deviceId, ElemTypeName<ElemType>(), sourceOfNetwork.c_str());
-        let expr = BS::ParseConfigDictFromString(sourceOfBS, move(includePaths));
+        let expr = BS::ParseConfigDictFromString(sourceOfBS, L"BrainScriptNetworkBuilder", move(includePaths));
 
         // the rest is done in a lambda that is only evaluated when a virgin network is needed
         // Note that evaluating the BrainScript *is* instantiating the network, so the evaluate call must be inside the lambda.
@@ -142,11 +142,11 @@ static void PatchOutputNodes(const ComputationNetworkPtr& net, const ConfigArray
 }
 
 template <class ConfigRecordType, typename ElemType>
-ComputationNetworkPtr GetModelFromConfig(const ConfigRecordType& config, vector<wstring>& outputNodeNamesVector)
+ComputationNetworkPtr GetModelFromConfig(const ConfigRecordType& config, const wstring& outputNodeNamesConfig, vector<wstring>& outputNodeNamesVector)
 {
     DEVICEID_TYPE deviceId = DeviceFromConfig(config);
 
-    ConfigArray outputNodeNames = config(L"outputNodeNames", ConfigArray(""));
+    ConfigArray outputNodeNames = config(outputNodeNamesConfig.c_str(), ConfigArray(""));
 
     ComputationNetworkPtr net;
 
@@ -185,5 +185,5 @@ template function<ComputationNetworkPtr(DEVICEID_TYPE)> GetNetworkFactory<Script
 template function<ComputationNetworkPtr(DEVICEID_TYPE)> GetNetworkFactory<ScriptableObjects::IConfigRecord, double>(const ScriptableObjects::IConfigRecord& config);
 template function<ComputationNetworkPtr(DEVICEID_TYPE)> GetNetworkFactory<ConfigParameters, float>(const ConfigParameters& config);
 template function<ComputationNetworkPtr(DEVICEID_TYPE)> GetNetworkFactory<ConfigParameters, double>(const ConfigParameters& config);
-template ComputationNetworkPtr GetModelFromConfig<ConfigParameters, float>(const ConfigParameters& config, vector<wstring>& outputNodeNamesVector);
-template ComputationNetworkPtr GetModelFromConfig<ConfigParameters, double>(const ConfigParameters& config, vector<wstring>& outputNodeNamesVector);
+template ComputationNetworkPtr GetModelFromConfig<ConfigParameters, float> (const ConfigParameters& config, const wstring&, vector<wstring>& outputNodeNamesVector);
+template ComputationNetworkPtr GetModelFromConfig<ConfigParameters, double>(const ConfigParameters& config, const wstring&, vector<wstring>& outputNodeNamesVector);

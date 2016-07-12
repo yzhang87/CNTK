@@ -8,16 +8,18 @@
 
 #include "NoRandomizer.h"
 #include "DataReader.h"
+#include "ExceptionCapture.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-NoRandomizer::NoRandomizer(IDataDeserializerPtr deserializer)
+NoRandomizer::NoRandomizer(IDataDeserializerPtr deserializer, bool multithreadedGetNextSequences)
     : m_deserializer(deserializer),
       m_samplePositionInEpoch(0),
-      m_currentChunkPosition(SIZE_MAX),
+      m_currentChunkPosition(CHUNKID_MAX),
       m_globalSamplePosition(0),
       m_totalNumberOfSamples(0),
-      m_currentSequencePositionInChunk(0)
+      m_currentSequencePositionInChunk(0),
+      m_multithreadedGetNextSequences(multithreadedGetNextSequences)
 {
     assert(deserializer != nullptr);
     m_streams = m_deserializer->GetStreamDescriptions();
@@ -41,14 +43,10 @@ NoRandomizer::NoRandomizer(IDataDeserializerPtr deserializer)
     m_totalNumberOfSamples = sampleCount;
 }
 
-void NoRandomizer::Initialize(TransformerPtr, const ConfigParameters&)
-{
-}
-
-size_t NoRandomizer::GetChunkIndexOf(size_t samplePosition)
+ChunkIdType NoRandomizer::GetChunkIndexOf(size_t samplePosition)
 {
     auto result = std::upper_bound(m_chunkSampleOffset.begin(), m_chunkSampleOffset.end(), samplePosition);
-    return result - 1 - m_chunkSampleOffset.begin();
+    return (ChunkIdType) (result - 1 - m_chunkSampleOffset.begin());
 }
 
 void NoRandomizer::StartEpoch(const EpochConfiguration& config)
@@ -64,11 +62,11 @@ void NoRandomizer::StartEpoch(const EpochConfiguration& config)
     m_globalSamplePosition = m_config.m_totalEpochSizeInSamples * config.m_epochIndex;
     size_t sweepSamplePosition = m_globalSamplePosition % m_totalNumberOfSamples;
 
-    size_t chunkIndex = GetChunkIndexOf(sweepSamplePosition);
+    ChunkIdType chunkIndex = GetChunkIndexOf(sweepSamplePosition);
     if (chunkIndex != m_currentChunkPosition)
     {
         // unloading everything.
-        m_currentChunkId = SIZE_MAX;
+        m_currentChunkId = CHUNKID_MAX;
         m_currentChunk = nullptr;
 
         // Need to load descriptions for the new current chunk.
@@ -172,22 +170,62 @@ Sequences NoRandomizer::GetNextSequences(size_t sampleCount)
     }
 
     result.m_data.resize(m_streams.size(), std::vector<SequenceDataPtr>(subsetSize));
+
+    // Collect all the chunks that we need
+    std::map<ChunkIdType, ChunkPtr> chunks;
+
+    if (m_currentChunk != nullptr)
+    {
+        chunks[m_currentChunkId] = m_currentChunk;
+    }
+
     for (int i = 0; i < subsetSize; ++i)
     {
+        const auto& sequenceDescription = descriptions[start + i];
+        auto it = chunks.find(sequenceDescription.m_chunkId);
+        if (it == chunks.end())
+        {
+            chunks[sequenceDescription.m_chunkId] = m_deserializer->GetChunk(sequenceDescription.m_chunkId);
+        }
+    }
+
+    auto process = [&](int i) -> void {
         std::vector<SequenceDataPtr> sequence;
         const auto& sequenceDescription = descriptions[start + i];
-        if (sequenceDescription.m_chunkId != m_currentChunkId)
+
+        auto it = chunks.find(sequenceDescription.m_chunkId);
+        if (it == chunks.end())
         {
-            m_currentChunk = m_deserializer->GetChunk(sequenceDescription.m_chunkId);
-            m_currentChunkId = sequenceDescription.m_chunkId;
+            LogicError("Invalid chunk requested.");
         }
 
-        m_currentChunk->GetSequence(sequenceDescription.m_id, sequence);
+        it->second->GetSequence(sequenceDescription.m_id, sequence);
         for (int j = 0; j < m_streams.size(); ++j)
         {
             result.m_data[j][i] = sequence[j];
         }
+    };
+
+    // TODO: This will be changed, when we move transformers under the (no-) randomizer, should not deal with multithreading here.
+    if (m_multithreadedGetNextSequences)
+    {
+        ExceptionCapture capture;
+#pragma omp parallel for schedule(dynamic)
+        for (int i = 0; i < subsetSize; ++i)
+            capture.SafeRun(process, i);
+        capture.RethrowIfHappened();
     }
+    else
+    {
+        for (int i = 0; i < subsetSize; ++i)
+            process(i);
+    }
+
+    // Keep the last chunk for next time
+    m_currentChunkId = descriptions[start + subsetSize - 1].m_chunkId;
+    auto it = chunks.find(m_currentChunkId);
+    assert(it != chunks.end());
+    m_currentChunk = it->second;
 
     return result;
 }

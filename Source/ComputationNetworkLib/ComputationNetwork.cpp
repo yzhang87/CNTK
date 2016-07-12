@@ -490,27 +490,30 @@ void ComputationNetwork::CollectInputAndLearnableParametersRec(const Computation
 }
 
 template <class ElemType>
-/*static*/ void ComputationNetwork::SetDropoutRate(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, unsigned long& dropOutSeed)
+/*static*/ void ComputationNetwork::SetDropoutRate(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, size_t randSeedBase)
 {
+    list<ComputationNodeBasePtr> dropoutNodes = net->GetNodesWithType(OperationNameOf(DropoutNode), criterionNode);
     if (dropoutRate != prevDropoutRate)
     {
         fprintf(stderr, "Setting dropout rate to %.8g.\n", dropoutRate);
         // TODO: Change this to use an interface that is independent of <ElemType>.
-        list<ComputationNodeBasePtr> dropoutNodes = net->GetNodesWithType(OperationNameOf(DropoutNode), criterionNode);
         if (dropoutNodes.size() == 0 && dropoutRate > 0)
-            fprintf(stderr, "WARNING: there is no dropout node.\n");
-        else
-        {
-            for (auto& nodeIter: dropoutNodes)
-            {
-                auto node = dynamic_pointer_cast<DropoutNode<ElemType>>(nodeIter);
-                node->SetDropoutRate(dropoutRate);
-                node->SetRandomSeed(dropOutSeed++);
-            }
-        }
-
-        prevDropoutRate = dropoutRate;
+            fprintf(stderr, "WARNING: Attempting to set dropout rate, but there is no dropout node in the network.\n");
     }
+
+    // Each dropout node gets a distinct seed. The actual seed for each dropout node is computed as follows:
+    // seed = (((parallelWorkerIdx * maxEpochs) + currentEpochNum) /*i.e. randSeedBase*/ * dropoutNodes.size()) + dropoutNodeIdx
+    size_t randSeed = randSeedBase * dropoutNodes.size();
+    for (auto& nodeIter : dropoutNodes)
+    {
+        auto node = dynamic_pointer_cast<DropoutNode<ElemType>>(nodeIter);
+        if (dropoutRate != prevDropoutRate)
+            node->SetDropoutRate(dropoutRate);
+        node->SetRandomSeed(randSeed);
+        randSeed++;
+    }
+
+    prevDropoutRate = dropoutRate;
 }
 
 template <class ElemType>
@@ -787,8 +790,8 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
     for (const auto& x : allnodes)
     {
         line.clear();
-        line = msra::strfun::wstrprintf(L" \"%ls\" [ label = \"%ls [%s%ls]\\n%ls\" ] ;\n",
-                                        x->GetName().c_str(), x->GetName().c_str(), string(x->GetSampleLayout()).c_str(), x->GetMBLayoutAxisString().c_str(),
+        line = msra::strfun::wstrprintf(L" \"%ls\" [ label = \"%ls [%ls%ls]\\n%ls\" ] ;\n",
+                                        x->GetName().c_str(), x->GetName().c_str(), wstring(x->GetSampleLayout()).c_str(), x->HasMBLayout() ? L" x *" : L"",
                                         x->OperationName().c_str());
         fstream << line;
     }
@@ -874,7 +877,7 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
     fstream << L"\n}\n";
 }
 
-void ComputationNetwork::PlotNetworkTopology(const wstring outputFile) //  [1/13/2015 erw] plot network topology using dot language
+void ComputationNetwork::PlotNetworkTopology(const wstring& outputFile) 
 {
     VerifyIsCompiled("PlotNetworkTopology");
     // ValidateNetwork(false, true);
@@ -945,24 +948,27 @@ void ComputationNodeBase::EnumerateArcs(std::unordered_set<ComputationNodeBasePt
 // ========================================
 // BUGBUG: this only currently works for one ElemType, not both
 template <class ElemType>
-void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDConfig, size_t AlignedSize)
+void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDConfig, size_t alignedSize)
 {
     vector<pair<vector<wstring>, float>> nodeGroups;
-    wregex NameFilter;
+    wregex nameFilter;
 
     for (const auto& e : SVDConfig)
     {
         wstring regexStr = e.first;
-        float keepRatio = e.second;
-        vector<wstring> NamesInGroup;
+        if (regexStr.empty())
+            continue;
 
-        NameFilter.assign(regexStr);
+        float keepRatio = e.second;
+        vector<wstring> namesInGroup;
+
+        nameFilter.assign(regexStr);
 
         for (auto n = m_nameToNodeMap.begin(); n != m_nameToNodeMap.end(); n++)
         {
-            if (!regexStr.empty() && !regex_match(n->first, NameFilter))
+            if (!regex_match(n->first, nameFilter))
             {
-                // if regexStr is not empty and the the node node does not match with the regexStr
+                // if regexStr is not empty and the the node does not match with the regexStr
                 continue;
             }
 
@@ -974,20 +980,20 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
                 continue;
 
             // still here ?
-            NamesInGroup.push_back(n->first);
+            namesInGroup.push_back(n->first);
         }
-        nodeGroups.push_back(make_pair(NamesInGroup, keepRatio));
+        nodeGroups.push_back(make_pair(namesInGroup, keepRatio));
     }
 
     size_t groupID = 0;
     for (auto& group : nodeGroups)
     {
-        float keepratio = group.second;
+        float keepRatio = group.second;
         fprintf(stderr,
                 "--------------------------------------------------------------------------------------------\n");
         fprintf(stderr,
                 "ParameterSVD: start to process group %d with KeepRatio=%.2f\n",
-                (int) groupID++, keepratio);
+                (int) groupID++, keepRatio);
         fprintf(stderr,
                 "--------------------------------------------------------------------------------------------\n");
 
@@ -1022,17 +1028,17 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
             // S \in R^{min(m,n),1}
             // S is in descending order
 
-            ElemType totalenergy = 0.0f;
+            ElemType totalEnergy = 0.0f;
             for (size_t i = 0; i < S.GetNumRows(); i++)
-                totalenergy += S(i, 0);
-            ElemType keepenergy = totalenergy * keepratio;
-            ElemType runenergy = 0.0f;
+                totalEnergy += S(i, 0);
+            ElemType keepEnergy = totalEnergy * keepRatio;
+            ElemType runEnergy = 0.0f;
 
             size_t r = 0;
             for (size_t indx = 0; indx < S.GetNumRows(); indx++)
             {
-                runenergy += S(indx, 0);
-                if (runenergy > keepenergy)
+                runEnergy += S(indx, 0);
+                if (runEnergy > keepEnergy)
                 {
                     r = indx + 1;
                     break;
@@ -1041,10 +1047,10 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
 
             r = r > S.GetNumRows() ? S.GetNumRows() : r;
 
-            if (r % AlignedSize != 0)
+            if (r % alignedSize != 0)
             {
-                r -= r % AlignedSize;
-                r = r + AlignedSize > S.GetNumRows() ? S.GetNumRows() : r + AlignedSize;
+                r -= r % alignedSize;
+                r = r + alignedSize > S.GetNumRows() ? S.GetNumRows() : r + alignedSize;
             }
             // r = (r + 7) & (~7); //  to keep the number of rows/cols of resultant matrix a multipier of 8
             //  which can be helpful at runtime
@@ -1053,7 +1059,7 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
             fprintf(stderr,
                     "Performing SVD for a %5d-by-%-5d matrix (node name: %-20ls) ---  computation time %5.2f secs ;  keep %4.1f%% energy ===> keep %5d svd values (reduce to %4.1f%% parameters) \n",
                     (int) m, (int) n, name.c_str(), elapsedtime.count(),
-                    keepratio * 100, (int) r,
+                    keepRatio * 100, (int) r,
                     ((m + n) * r + 0.0f) / m / n * 100);
 
             // redU in R^ {mXr}
@@ -1067,28 +1073,49 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
             Matrix<ElemType> redS(r, (size_t)1, A.GetDeviceId());
             for (size_t i = 0; i < r; i++)
             {
-                ElemType sqrtsigma = (ElemType) sqrt((double) S(i, 0));
-                redS(i, 0) = sqrtsigma;
+                ElemType sqrtSigma = (ElemType) sqrt((double) S(i, 0));
+                redS(i, 0) = sqrtSigma;
             }
 
             redU.RowElementMultiplyWith(redS.Transpose());
             redVT.ColumnElementMultiplyWith(redS);
 
             // Step 2. create two new Parameter nodes and one Times node
-            wstring leftChildName = name + L"-U";  // BUGBUG: With BrainScript, node names must be proper identifiers/variable expressions. We can't have '-' in node names.
-            wstring rightChildName = name + L"-V";
+            wstring leftChildName = name + L"_U";
+            wstring rightChildName = name + L"_V";
             shared_ptr<ComputationNode<ElemType>> pLeft = AddNodeToNetWithElemType(New<LearnableParameter<ElemType>>(m_deviceId, leftChildName, m, r));
             shared_ptr<ComputationNode<ElemType>> pRight = AddNodeToNetWithElemType(New<LearnableParameter<ElemType>>(m_deviceId, rightChildName, r, n));
 
-            // TODO: We should be able to move instead of copy but it currently isn't strightforward
+            // TODO: We should be able to move instead of copy but it currently isn't straightforward
             // due to redU and redVT being slices
             pLeft->ValueAsMatrix() = redU.DeepClone();
             pRight->ValueAsMatrix() = redVT.DeepClone();
 
-            shared_ptr<ComputationNode<ElemType>> pTimes = AddNodeToNetAndAttachInputs(New<TimesNode<ElemType>>(m_deviceId, name + L"-SVD"), { pLeft, pRight });
+            // Step 3. Change the network hierachy to include the SVD nodes
+            auto parentNodes = GetParentNodes(name);
 
-            // Step 3. remove old node
-            ReplaceLeafNode(name, pTimes);
+            for (auto& pParentNode : parentNodes)
+            {
+                // Change the hierarchy of the network if the node is immediately used in a product
+                auto pParentTimesNode = dynamic_pointer_cast<TimesNode<ElemType>>(pParentNode);
+                if (pParentTimesNode)
+                {
+                    // Change the hierarchy to ensure multiplication order
+                    // U*(V*X)
+                    shared_ptr<ComputationNode<ElemType>> pTimes = New<TimesNode<ElemType>>(m_deviceId, name + L"_SVD");
+                    pTimes->AttachInputs({ pLeft, pParentNode });
+                    
+                    InsertNode(pParentNode->GetName(), pTimes, pParentNode->GetTags());
+                    ReplaceLeafNode(name, pRight);
+                }
+                else
+                {
+                    // Default multiplication order
+                    shared_ptr<ComputationNode<ElemType>> pTimes = AddNodeToNetAndAttachInputs(New<TimesNode<ElemType>>(m_deviceId, name + L"_SVD"), { pLeft, pRight });
+
+                    ReplaceLeafNode(name, pTimes);
+                }
+            }
         }
     }
 
@@ -1463,7 +1490,7 @@ template void ComputationNetwork::InitLearnableParameters<float>(const Computati
 template void ComputationNetwork::Read<float>(const wstring& fileName);
 template void ComputationNetwork::ReadPersistableParameters<float>(File& fstream, bool create);
 template void ComputationNetwork::PerformSVDecomposition<float>(const map<wstring, float>& SVDConfig, size_t alignedsize);
-template /*static*/ void ComputationNetwork::SetDropoutRate<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, unsigned long& dropOutSeed);
+template /*static*/ void ComputationNetwork::SetDropoutRate<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, size_t randSeedBase);
 template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
 template void ComputationNetwork::SetSeqParam<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
                                                      const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
@@ -1473,7 +1500,7 @@ template void ComputationNetwork::InitLearnableParameters<double>(const Computat
 template void ComputationNetwork::Read<double>(const wstring& fileName);
 template void ComputationNetwork::ReadPersistableParameters<double>(File& fstream, bool create);
 template void ComputationNetwork::PerformSVDecomposition<double>(const map<wstring, float>& SVDConfig, size_t alignedsize);
-template /*static*/ void ComputationNetwork::SetDropoutRate<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, unsigned long& dropOutSeed);
+template /*static*/ void ComputationNetwork::SetDropoutRate<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, size_t randSeedBase);
 template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
 template void ComputationNetwork::SetSeqParam<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
                                                       const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);

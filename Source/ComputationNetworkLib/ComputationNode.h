@@ -37,7 +37,8 @@
 #define CNTK_MODEL_VERSION_6 6 // Batch norm blending
 #define CNTK_MODEL_VERSION_7 7 // ElemType tag in model file
 #define CNTK_MODEL_VERSION_8 8 // DynamicAxis for inputs
-#define CURRENT_CNTK_MODEL_VERSION CNTK_MODEL_VERSION_8
+#define CNTK_MODEL_VERSION_9 9 // Transpose flag in ConvolutionNode to support deconvolution. 
+#define CURRENT_CNTK_MODEL_VERSION CNTK_MODEL_VERSION_9
 
 extern bool g_shareNodeValueMatrices;
 
@@ -229,6 +230,10 @@ public:
     void ResetEvalTimeStamp()
     {
         m_evalTimeStamp = s_timeStampCounter;
+    }
+    void SetEvalTimeStampOutdatedWrtAll()
+    {
+        m_evalTimeStamp = 0;
     }
     int64_t GetEvalTimeStamp() const
     {
@@ -649,8 +654,10 @@ protected:
     void ValidateUnaryMap(bool isFinalValidationPass);
     void ValidateUnaryReduce(bool isFinalValidationPass);
     void ValidateInferBinaryInputDims();
+    void ValidateInferNaryInputDims(size_t numInputs);    
     void ValidateBinaryZip(bool isFinalValidationPass, bool allowBroadcast);
-    void ValidateBinaryReduce(bool isFinalValidationPass);
+    void ValidateBinaryReduce(bool isFinalValidationPass);    
+    void ValidateNaryZip(bool isFinalValidationPass, bool allowBroadcast, size_t numInputs);
     void InferMBLayoutFromInputsForStandardCase(bool isFinalValidationPass);
     virtual void ValidateInferInputDimsFrom(const TensorShape&) = 0;    // (implemented by ComputationNode<ElemType>)
 
@@ -936,7 +943,7 @@ public:
             if (m_value)
             {
                 node->CreateValueMatrixIfNull();
-            node->m_value->SetValue(*m_value);
+                node->m_value->SetValue(*m_value);
             }
             else
                 node->m_value = nullptr;
@@ -1318,7 +1325,7 @@ public:
     void UpdateFunctionValuesSize()
     {
         UpdateDataSize(Value());
-        Value().CollapseDataLocation(); // actually before writing, should change the name
+        Value().CollapseDataLocation();
     }
 
     // -----------------------------------------------------------------------
@@ -1416,9 +1423,33 @@ public:
         m_gradientInitialized = true;
     }
 
+    // Assign the given matrix's value to this node's gradient. The matrix sizes must match.
+    void AssignGradient(const Matrix<ElemType>& val)
+    {
+        UpdateDataSize(Gradient());
+
+        // The specified value matrix's dimensions must match the gradient matrix dimensions
+        if ((val.GetNumRows() != Gradient().GetNumRows()) || (val.GetNumCols() != Gradient().GetNumCols()))
+            LogicError("%ls %ls operation: The value matrix specified for ResetGradient() does not match the dimensions of the gradient matrix.", NodeName().c_str(), OperationName().c_str());
+
+        Gradient().AssignValuesOf(val);
+
+        m_gradientInitialized = true;
+    }
+
     // -----------------------------------------------------------------------
     // memory sharing
     // -----------------------------------------------------------------------
+
+    //this function is for displaying memeory sharing information
+    //TODO: customize this function for all nodes that uses temp internal matrices.
+    virtual std::set<std::pair<const Matrix<ElemType>*, const std::wstring>> GetMatrixInfo()
+    {
+        std::set<std::pair<const Matrix<ElemType>*, const std::wstring>> matrixInfo;
+        matrixInfo.insert(make_pair(&Value(),    NodeName() + L" Value"    + msra::strfun::utf16(ShapeDescription())));
+        matrixInfo.insert(make_pair(&Gradient(), NodeName() + L" Gradient" + msra::strfun::utf16(ShapeDescription())));
+        return matrixInfo;
+    }
 
     // request matrices needed to do node function value evaluation
     virtual void RequestMatricesBeforeForwardProp(MatrixPool& matrixPool) override
@@ -1537,6 +1568,7 @@ public:
 
     void Trace()
     {
+        //DebugLogMinibatch();
 #if 0
         static const std::set<std::wstring> toLog{
             L"labelSentenceStartEmbedded",
@@ -1961,7 +1993,9 @@ protected:                                                                      
     using Base::Validate;                                                                                                                                \
     using Base::ValidateBinaryReduce;                                                                                                                    \
     using Base::ValidateBinaryZip;                                                                                                                       \
+    using Base::ValidateNaryZip;                                                                                                                         \
     using Base::ValidateInferBinaryInputDims;                                                                                                            \
+    using Base::ValidateInferNaryInputDims;                                                                                                              \
     using Base::ValidateInferInputDimsFrom;                                                                                                              \
     using Base::ValidateUnaryMap;                                                                                                                        \
     using Base::ValidateUnaryReduce;                                                                                                                     \

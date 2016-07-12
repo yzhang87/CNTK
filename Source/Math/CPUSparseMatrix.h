@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 #include "CPUMatrix.h"
+//#include "GPUMatrix.h"
+//#include "GPUSparseMatrix.h"
 #include <map>
 #include <unordered_map>
 
@@ -82,7 +84,14 @@ public:
 public:
 
     void SetValue(const size_t row, const size_t col, ElemType val);
+    //void SetValue(const CPUMatrix<ElemType>& /*val*/);
+    //void SetValue(const GPUMatrix<ElemType>& /*val*/);
     void SetValue(const CPUSparseMatrix<ElemType>& /*val*/);
+    //void SetValue(const GPUSparseMatrix<ElemType>& /*val*/);
+
+    void MaskColumnsValue(const CPUMatrix<char>& columnsMask, ElemType val);
+
+    CPUSparseMatrix<ElemType>& DoGatherColumnsOf(ElemType beta, const CPUMatrix<ElemType>& idx, const CPUSparseMatrix<ElemType>& a, ElemType alpha);
 
     size_t BufferSize() const
     {
@@ -97,6 +106,7 @@ public:
 
     CPUSparseMatrix<ElemType> ColumnSlice(size_t startColumn, size_t numCols) const;
     CPUMatrix<ElemType> CopyColumnSliceToDense(size_t startColumn, size_t numCols) const;
+    void AssignColumnSliceToDense(CPUMatrix<ElemType>& slice, size_t startColumn, size_t numCols) const;
 
     CPUMatrix<ElemType> DiagonalToDense() const;
 
@@ -223,9 +233,9 @@ public:
     size_t NzCount() const
     {
         if (GetFormat() == matrixFormatSparseCSC)
-			return GetCompIndex()[GetNumCols()] - GetCompIndex()[0];
+            return GetCompIndex()[GetNumCols()] - GetCompIndex()[0];
         else if (GetFormat()== matrixFormatSparseCSR)
-			return GetCompIndex()[GetNumRows()] - GetCompIndex()[0];
+            return GetCompIndex()[GetNumRows()] - GetCompIndex()[0];
         else if (GetFormat() == matrixFormatSparseBlockCol)
             return GetBlockSize() * GetNumRows();
         else
@@ -236,6 +246,19 @@ public:
     {
         return sizeof(ElemType) * NzCount();
     } // actual number of element bytes in use
+
+    void SetBlockSize(size_t newBlockSize)
+    {
+        BaseMatrix<ElemType>::SetBlockSize(newBlockSize);
+    }
+
+    size_t* BlockIdsLocation() const
+    {
+        if ((GetFormat() != matrixFormatSparseBlockCol) && (GetFormat() != matrixFormatSparseBlockRow))
+            LogicError("CPUSparseMatrix::BlockIdsLocation is only applicable to sparse block formats");
+
+        return GetBlockIds();
+    }
 
     CPUSPARSE_INDEX_TYPE* MajorIndexLocation() const
     {

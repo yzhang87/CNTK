@@ -50,15 +50,17 @@ enum class GradientsUpdateType : int
     FSAdaGrad
 };
 
-// TODO: While currently combining these methods is not supported,
-// these are not mutually exclusive and we can/should support combinations of these
-// in the future
+// modelParallelSGD can be combined with dataParallelSGD/modelAveragingSGD/blockMomentumSGD 
+// but dataParallelSGD/modelAveragingSGD/blockMomentumSGD are mutually exclusive (at least at the moment)
+// we assign the lower 8 bits to the enumerate data parallelization methods 
+// and next 8 bits to model parallelization methods
 enum class ParallelizationMethod : int
 {
-    None = 0,
-    DataParallelSGD = 1,
-    ModelAveragingSGD = (1 << 1),
-    ModelParallelSGD = (1 << 2), // Currently unsupported
+    none = 0,
+    dataParallelSGD = 1,
+    modelAveragingSGD = 2,
+    blockMomentumSGD = 3,
+    modelParallelSGD = (1 << 8) // Currently unsupported
 };
 
 // configuration parameters associated with RMSProp learning algorithm
@@ -126,7 +128,14 @@ protected:
     {
         // remedy the bug that truncation size is incorrectly passed as MB size
         if (m_truncated && specifiedMBSize > 1)      // currently only happens in this mode
+        {
+            if (numParallelSequences == 0)
+            {
+                RuntimeError("Learning rate and momentum are not supported per minibatch, please specify them per sample.");
+            }
+
             specifiedMBSize *= numParallelSequences; // assume 'specifiedMBSize' refers to truncation size
+        }
         // end bug post-fix
         // TODO: This ^^ should go away once SGD gets fixed to take the truncation size as a parameter.
 
@@ -147,11 +156,13 @@ protected:
     ParallelizationMethod GetParallelizationMethod() const
     {
         if (m_mpi == nullptr)
-            return ParallelizationMethod::None;
+            return ParallelizationMethod::none;
 
         return m_parallelizationMethod;
     }
 
+    // helper function to initialize and check BlockMomentumSGD related parameters
+    void InitializeAndCheckBlockMomentumSGDParameters();
     // only true when the user specify LearningRatePerMB and the number of parallel utterances in Reader > 1
     // bool m_needToNormalizeLRByParallUtterance;          // TODO: should go away
     // bool m_needToNormalizeMomentumByParallUtterance;
@@ -255,8 +266,12 @@ protected:
     bool m_bufferedAsyncGradientAggregation;
     bool m_zeroThresholdFor1Bit;
 
-    // Parallel training related with MA
-    size_t m_nFramesBetweenMASync;
+    // Parallel training related with MA / BM
+    size_t m_modelAggregationBlockSize;
+    bool   m_resetSGDMomentum; 
+    bool   m_useNesterovBlockMomentum;
+    double m_blockLearningRate; 
+    double m_blockMomentumAsTimeConstant;
 
     bool m_needAveMultiplier;
     double m_L2RegWeight;
@@ -297,7 +312,6 @@ public:
           // TODO: The next few do not belong into SGD any more than the network or reader we operate on. Either move network and reader in here, or move these out.
           m_modelPath((const wstring&) configSGD(L"modelPath")),
           m_keepCheckPointFiles(configSGD(L"keepCheckPointFiles", false)),
-          // m_validateAfterModelReloading(configSGD(L"validateAfterModelReloading", true)),
           m_trainCriterionNodeName((const wstring&) configSGD(L"trainCriterionNodeName", L"")),
           m_evalCriterionNodeName ((const wstring&) configSGD(L"evalCriterionNodeName", L"")),
           m_traceNodeNamesReal    (configSGD(L"traceNodeNamesReal",     ConfigRecordType::Array(stringargvector()))),
@@ -323,7 +337,7 @@ public:
         m_mpi = mpi;
 
         if (m_mpi == nullptr)
-            m_parallelizationMethod = ParallelizationMethod::None;
+            m_parallelizationMethod = ParallelizationMethod::none;
     }
 
     void Train(function<ComputationNetworkPtr(DEVICEID_TYPE)> createNetworkFn, DEVICEID_TYPE deviceId,
@@ -454,7 +468,7 @@ protected:
                          const std::string& prefixMsg = "");
 
     void InitDistGradAgg(int numEvalNodes, int traceLevel);
-    void InitModelAggregationHandler(int traceLevel);
+    void InitModelAggregationHandler(int traceLevel, DEVICEID_TYPE devID);
 public:
     // UpdateWeightsS - static version of UpdateWeights()
     static void UpdateWeightsS(const SGD* sgd, Matrix<ElemType>& functionValues,
@@ -526,7 +540,6 @@ public:
 protected:
     std::wstring m_modelPath;
     bool m_keepCheckPointFiles;
-    // bool m_validateAfterModelReloading; // TODO: remove this. Why would one not validate a model?
 
     std::wstring m_trainCriterionNodeName;
     std::wstring m_evalCriterionNodeName;
@@ -539,13 +552,28 @@ protected:
     size_t m_prevChosenMinibatchSize;
     double m_lastFinishedEpochTrainLoss;
 
-    IDistGradAggregator<ElemType>* m_distGradAgg;
-    struct DistGradHeader* m_gradHeader;
+    std::shared_ptr<IDistGradAggregator<ElemType>> m_distGradAgg;
+    std::shared_ptr<struct DistGradHeader> m_gradHeader;
 
     shared_ptr<IMASGD<ElemType>> m_pMASGDHelper;
 
 private:
-    int SGDTrace(FILE* __restrict __stream, bool isPrependTimestamp, const char* __restrict __format, ...);
+    void MarkDropoutNodesEvalTimeStampAsOutdated(const ComputationNetworkPtr& net, const ComputationNodeBasePtr& criterionNode);
+
+    bool UsingGradientAggregation(size_t epochNumber) const
+    {
+        return ((GetParallelizationMethod() == ParallelizationMethod::dataParallelSGD) && (epochNumber >= m_parallelizationStartEpochNum));
+    }
+    bool UsingModelAggregation(size_t epochNumber) const
+    {
+        return ((GetParallelizationMethod() == ParallelizationMethod::modelAveragingSGD ||
+                 GetParallelizationMethod() == ParallelizationMethod::blockMomentumSGD) &&
+                (epochNumber >= m_parallelizationStartEpochNum));
+    }
+    bool UsingParallelTrain(size_t epochNumber) const
+    {
+        return UsingGradientAggregation(epochNumber) || UsingModelAggregation(epochNumber);
+    }
 };
 
 }}}
