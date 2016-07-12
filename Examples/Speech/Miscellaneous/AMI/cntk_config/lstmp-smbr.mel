@@ -6,7 +6,6 @@ DeleteNode(cr)
 
 # Adds cross entropy criteria node as a normal node
 CR1 = CrossEntropyWithSoftmax(labels, LSTMoutputW)
-SetProperty(CR1, MultiSeq, true) 
 scaledCR1 = Scale(Constant($scaleFactor$), CR1)
 
 # Adds dummy criteria node as a normal node
