@@ -2,8 +2,8 @@ dataDir: ./
 tags:
      # running on every BVT job in 'S' (Speech) leg in Debug-GPU and Release-CPU configurations:
      - bvt-s  (build_sku == 'gpu') and ((flavor=='debug') ^ (device=='cpu'))
-     # running unconditionally on every Nightly job in 'S' leg
-     - nightly-s (build_sku == 'gpu')
+     # For Nightly, run everything except for Windows Debug-CPU (which runs ~ 7200 sec)
+     - nightly-s (build_sku == 'gpu') and ((os=='linux') or (device=='gpu') or (flavor=='release'))
 
 testCases:
   Must train epochs in exactly same order and parameters:
@@ -17,21 +17,21 @@ testCases:
     patterns:
       - ^MPI Rank {{integer}}
       - Finished Epoch[{{integer}} of {{integer}}]
-      - Training Set
-      - TrainLossPerSample = {{float,tolerance=.1%}}
-      - AvgLearningRatePerSample = {{float,tolerance=0.001%}}
+      - Training
+      - ce = {{float,tolerance=.1%}}
+      - learningRatePerSample = {{float,tolerance=0.001%}}
 
   Cross Validation must finish as expected:
     patterns:
       - ^MPI Rank {{integer}}
       - Finished Epoch[{{integer}} of {{integer}}]
-      - Validation Set
-      - TrainLossPerSample = {{float,tolerance=.1%}}
+      - Validate
+      - ce = {{float,tolerance=.1%}}
 
   Per-minibatch training results must match:
     patterns:
       - ^MPI Rank {{integer}}
       - Epoch[{{integer}} of {{integer}}]-Minibatch[{{integer}}-{{integer}}
-      - SamplesSeen = {{integer}}
-      - TrainLossPerSample = {{float,tolerance=.1%}}
+      - " * {{integer}}; "
+      - ce = {{float,tolerance=.1%}}
 

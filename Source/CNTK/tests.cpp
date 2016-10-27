@@ -118,16 +118,17 @@ void TestReader(const ConfigParameters& configBase)
     int deviceId = 0;
     auto featuresMatrix = make_shared<Matrix<ElemType>>(deviceId);
     auto labelsMatrix   = make_shared<Matrix<ElemType>>(deviceId);
+    MBLayoutPtr pMBLayout = make_shared<MBLayout>();
     StreamMinibatchInputs matrices;
-    matrices.AddInputMatrix(featureNames[0], featuresMatrix);
-    matrices.AddInputMatrix(labelNames[0],   labelsMatrix);
+    matrices.AddInput(featureNames[0], featuresMatrix, pMBLayout, TensorShape());
+    matrices.AddInput(labelNames[0],   labelsMatrix  , pMBLayout, TensorShape());
 
     auto start = std::chrono::system_clock::now();
     int epochs = config("maxEpochs");
     epochs *= 2;
     for (int epoch = 0; epoch < epochs; epoch++)
     {
-        dataReader.StartMinibatchLoop(mbSize, epoch, epochSize);
+        dataReader.StartMinibatchLoop(mbSize, epoch, matrices.GetStreamDescriptions(), epochSize);
         int i = 0;
         while (dataReader.GetMinibatch(matrices))
         {
@@ -180,16 +181,17 @@ void TestSequenceReader(const ConfigParameters& configBase)
         // setup minibatch matrices
         auto featuresMatrix = make_shared<Matrix<ElemType>>();
         auto labelsMatrix   = make_shared<Matrix<ElemType>>();
+        MBLayoutPtr pMBLayout = make_shared<MBLayout>();
         StreamMinibatchInputs matrices;
-        matrices.AddInputMatrix(featureNames[0], featuresMatrix);
-        matrices.AddInputMatrix(labelNames[1]  , labelsMatrix);
+        matrices.AddInput(featureNames[0], featuresMatrix, pMBLayout, TensorShape());
+        matrices.AddInput(labelNames[1]  , labelsMatrix  , pMBLayout, TensorShape());
 
         auto start = std::chrono::system_clock::now();
         int epochs = config("maxEpochs");
         epochs *= 2;
         for (int epoch = 0; epoch < epochs; epoch++)
         {
-            dataReader.StartMinibatchLoop(mbSize, epoch, epochSize);
+            dataReader.StartMinibatchLoop(mbSize, epoch, matrices.GetStreamDescriptions(), epochSize);
             for (int i = 0; dataReader.GetMinibatch(matrices); i++)
             {
                 auto& features = matrices.GetInputMatrix<ElemType>(featureNames[0]);

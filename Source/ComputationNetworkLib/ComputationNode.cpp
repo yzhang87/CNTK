@@ -31,8 +31,18 @@ void ComputationNode<ElemType>::Backprop(const FrameRange& fr, bool childrenInTh
     // after nodes that propagate outside of the loop, and thus, in the last
     // time step of the sequence, have not yet received a gradient from a parent
     // and thus may not have had their gradient matrices allocated.
-    //if (m_needsGradient)
-    //    LazyZeroGradient(); // set gradient to 0 if this is the first time
+#if 1 // keep enabled once this works
+#if 0 // log the cases where this is needed
+    if (m_needsGradient && !m_gradientInitialized)
+    {
+        static size_t c = 0;
+        if (c++ < 100)
+            fprintf(stderr, "%ls %ls operation: Initializing gradient out of line.\n", NodeName().c_str(), OperationName().c_str());
+    }
+#endif
+    if (m_needsGradient)
+        LazyZeroGradient(); // set gradient to 0 if this is the first time
+#endif
 
     if (fr.IsAllFrames() && IsPartOfLoop() && childrenInThisLoop)
         LogicError("%ls %ls operation: Backprop called with whole-batch FrameRange on node that participates in a loop", NodeName().c_str(), OperationName().c_str());
@@ -63,6 +73,8 @@ void ComputationNode<ElemType>::Backprop(const FrameRange& fr, bool childrenInTh
 
             // fprintf(stderr, "BackpropTo %d %d %ls %ls\n", (int)fr.timeIdxInSeq, (int)i, NodeName().c_str(), OperationName().c_str());
             BackpropTo(i, fr); // this computes partial wrt to the child and sums the gradient value in the child
+
+            //child->DebugLogMinibatch(/*gradient*/true);
         }
 #ifdef DISPLAY_DEBUG
         else
@@ -75,6 +87,27 @@ void ComputationNode<ElemType>::Backprop(const FrameRange& fr, bool childrenInTh
 // subroutines for Validate() implementations
 // -----------------------------------------------------------------------
 
+// compare two MBLayouts, and alert if they are different
+void ComputationNodeBase::ValidateMBLayout(const ComputationNodeBasePtr which, const ComputationNodeBasePtr vsWhich) const
+{
+    if (!which->HasMBLayout() || !vsWhich->HasMBLayout() || which->GetMBLayout() == vsWhich->GetMBLayout())
+        return;
+    // MBLayouts are inconsistent
+#if 0
+    // can't have that
+    RuntimeError("%ls: Dynamic axes mismatch between %ls and %ls. If this is by design, use ReconcileDynamicAxis().",
+                 NodeDescription().c_str(), which->NodeDescription().c_str(), vsWhich->NodeDescription());
+#else
+    // We will let this slip with a reminder, assuming that this will be caught at runtime.
+    // By allowing this, users will not need ReconcileDynamicAxis() for reductions over a sequence like BS.Sequences.Last().
+    if (GetEnvironmentPtr() && (Environment().traceLevel > 0))
+    {
+        fprintf(stderr, "WARNING: %ls: Dynamic axes mismatch between %ls and %ls. If they are incompatible, this will fail later.\n",
+                NodeDescription().c_str(), which->NodeDescription().c_str(), vsWhich->NodeDescription().c_str());
+    }
+#endif
+}
+
 // helper function to infer the MBLayout for this node from inputs, for the *standard case*
 // the standard case is:
 //  - all inputs must share the same layout (e.g. adding two minibatches)
@@ -83,21 +116,20 @@ void ComputationNode<ElemType>::Backprop(const FrameRange& fr, bool childrenInTh
 //  - if there are more than one different layouts involved, this function will fail
 void ComputationNodeBase::InferMBLayoutFromInputsForStandardCase(bool isFinalValidationPass)
 {
-    MBLayoutPtr pMBLayout; // start with NULL layout
-    for (auto child : m_inputs)
+    ComputationNodeBasePtr firstInputWithMBLayout;
+    for (auto input : m_inputs)
     {
-        if (!child) // node not set yet (DelayedValueNodeBase seems to allow this)--BUGBUG: Then this function won't operate correctly.
+        if (!input) // node not set yet (DelayedValueNodeBase seems to allow this)--BUGBUG: Then this function won't operate correctly.
             ;
-        else if (!child->m_pMBLayout) // NULL layout (typical for parameter nodes)
+        else if (!input->m_pMBLayout) // NULL layout (typical for parameter nodes)
             ;
-        else if (!pMBLayout) // first non-NULL layout: just copy it
-            pMBLayout = child->m_pMBLayout;
-        else if (pMBLayout != child->m_pMBLayout && isFinalValidationPass) // got a layout--compare whether it is the same
-            RuntimeError("%ls: InferMBLayoutFromInputsForStandardCase: Expected minibatch layouts to be the same between all children. Child '%ls' (%ls) uses a different layout than previously checked children and might get out of sync during runtime. If this is by design, use ReconcileMBLayout() to forward layouts between nodes.",
-                         NodeDescription().c_str(), child->NodeName().c_str(), child->OperationName().c_str());
+        else if (!firstInputWithMBLayout) // first input with layout: remember this child
+            firstInputWithMBLayout = input;
+        else if (isFinalValidationPass) // got a layout--compare whether it is the same
+            ValidateMBLayout(firstInputWithMBLayout, input);
     }
     // all are consistent: install it
-    LinkToMBLayout(pMBLayout);
+    LinkToMBLayout(firstInputWithMBLayout ? firstInputWithMBLayout->m_pMBLayout : nullptr);
 }
 
 // single input that maps its input element-wise (e.g. Sigmoid)
@@ -120,11 +152,8 @@ void ComputationNodeBase::ValidateBinaryZip(bool isFinalValidationPass, bool all
 
     ValidateInferBinaryInputDims();
 
-    if (isFinalValidationPass &&
-        Input(0)->GetMBLayout() != Input(1)->GetMBLayout() && Input(0)->HasMBLayout() && Input(1)->HasMBLayout())
-    {
-        LogicError("%ls: Minibatch layouts are not the same between arguments and might get out of sync during runtime. If this is by design, use ReconcileMBLayout() to forward layouts between nodes.", NodeDescription().c_str());
-    }
+    if (isFinalValidationPass)
+        ValidateMBLayout(Input(0), Input(1));
 
     // result has tensor shape with dimensions being the max over both
     let shape0 = GetInputSampleLayout(0);
@@ -139,13 +168,90 @@ void ComputationNodeBase::ValidateBinaryZip(bool isFinalValidationPass, bool all
     {
         size_t dim1 = shape1[k];
         // BUGBUG: We must consider the allowBroadcast flag here.
-        if (dims[k] == 1)                                  // is [0] broadcasting?
+        if (dims[k] <= 1 && dim1 != 0)                     // is [0] broadcasting (1) or unspecified (0)?
             dims[k] = dim1;                                // then use dimension we broadcast to
-        else if (dim1 == 1)                                // if [1] is broadcasting
-            ;                                              // dims is already correct
-        else if (isFinalValidationPass && dim1 != dims[k]) // no broadcasting: they must match
+        else if (dim1 <= 1 && dims[k] != 0)                // if [1] is broadcasting or unspecified
+            ;                                              // then dims is already correct
+        else if (isFinalValidationPass && dim1 != dims[k]) // no broadcasting or unspecified: they must match
             InvalidArgument("%ls: Input dimensions [%s] and [%s] are not compatible.",
                             NodeDescription().c_str(), string(shape0).c_str(), string(shape1).c_str());
+    }
+
+    SetDims(TensorShape(dims), HasMBLayout());
+}
+
+// N-nary zip operation, e.g. for TernaryZip for clip()
+// If allowBroadcast then one can be a sub-dimension of the other (if layout then only for rows, otherwise for cols, too).
+// This also helpfully resizes the children if not yet sized.
+void ComputationNodeBase::ValidateNaryZip(bool isFinalValidationPass, bool allowBroadcast, size_t numInputs)
+{
+    assert(m_inputs.size() == numInputs);
+    ComputationNodeBase::Validate(isFinalValidationPass);
+    InferMBLayoutFromInputsForStandardCase(isFinalValidationPass);
+
+    ValidateInferNaryInputDims(numInputs);
+
+    // check minibatch layout consistency for all possible pairs (n choose 2)
+    if (isFinalValidationPass)
+        for (size_t i = 0; i < numInputs; i++)
+            for (size_t j = i + 1; j < numInputs; j++)
+                ValidateMBLayout(Input(i), Input(j));
+
+    // result has tensor shape with dimensions being the max over all inputs
+    let shape0 = GetInputSampleLayout(0);
+
+    // dims is max over all inputs
+    size_t maxRank = shape0.GetRank();    
+    for (size_t i = 1; i < numInputs; i++)
+    {
+        let shape = GetInputSampleLayout(i);
+        if (shape.GetRank() > maxRank)
+            maxRank = shape.GetRank();
+    }        
+    SmallVector<size_t> dims = shape0.GetDims();
+    dims.resize(maxRank, 1); // pad with 1
+
+    // first check for invalid dimensions
+    for (size_t k = 0; k < maxRank; k++)
+    {
+        size_t maxDim = 0;
+        TensorShape maxShape = shape0; // arbitrary; this is just used for the error message
+        for (size_t i = 0; i < numInputs; i++)
+        {
+            let currentShape = GetInputSampleLayout(i);
+            size_t currentRank = currentShape.GetRank();
+            // make sure that the rank of this input is bigger than the current index (otherwise, these are implied singleton dimensions that do not need to be checked)
+            if (currentRank > k)
+            {
+                size_t currentDim = currentShape[k];
+                if (currentDim > 1 && maxDim != currentDim && maxDim > 1) // 1=broadcasting, 0=not known yet, meant to be inferred
+                {
+                    InvalidArgument("%ls: Input dimensions [%s] and [%s] are not compatible.",
+                        NodeDescription().c_str(), string(maxShape).c_str(), string(currentShape).c_str());
+                }
+                else if (currentDim > maxDim)
+                {
+                    maxDim = currentDim;
+                    maxShape = currentShape;
+                }
+            }
+        }
+    }
+
+    // now set up the right dims
+    for (size_t k = 0; k < maxRank; k++)
+    {
+        for (size_t i = 0; i < numInputs; i++)
+        {
+            let shape = GetInputSampleLayout(i);
+
+            if (shape.GetRank() > k)
+            {
+                size_t dim = shape[k];
+                if (dims[k] <= 1 && dim != 0)
+                    dims[k] = dim;
+            }
+        }
     }
 
     SetDims(TensorShape(dims), HasMBLayout());
@@ -169,6 +275,7 @@ void ComputationNodeBase::ValidateBinaryReduce(bool isFinalValidationPass)
     ComputationNodeBase::Validate(isFinalValidationPass);
     m_pMBLayout = nullptr; // this node does not hold mini-batch data
     ValidateInferBinaryInputDims();
+
     if (isFinalValidationPass)
     {
         if (!(Input(0)->GetSampleLayout().IsElementwiseCompatibleWith(Input(1)->GetSampleLayout())))
@@ -204,6 +311,30 @@ void ComputationNodeBase::ValidateInferBinaryInputDims()
         auto other = Input(1 - index);
         // borrow any unset dimension on one input from the other input
         in->ValidateInferInputDimsFrom(other->GetSampleLayout());
+    }
+}
+
+// as above but for N-ary cases
+void ComputationNodeBase::ValidateInferNaryInputDims(size_t numInputs)
+{
+    // limited inference of children dimensions
+    // if dimension not specified we assume two operands' dimensions should be the same
+    // NOTE: The assert is set to check if >= numInputs since this is called from nodes which have more than 'nInputs' children.
+    //      The number of children is formally verified elsewhere, so this will not break consistency.
+    assert(m_inputs.size() >= numInputs);
+    for (size_t index = 0; index < numInputs; index++)
+    {
+        const auto& in = Input(index);
+        
+        for (size_t indexOther = 0; indexOther < numInputs; indexOther++)
+        {
+            if (indexOther != index) 
+            {
+                const auto& other = Input(indexOther);
+                // borrow any unset dimension on one input from the other input
+                in->ValidateInferInputDimsFrom(other->GetSampleLayout());
+            }
+        }
     }
 }
 
@@ -244,7 +375,7 @@ TensorShape ComputationNodeBase::GetTensorShape(size_t rank) const
     TensorShape tensorShape = GetSampleLayout(); // TODO: Do we need to expect this tensor to have arbitrary strides? In case it came out of a Slice, Reshape, or Transpose op in-place?
     if (HasMBLayout())
     {
-        size_t i = rank;
+        size_t i = (rank != SIZE_MAX) ? rank : tensorShape.GetRank();
         tensorShape.AppendInPlace(i++, GetMBLayout()->GetNumParallelSequences());
         tensorShape.AppendInPlace(i++, GetMBLayout()->GetNumTimeSteps());
     }
@@ -261,7 +392,7 @@ TensorShape ComputationNodeBase::GetTensorSliceFor(size_t rank, const FrameRange
 
     // determine the slice dimensions described by the FrameRange
     // Note: These are dimensions without strides.
-    auto slice = TensorSliceWithMBLayoutFor(tensorShape.GetDims(), fr, GetMBLayout());
+    let slice = TensorSliceWithMBLayoutFor(tensorShape.GetDims(), fr, GetMBLayout());
 
     // narrow the tensor
     // Note: Strides are honored correctly.
@@ -331,24 +462,23 @@ TensorShape ComputationNodeBase::GetOneSampleTensorSliceFor(size_t rank, const F
                 prototype += "NULL";
                 continue;
             }
-
-            const char* mbSizeMark = child->m_pMBLayout ? " x *" : "";
-#if 0
-            if (child->m_sampleLayout.GetRank() == 3 && (child->m_sampleLayout[1] != 1 || child->m_sampleLayout[0] != 1)) // looks like an image: use WHC notation
-                prototype += msra::strfun::strprintf("%ls[%s%s {W=%lu, H=%lu, C=%lu}]", child->NodeName().c_str(), string(child->m_sampleLayout).c_str(), mbSizeMark,
-                child->m_sampleLayout[1], child->m_sampleLayout[2], child->m_sampleLayout[0]);
-            // BUGBUG: This ^^ will print based on the old legacy layout, and we have no way of knowing here whether that is correct.
-            else
-#endif
-                prototype += msra::strfun::strprintf("[%s%s]", string(child->m_sampleLayout).c_str(), mbSizeMark);
+            prototype += child->ShapeDescription().c_str();
         }
         prototype += extraArgs;
         //prototype += ")";
     }
 
-    prototype += msra::strfun::strprintf(" -> [%s%s]", string(GetSampleLayout()).c_str(), HasMBLayout() ? " x *" : "");
+    prototype += msra::strfun::strprintf(" -> %s", ShapeDescription().c_str());
 
     return prototype;
+}
+
+const std::string ComputationNodeBase::ShapeDescription() const
+{
+    return msra::strfun::strprintf("[%s%s%ls]",
+        string(m_sampleLayout).c_str(),
+        HasMBLayout() ? " x " : "",
+        HasMBLayout() ? GetMBLayout()->GetAxisName() : L"");
 }
 
 template <class ElemType>
@@ -397,8 +527,8 @@ void ComputationNode<ElemType>::WriteMinibatchWithFormatting(FILE* f, const Fram
     if (!pMBLayout) // no MBLayout: We are printing aggregates (or LearnableParameters?)
     {
         pMBLayout = make_shared<MBLayout>();
-        pMBLayout->InitAsFrameMode(1); // treat this as if we have one single sample
-        // TODO: This can be done more efficiently, if ever needed.
+        pMBLayout->Init(1, outputValues.GetNumCols()); // treat this as if we have one single sequence consisting of the columns
+        pMBLayout->AddSequence(0, 0, 0, outputValues.GetNumCols());
     }
     let& sequences = pMBLayout->GetAllSequences();
     let  width     = pMBLayout->GetNumTimeSteps();
@@ -507,6 +637,7 @@ void ComputationNode<ElemType>::WriteMinibatchWithFormatting(FILE* f, const Fram
         {
             if (formatChar == 'f') // print as real number
             {
+                if (dval == 0) dval = fabs(dval);    // clear the sign of a negative 0, which are produced inconsistently between CPU and GPU
                 fprintfOrDie(f, valueFormatString.c_str(), dval);
             }
             else if (formatChar == 'u') // print category as integer index
@@ -707,7 +838,11 @@ using namespace Microsoft::MSR::CNTK;
 template <>
 shared_ptr<Object> MakeRuntimeObject<ComputationNodeBase>(const IConfigRecordPtr configp)
 {
-    return NewComputationNodeFromConfig(configp);
+    let node = NewComputationNodeFromConfig(configp);
+    // temporarily disabling this, as it caused a test to fail:
+    //if (!node->Is<IRecurrentNode>())
+    //    node->Validate(/*isFinalValidationPass*/false); // do an initial validation, so that we have access to dimensions
+    return node;
 }
 
 ScriptableObjects::ConfigurableRuntimeTypeRegister::Add<ComputationNodeBase> registerComputationNode(L"ComputationNode");

@@ -9,6 +9,7 @@
 
 #include "Platform.h"
 #include "ExceptionWithCallStack.h"
+#include <cmath>
 #include <string>
 #include <vector>
 #include <assert.h>
@@ -25,7 +26,8 @@
 #define TWO_PI 6.283185307f // TODO: find the official standards-confirming definition of this and use it instead
 
 #define EPSILON 1e-5
-#define ISCLOSE(a, b, threshold) (abs(a - b) < threshold) ? true : false
+#define ISCLOSE(a, b, threshold) (std::abs(a - b) < threshold) ? true : false
+#define DLCLOSE_SUCCESS 0
 
 #define UNUSED(x) (void)(x) // for variables that are, e.g., only used in _DEBUG builds
 
@@ -84,9 +86,15 @@ __declspec_noreturn static inline void ThrowFormatted(const char* format, ...)
 
 // RuntimeError - throw a std::runtime_error with a formatted error string
 #ifndef _MSC_VER // gcc __attribute__((format(printf())) does not percolate through variadic templates; so must go the macro route
+#ifndef RuntimeError
 #define RuntimeError ThrowFormatted<std::runtime_error>
+#endif
+#ifndef LogicError
 #define LogicError ThrowFormatted<std::logic_error>
+#endif
+#ifndef InvalidArgument
 #define InvalidArgument ThrowFormatted<std::invalid_argument>
+#endif
 #else
 template <class... _Types>
 __declspec_noreturn static inline void RuntimeError(const char* format, _Types&&... _Args)
@@ -127,13 +135,11 @@ static inline void Warning(const string& message)
     \
 {                                                                                                                             \
         fprintf(stderr, "Inside File: %s  Line: %d  Function: %s  -> Feature Not Implemented.\n", __FILE__, __LINE__, __FUNCTION__); \
-        LogicError("Inside File: %s  Line: %d  Function: %s  -> Feature Not Implemented.\n", __FILE__, __LINE__, __FUNCTION__);      \
+        LogicError("Inside File: %s  Line: %d  Function: %s  -> Feature Not Implemented.", __FILE__, __LINE__, __FUNCTION__);      \
     \
 }
 #endif
-}
-}
-}
+}}}
 
 #ifndef _MSC_VER
 using Microsoft::MSR::CNTK::ThrowFormatted;
@@ -579,6 +585,60 @@ struct nocase_compare
 // random collection of stuff we needed at some place
 // ----------------------------------------------------------------------------
 
+// Array class
+template <class T>
+class ArrayRef
+{
+    T* elements; // Array of type T
+    size_t count;
+
+public:
+
+    ArrayRef(T* elementsIn, size_t sizeIn)
+    {
+        elements = elementsIn;
+        count = sizeIn;
+    }
+
+    // TODO: Copy Constructor
+    ArrayRef(const ArrayRef& other) = delete;
+
+    // TODO: Move Constructor
+    ArrayRef(ArrayRef&& other) = delete;
+
+    // TODO: Assignment operator
+    ArrayRef& operator=(const ArrayRef& rhs) = delete;
+
+    // TODO: Move assignment operator
+    ArrayRef& operator=(ArrayRef&& rhs) = delete;
+
+    size_t size() const { return count; }
+    T* data() const { return elements; }
+
+    T operator[](size_t i) const
+    {
+        if (i >= size())
+            LogicError("ArrayRef: index overflow");
+        return elements[i];
+    }
+
+    T& operator[](size_t i)
+    {
+        if (i >= count)
+            LogicError("ArrayRef: index overflow");
+        return elements[i];
+    }
+
+    const T* begin() const
+    {
+        return data();
+    }
+    const T* end() const
+    {
+        return data() + size();
+    }
+};
+
 // TODO: maybe change to type id of an actual thing we pass in
 // TODO: is this header appropriate?
 template <class C>
@@ -647,15 +707,54 @@ public:
     }
     ~Plugin()
     {
-        // TODO: Check for error code and throw if !std::uncaught_exception()
         if (handle != NULL)
-            dlclose(handle);
+        {
+            int rc = dlclose(handle);
+            if ((rc != DLCLOSE_SUCCESS) && !std::uncaught_exception())
+            {
+                RuntimeError("Plugin: Failed to decrements the reference count.");
+            }
+        }
     }
 };
 #endif
+
+template <typename EF>
+struct ScopeExit {
+    explicit ScopeExit(EF &&f) :
+        m_exitFunction(std::move(f)), m_exitOnDestruction(true) 
+    {}
+
+    ~ScopeExit() 
+    {
+        if (m_exitOnDestruction)
+            m_exitFunction(); 
+    }
+
+    ScopeExit(ScopeExit&& other)
+        : m_exitFunction(std::move(other.m_exitFunction)), m_exitOnDestruction(other.m_exitOnDestruction)
+    {
+        other.m_exitOnDestruction = false;
+    }
+
+private:
+    // Disallow copy construction, assignment
+    ScopeExit(const ScopeExit&) = delete;
+    ScopeExit& operator=(const ScopeExit&) = delete;
+
+    // Disallow move assignment
+    ScopeExit& operator=(ScopeExit&&) = delete;
+
+    EF m_exitFunction;
+    bool m_exitOnDestruction;
+};
+
+template <typename EF>
+ScopeExit<typename std::remove_reference<EF>::type> MakeScopeExit(EF&& exitFunction)
+{
+    return ScopeExit<typename std::remove_reference<EF>::type>(std::forward<EF>(exitFunction));
 }
-}
-}
+}}}
 
 #ifdef _WIN32
 // ----------------------------------------------------------------------------

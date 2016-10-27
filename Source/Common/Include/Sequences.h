@@ -7,10 +7,11 @@
 
 #pragma once
 
-#include "Basics.h"
-#include "Matrix.h"
 #include <vector>
 #include <memory> // for shared_ptr
+#include <mutex>
+#include "Basics.h"
+#include "Matrix.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -100,29 +101,29 @@ struct MBLayout
         {
             return seqId == other.seqId && s == other.s && tBegin == other.tBegin && tEnd == other.tEnd;
         }
-        size_t GetNumTimeSteps() const
-        {
-            return (size_t)(tEnd - tBegin);
-        }
+        size_t GetNumTimeSteps() const { return (size_t)(tEnd - tBegin); }
     };
 
     // -------------------------------------------------------------------
     // construction
     // -------------------------------------------------------------------
 
-    MBLayout(size_t numParallelSequences, size_t numTimeSteps)
+    MBLayout(size_t numParallelSequences, size_t numTimeSteps, const std::wstring &name)
         : m_distanceToStart(CPUDEVICE), m_distanceToEnd(CPUDEVICE), m_columnsValidityMask(CPUDEVICE)
     {
         Init(numParallelSequences, numTimeSteps);
+        SetUniqueAxisName(name != L"" ? name : L"DynamicAxis");
     }
     MBLayout()
-        : MBLayout(1, 0)
+        : MBLayout(1, 0, L"")
     {
     }
 
     // copy the content of another MBLayoutPtr over
     // Use this instead of actual assignment to make it super-obvious that this is not copying the pointer but actual content. The pointer is kept fixed.
-    void CopyFrom(const MBLayoutPtr& other)
+    // Use "keepName" if the "identity" of the target is to be preserved, e.g. 
+    // while copying from reader space to network space.
+    void CopyFrom(const MBLayoutPtr& other, bool keepName=false)
     {
         m_numTimeSteps = other->m_numTimeSteps;
         m_numParallelSequences = other->m_numParallelSequences;
@@ -140,6 +141,9 @@ struct MBLayout
 
         m_columnsValidityMask.SetValue(other->m_columnsValidityMask);
         m_writable = other->m_writable;
+
+        if (!keepName)
+            m_axisName = other->m_axisName;
     }
 
     // Destructive copy that steals ownership if the content, like std::move()
@@ -163,6 +167,8 @@ struct MBLayout
 
         m_columnsValidityMask = std::move(other->m_columnsValidityMask);
         m_writable = other->m_writable;
+
+        m_axisName = std::move(other->m_axisName);
     }
 
     MBLayout(const MBLayout&) = delete;
@@ -191,7 +197,6 @@ public:
     // packing algorithm
     //  - width: maximum width of structure; set to maximum over sequence lengths
     //  - inputSequences: vector of input SequenceInfo records (only seqId and GetNumTimeSteps() are used)
-    //  - [out] *pMBLayout: MBLayout that describes the created packed sequence set
     //  - placement, rowAllocations: temp buffers (passed in to be able to optimize memory allocations)
     template<typename SequenceInfoVector>
     void InitAsPackedSequences(const SequenceInfoVector& inputSequences,
@@ -248,13 +253,39 @@ public:
     // accessors
     // -------------------------------------------------------------------
 
-    size_t GetNumTimeSteps() const
+    size_t GetNumTimeSteps() const { return m_numTimeSteps; }
+    size_t GetNumParallelSequences() const { return m_numParallelSequences; }
+    size_t GetNumSequences() const
     {
-        return m_numTimeSteps;
+        return std::count_if(m_sequences.begin(), m_sequences.end(), [](const SequenceInfo& sequence) {
+            return sequence.seqId != GAP_SEQUENCE_ID;
+        });
     }
-    size_t GetNumParallelSequences() const
+
+    // axis names are for now only a debugging aid
+    // In the future, there will be a mechanism to denote that axes are meant to be the same.
+    const wchar_t* GetAxisName() const { return m_axisName.c_str(); }
+    void SetAxisName(const std::wstring& name) { m_axisName = name; }
+    void SetUniqueAxisName(std::wstring name) // helper for constructing
     {
-        return m_numParallelSequences;
+        // Unfortunatelly, initialization of local static variables is not thread-safe in VS2013.
+        // As workaround, it is moved to the struct level. 
+        // Todo: when upgraded to VS2013, change back to use the local static mutex, and remove also Sequences.cpp.
+        // The mutex is need to make access to nameIndices be thread-safe.
+        // static std::mutex nameIndiciesMutex;
+        // static std::map<std::wstring, size_t> nameIndices;
+
+        size_t index;
+
+        // Use the block to make sure that nameIndiciesMutex is unlocked as soon as possible.
+        {
+            std::unique_lock<std::mutex> lock(s_nameIndiciesMutex);
+            index = s_nameIndices[name]++;
+        }
+
+        if (index > 0)
+            name += msra::strfun::wstrprintf(L"%d", (int)index);
+        SetAxisName(name);
     }
 
     // how many columns the underlying MB matrix has
@@ -264,7 +295,7 @@ public:
     }
 
     // return all sequences stored in this minibatch
-    const vector<SequenceInfo> &GetAllSequences() const
+    const vector<SequenceInfo>& GetAllSequences() const
     {
         return m_sequences;
     }
@@ -276,7 +307,7 @@ public:
     const Matrix<char>& GetColumnsValidityMask(DEVICEID_TYPE deviceId) const;
 
     // compare whether two layouts are the same
-    bool operator==(const MBLayout &other) const
+    bool operator==(const MBLayout& other) const
     {
         if (this == &other)
             return true;
@@ -430,8 +461,9 @@ public:
     bool HasGaps(const FrameRange &fr) const;
 
     // test boundary flags for a specific condition
-    bool IsBeyondStartOrEnd(const FrameRange &fr) const;
-    bool IsGap(const FrameRange &fr) const;
+    bool IsBeyondStartOrEnd(const FrameRange& fr) const;
+    bool IsGap(const FrameRange& fr) const;
+    bool IsBeyondMinibatch(const FrameRange& fr) const;
 
     // test whether at least one sequence crosses the bounds of this minibatch
     bool HasSequenceBeyondBegin() const
@@ -544,6 +576,15 @@ private:
     // Meant to guard in lazy creation of m_columnsValidityMask.
     mutable bool m_writable;
 
+    // The axis this MBLayout represents.
+    // For now only a string meant for debugging.
+    std::wstring m_axisName;
+
+    // The mutex to searilize the access to nameIndices in SetUniqueAxisName().
+    // Todo: after upgraded to VS2015, move both static variables into SetUnqiueAxisName() as local static variables there.
+    static std::mutex s_nameIndiciesMutex;
+    static std::map<std::wstring, size_t> s_nameIndices;
+
 public:
 
     // special accessor for sequence training  --TODO: must be replaced by a different mechanism
@@ -648,6 +689,14 @@ public:
         return ret;
     }
 
+    // remove a time offset from a FrameRange
+    FrameRange WithoutTimeOffset() const
+    {
+        FrameRange ret = *this;
+        ret.m_timeOffset = 0;
+        return ret;
+    }
+
     // create a FrameRange with a time range > 1
     FrameRange WithTimeRange(size_t range) const
     {
@@ -736,6 +785,7 @@ inline bool MBLayout::HasGaps() const
 {
     return m_numGapFrames > 0; /*HasGaps(FrameRange());*/
 }
+
 inline bool MBLayout::HasGaps(const FrameRange &fr) const
 {
     CheckIsValid();
@@ -764,7 +814,21 @@ inline bool MBLayout::IsGap(const FrameRange &fr) const
     return m_distanceToStart(s, t) < 0; // value is -1 for gaps, non-negative otherwise
 }
 
+// test whether frame is exceeding the bounds of the MB
+inline bool MBLayout::IsBeyondMinibatch(const FrameRange& fr) const
+{
+    CheckIsValid();
+
+    if (fr.IsAllFrames())
+        LogicError("MBLayout::IsBeyondStartOrEnd() cannot be applied to FrameRange that specifies more than a single time step.");
+
+    const auto beginTime = (ptrdiff_t)fr.timeIdxInSeq + fr.m_timeOffset; // we test off the frame without offset
+    const auto endTime = beginTime + (ptrdiff_t)fr.m_timeRange;
+    return beginTime < 0 || endTime > (ptrdiff_t)GetNumTimeSteps();
+}
+
 // test whether frame is exceeding the sentence boundaries
+// In case of a gap, this returns false.
 inline bool MBLayout::IsBeyondStartOrEnd(const FrameRange &fr) const
 {
     CheckIsValid();
@@ -813,7 +877,7 @@ inline size_t MBLayout::GetActualNumSamples() const { return m_numFramesDeclared
 // only called from MaskMissingColumnsTo()
 // TODO: Can probably be faster by using the sequence array directly.
 // TODO: Or should we just blast m_distanceToStart to GPU, and maks based on that? It is small compared to features.
-inline const Matrix<char> &MBLayout::GetColumnsValidityMask(DEVICEID_TYPE deviceId) const
+inline const Matrix<char>& MBLayout::GetColumnsValidityMask(DEVICEID_TYPE deviceId) const
 {
     CheckIsValid();
     // lazily compute the validity mask
@@ -931,8 +995,9 @@ static inline std::pair<size_t, size_t> ColumnRangeWithMBLayoutFor(size_t numCol
 {
     // MBLayout of data and of FrameRange must be identical pointers,
     // or in case of broadcasting, respective parent pointers.
-    // MBLayouts that are identical in content but not object identity (pointer) are not admissible.
-    // For those cases, use a ReconcileMBLayout node.
+    // MBLayouts that are identical in content but not object identity (pointer) are admissible.
+    // We rely on a runtime check. If this is inefficient, use a ReconcileDynamicAxis node.
+    // (Note: Earlier versions of CNTK did not accept same-content MBLayouts.)
     if (fr.m_pMBLayout != pMBLayout)
     {
         // if broadcast allowed then it is allowed to broadcast from an outer-loop value
@@ -940,9 +1005,9 @@ static inline std::pair<size_t, size_t> ColumnRangeWithMBLayoutFor(size_t numCol
         if (fr.m_broadcastAllowed && !pMBLayout && numCols == 1)
             return std::pair<size_t, size_t>(0, numCols);
         if (fr.m_pMBLayout && pMBLayout && *fr.m_pMBLayout == *pMBLayout)
-            LogicError("DataFor: FrameRange's MBLayout inconsistent with matrix. They are compatible though--are you missing a ReconcileMBLayout operation?");
+            ; // layouts are compatible--you may proceed
         else
-            LogicError("DataFor: FrameRange's MBLayout inconsistent with matrix.");
+            LogicError("DataFor: FrameRange's dynamic axis is inconsistent with matrix. They are compatible though--are you missing a ReconcileDynamicAxis operation?");
     }
     // if FrameRange refers to whole minibatch (map mode)
     // or if we don't even have a layout
@@ -1024,8 +1089,9 @@ static inline std::pair<DimensionVector, DimensionVector> TensorSliceWithMBLayou
 
     // MBLayout of data and of FrameRange must be identical pointers,
     // or in case of broadcasting, respective parent pointers.
-    // MBLayouts that are identical in content but not object identity (pointer) are not admissible.
-    // For those cases, use a ReconcileMBLayout node.
+    // MBLayouts that are identical in content but not object identity (pointer) are admissible.
+    // We rely on a runtime check. If this is inefficient, use a ReconcileDynamicAxis node.
+    // (Note: Earlier versions of CNTK did not accept same-content MBLayouts.)
     if (isTimeIteration && fr.m_pMBLayout != pMBLayout)
     {
         // if broadcast allowed then it is allowed to broadcast from an outer-loop value
@@ -1033,10 +1099,9 @@ static inline std::pair<DimensionVector, DimensionVector> TensorSliceWithMBLayou
         if (fr.m_pMBLayout /*get data for a loop*/ && !pMBLayout /*'data' is not samples*/ && fr.m_broadcastAllowed /*we're OK with that*/)
             ; // the time dimension is broadcasting--leave it as is
         else if (fr.m_pMBLayout && pMBLayout && *fr.m_pMBLayout == *pMBLayout)
-            LogicError("DataFor: FrameRange's MBLayout inconsistent with matrix. They are compatible though--are you missing a ReconcileMBLayout operation? %s vs. %s", 
-                       static_cast<string>(*(fr.m_pMBLayout)).c_str(), static_cast<string>(*(pMBLayout)).c_str());
+            ; // layouts are compatible--you may proceed
         else
-            LogicError("DataFor: FrameRange's MBLayout inconsistent with matrix: %s vs. %s", 
+            LogicError("DataFor: FrameRange's dynamic axis is inconsistent with matrix: %s vs. %s", 
                        static_cast<string>(*(fr.m_pMBLayout)).c_str(), static_cast<string>(*(pMBLayout)).c_str());
     }
     // if FrameRange refers to whole minibatch (map mode)
@@ -1108,8 +1173,10 @@ static inline void MaskMissingColumnsTo(Matrix<ElemType>& matrixToMask, const MB
         TensorView<ElemType>(matrixSliceToMask).DoMaskNegativeOf(0, TensorView<ElemType>(matrixSliceToMask), TensorView<ElemType>(maskSlice), 1); val;
 #else
         const auto& maskMatrix = pMBLayout->GetColumnsValidityMask(matrixToMask.GetDeviceId());
+
         maskMatrix.TransferToDeviceIfNotThere(matrixToMask.GetDeviceId(), /*ismoved=*/ false, /*emptyTransfer=*/ false, /*updatePreferredDevice=*/ false);
         auto maskSlice = DataWithMBLayoutFor(maskMatrix, fr, pMBLayout);
+
         auto matrixSliceToMask = DataWithMBLayoutFor(matrixToMask, fr, pMBLayout);
         matrixSliceToMask.MaskColumnsValue(maskSlice, val);
 #endif

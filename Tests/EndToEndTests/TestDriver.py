@@ -106,6 +106,17 @@ except ImportError:
 thisDir = os.path.dirname(os.path.realpath(__file__))
 windows = os.getenv("OS")=="Windows_NT"
 
+def cygpath(path, relative=False):
+    if windows:
+        if path.startswith('/'):
+          return path
+        path = os.path.abspath(path)
+        if not relative and path[1]==':': # Windows drive
+          path = '/cygdrive/' + path[0] + path[2:]
+        path = path.replace('\\','/')
+
+    return path
+
 # This class encapsulates an instance of the test
 class Test:
   # "Suite/TestName" => instance of Test
@@ -120,7 +131,7 @@ class Test:
     self.fullName = suite + "/" + name
 
     # computing location of test directory (yml file directory)
-    self.testDir = os.path.dirname(pathToYmlFile)
+    self.testDir = cygpath(os.path.dirname(pathToYmlFile), relative=True)
 
     # parsing yml file with testcases 
     with open(pathToYmlFile, "r") as f:
@@ -208,26 +219,28 @@ class Test:
     if len(self.testCases) > 0:
       # Locating and reading baseline file
       baselineFile = self.findBaselineFile(flavor, device)
-      if baselineFile == None:
-        return TestRunResult.fatalError("Baseline file sanity check", "Can't find baseline file")
-  
-      with open(baselineFile, "r") as f:
-        baseline = f.read().split("\n")
-        if args.verbose:
-           six.print_("Baseline: " + baselineFile)
+      if baselineFile != None:
+          with open(baselineFile, "r") as f:
+            baseline = f.read().split("\n")
+            if args.verbose:
+               six.print_("Baseline: " + baselineFile)
 
-    # Before running the test, pre-creating TestCaseRunResult object for each test case
-    # and compute filtered lines from baseline file.
-    # Note: some test cases might fail at this time if baseline and/or patterns are inconsistent
-      if not args.update_baseline:
-        for testCase in self.testCases:
-          testCaseRunResult = testCase.processBaseline(baseline)
-          if not testCaseRunResult.succeeded:
-             result.succeeded = False
-          result.testCaseRunResults.append(testCaseRunResult)
+          # Before running the test, pre-creating TestCaseRunResult object for each test case
+          # and compute filtered lines from baseline file.
+          # Note: some test cases might fail at this time if baseline and/or patterns are inconsistent
+          if not args.update_baseline:
+            for testCase in self.testCases:
+              testCaseRunResult = testCase.processBaseline(baseline)
+              if not testCaseRunResult.succeeded:
+                 result.succeeded = False
+              result.testCaseRunResults.append(testCaseRunResult)
+      else:
+          if not args.create_baseline:
+              return TestRunResult.fatalError("Baseline file sanity check", "Can't find baseline file")
   
     # preparing run directory
     runDir = os.path.join(args.run_dir, "{0}_{1}@{2}_{3}".format(self.suite, self.name, flavor, device))
+    runDir = cygpath(runDir)
     if not os.path.isdir(runDir):
       os.makedirs(runDir)
 
@@ -252,6 +265,7 @@ class Test:
       os.environ["MPI_BINARY"] = "mpiexec"
     if not os.path.exists(os.environ["TEST_CNTK_BINARY"]):
       raise ValueError("the cntk executable does not exist at path '%s'"%os.environ["TEST_CNTK_BINARY"]) 
+    os.environ["TEST_BIN_DIR"] = os.path.dirname(os.environ["TEST_CNTK_BINARY"])
     os.environ["TEST_DIR"] = self.testDir
     os.environ["TEST_DATA_DIR"] = self.dataDir
     os.environ["TEST_RUN_DIR"] = runDir
@@ -281,7 +295,11 @@ class Test:
           line=line[:len(line)-1]
 
         if args.verbose:
-          six.print_(self.fullName + ": " + line)
+          # TODO find a better way
+          if sys.version_info.major < 3:
+            six.print_(self.fullName + ": " + line)
+          else:
+            six.print_(self.fullName + ": " + line.decode('utf-8').rstrip())
 
         if args.dry_run:
           print (line)
@@ -313,23 +331,39 @@ class Test:
       if not testCaseRunResult.succeeded:
         result.succeeded = False
 
-    if len(self.testCases)>0 and args.update_baseline and result.succeeded:
-      # When running in --update-baseline mode 
+    if len(self.testCases)>0 and (args.update_baseline or (baselineFile == None)) and result.succeeded:
+      # When running in --update-baseline or --create-baseline mode 
       # verifying that new output is successfully matching every pattern in the testcases.yml
-      # If this is not the case then baseline update will be rejected
+      # If this is not the case then baseline update/create will be rejected
       for testCase in self.testCases:
         testCaseRunResult = testCase.processBaseline(allLines)
         if not testCaseRunResult.succeeded:
-           result.succeeded = False
+          result.succeeded = False
         result.testCaseRunResults.append(testCaseRunResult)
 
+      if baselineFile == None:
+          baselineFile = self.newBaselineFilePath(device)
+
       if result.succeeded:
-       if args.verbose:
-         six.print_("Updating baseline file " + baselineFile)
-       with open(baselineFile, "w") as f:
-         f.write("\n".join(allLines))
+        if args.verbose:
+          if args.update_baseline:
+            six.print_("Updating baseline file " + baselineFile)
+          else:
+            six.print_("Creating baseline file " + baselineFile)
+
+        with open(baselineFile, "w") as f:
+          f.write("\n".join(allLines))
 
     return result
+
+  # Composes the full path of a new baseline file for a specified platform and device
+  # Note this currently hardcodes the baseline file name to be baseline.<os>.<device>.txt
+  # which is how the baselines currently exist for all CNTK E2E tests i.e. we have different
+  # baselines for platform and device but not for flavor
+  def newBaselineFilePath(self, device):
+      candidateName = "baseline" + "." + ("windows" if windows else "linux") + "." + device.lower() + ".txt"
+      fullPath = os.path.join(self.testDir, candidateName)
+      return fullPath
 
   # Finds a location of a baseline file by probing different names in the following order:
   #   baseline.$os.$flavor.$device.txt
@@ -345,7 +379,7 @@ class Test:
       for f in ["." + flavor.lower(), ""]:
         for d in ["." + device.lower(), ""]:
           candidateName = "baseline" + o + f + d + ".txt"
-          fullPath = os.path.join(self.testDir, candidateName)
+          fullPath = cygpath(os.path.join(self.testDir, candidateName), relative=True)
           if os.path.isfile(fullPath):
             return fullPath
     return None
@@ -563,7 +597,7 @@ def listCommand(args):
                    testsByTag[tag] = set([test.fullName])
   for tag in sorted(testsByTag.keys()):
     if tag=="*":
-      six.print_(' '.join(sorted(testsByTag[tag])))
+      six.print_(' \n'.join(sorted(testsByTag[tag])))
     else:
       six.print_(tag + ": " + ' '.join(sorted(testsByTag[tag])))
 
@@ -584,6 +618,9 @@ def runCommand(args):
 
   devices = args.devices
   flavors = args.flavors
+
+  if args.func == runCommand and args.prepend_path:
+    os.environ["PATH"] = os.pathsep.join([cygpath(y) for y in args.prepend_path.split(',')]) + os.pathsep + os.environ["PATH"]
 
   os.environ["TEST_ROOT_DIR"] = os.path.dirname(os.path.realpath(sys.argv[0]))
 
@@ -657,88 +694,91 @@ def runCommand(args):
     sys.exit(10)
 
 # ======================= Entry point =======================
-parser = argparse.ArgumentParser(description="TestDriver - CNTK Test Driver")
-subparsers = parser.add_subparsers(help="command to execute. Run TestDriver.py <command> --help for command-specific help")
-runSubparser = subparsers.add_parser("run", help="run test(s)")
-runSubparser.add_argument("test", nargs="*",
-                    help="optional test name(s) to run, specified as Suite/TestName. "
-                         "Use list command to list available tests. "
-                         "If not specified then all tests will be run.")
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description="TestDriver - CNTK Test Driver")
+  subparsers = parser.add_subparsers(help="command to execute. Run TestDriver.py <command> --help for command-specific help")
+  runSubparser = subparsers.add_parser("run", help="run test(s)")
+  runSubparser.add_argument("test", nargs="*",
+                      help="optional test name(s) to run, specified as Suite/TestName. "
+                           "Use list command to list available tests. "
+                           "If not specified then all tests will be run.")
 
-defaultBuildSKU = "gpu"
+  defaultBuildSKU = "gpu"
 
-runSubparser.add_argument("-b", "--build-location", help="location of the CNTK build to run")
-runSubparser.add_argument("-t", "--tag", help="runs tests which match the specified tag")
-runSubparser.add_argument("-d", "--device", help="cpu|gpu - run on a specified device")
-runSubparser.add_argument("-f", "--flavor", help="release|debug - run only a specified flavor")
-runSubparser.add_argument("-s", "--build-sku", default=defaultBuildSKU, help="cpu|gpu|1bitsgd - run tests only for a specified build SKU")
-tmpDir = os.getenv("TEMP") if windows else "/tmp"
-defaultRunDir=os.path.join(tmpDir, "cntk-test-{0}.{1}".format(time.strftime("%Y%m%d%H%M%S"), random.randint(0,1000000)))
-runSubparser.add_argument("-r", "--run-dir", default=defaultRunDir, help="directory where to store test output, default: a random dir within /tmp")
-runSubparser.add_argument("--update-baseline", action='store_true', help="update baseline file(s) instead of matching them")
-runSubparser.add_argument("-v", "--verbose", action='store_true', help="verbose output - dump all output of test script")
-runSubparser.add_argument("-n", "--dry-run", action='store_true', help="do not run the tests, only print test names and configurations to be run along with full command lines")
+  runSubparser.add_argument("-b", "--build-location", help="location of the CNTK build to run")
+  runSubparser.add_argument("-t", "--tag", help="runs tests which match the specified tag")
+  runSubparser.add_argument("-d", "--device", help="cpu|gpu - run on a specified device")
+  runSubparser.add_argument("-f", "--flavor", help="release|debug - run only a specified flavor")
+  runSubparser.add_argument("-s", "--build-sku", default=defaultBuildSKU, help="cpu|gpu|1bitsgd - run tests only for a specified build SKU")
+  runSubparser.add_argument("-pp", "--prepend-path", help="comma-separated paths to prepend when running test script")
+  tmpDir = os.getenv("TEMP") if windows else "/tmp"
+  defaultRunDir=os.path.join(tmpDir, "cntk-test-{0}.{1}".format(time.strftime("%Y%m%d%H%M%S"), random.randint(0,1000000)))
+  runSubparser.add_argument("-r", "--run-dir", default=defaultRunDir, help="directory where to store test output, default: a random dir within /tmp")
+  runSubparser.add_argument("--update-baseline", action='store_true', help="update baseline file(s) instead of matching them")
+  runSubparser.add_argument("--create-baseline", action='store_true', help="create new baseline file(s) (named as baseline.<os>.<device>.txt) for tests that do not currently have baselines")
+  runSubparser.add_argument("-v", "--verbose", action='store_true', help="verbose output - dump all output of test script")
+  runSubparser.add_argument("-n", "--dry-run", action='store_true', help="do not run the tests, only print test names and configurations to be run along with full command lines")
 
-runSubparser.set_defaults(func=runCommand)
+  runSubparser.set_defaults(func=runCommand)
 
-listSubparser = subparsers.add_parser("list", help="list available tests")
-listSubparser.add_argument("-t", "--tag", help="limits a resulting list to tests matching the specified tag")
-listSubparser.add_argument("-d", "--device", help="cpu|gpu - tests for a specified device")
-listSubparser.add_argument("-f", "--flavor", help="release|debug - tests for specified flavor")
-listSubparser.add_argument("-s", "--build-sku", default=defaultBuildSKU, help="cpu|gpu|1bitsgd - list tests only for a specified build SKU")
-listSubparser.add_argument("--os", help="windows|linux - tests for a specified operating system")
+  listSubparser = subparsers.add_parser("list", help="list available tests")
+  listSubparser.add_argument("-t", "--tag", help="limits a resulting list to tests matching the specified tag")
+  listSubparser.add_argument("-d", "--device", help="cpu|gpu - tests for a specified device")
+  listSubparser.add_argument("-f", "--flavor", help="release|debug - tests for specified flavor")
+  listSubparser.add_argument("-s", "--build-sku", default=defaultBuildSKU, help="cpu|gpu|1bitsgd - list tests only for a specified build SKU")
+  listSubparser.add_argument("--os", help="windows|linux - tests for a specified operating system")
 
-listSubparser.set_defaults(func=listCommand)
+  listSubparser.set_defaults(func=listCommand)
 
-if len(sys.argv)==1:
-    parser.print_help()
-    sys.exit(1)
-
-args = parser.parse_args(sys.argv[1:])
-
-# parsing a --device, --flavor and --os options:
-args.devices = ["cpu", "gpu"]
-if (args.device):
-  args.device = args.device.lower()
-  if not args.device in args.devices:
-    six.print_("--device must be one of", args.devices, file=sys.stderr)
-    sys.exit(1)
-  args.devices = [args.device]
-
-args.flavors = ["debug", "release"]
-if (args.flavor):
-  args.flavor = args.flavor.lower()
-  if not args.flavor in args.flavors:
-    six.print_("--flavor must be one of", args.flavors, file=sys.stderr)
-    sys.exit(1)
-  args.flavors = [args.flavor]
-
-args.buildSKUs = ["cpu", "gpu", "1bitsgd"]
-if (args.build_sku):
-  args.build_sku = args.build_sku.lower()
-  if not args.build_sku in args.buildSKUs:
-    six.print_("--build-sku must be one of", args.buildSKUs, file=sys.stderr)
-    sys.exit(1)
-  args.buildSKUs = [args.build_sku]
-  if args.build_sku == "cpu" and args.devices == ["gpu"]:
-    print >>sys.stderr, "Invalid combination: --build-sku cpu and --device gpu"
-    sys.exit(1)
-
-if args.func == runCommand and not args.build_location:
-  args.build_location = os.path.realpath(os.path.join(thisDir, "../..", "x64" if windows else "build/"))
-
-if args.func == listCommand:
-  args.oses = ["windows", "linux"]
-  if (args.os):
-    args.os = args.os.lower()
-    if not args.os in args.oses:
-      six.print_("--os must be one of", args.oses, file=sys.stderr)
+  if len(sys.argv)==1:
+      parser.print_help()
       sys.exit(1)
-  args.oses = [args.os]
 
-# discover all the tests
-Test.discoverAllTests()
+  args = parser.parse_args(sys.argv[1:])
 
-# execute the command
-args.func(args)
+  # parsing a --device, --flavor and --os options:
+  args.devices = ["cpu", "gpu"]
+  if (args.device):
+    args.device = args.device.lower()
+    if not args.device in args.devices:
+      six.print_("--device must be one of", args.devices, file=sys.stderr)
+      sys.exit(1)
+    args.devices = [args.device]
+
+  args.flavors = ["debug", "release"]
+  if (args.flavor):
+    args.flavor = args.flavor.lower()
+    if not args.flavor in args.flavors:
+      six.print_("--flavor must be one of", args.flavors, file=sys.stderr)
+      sys.exit(1)
+    args.flavors = [args.flavor]
+
+  args.buildSKUs = ["cpu", "gpu", "1bitsgd"]
+  if (args.build_sku):
+    args.build_sku = args.build_sku.lower()
+    if not args.build_sku in args.buildSKUs:
+      six.print_("--build-sku must be one of", args.buildSKUs, file=sys.stderr)
+      sys.exit(1)
+    args.buildSKUs = [args.build_sku]
+    if args.build_sku == "cpu" and args.devices == ["gpu"]:
+      print >>sys.stderr, "Invalid combination: --build-sku cpu and --device gpu"
+      sys.exit(1)
+
+  if args.func == runCommand and not args.build_location:
+    args.build_location = os.path.realpath(os.path.join(thisDir, "../..", "x64" if windows else "build/"))
+
+  if args.func == listCommand:
+    args.oses = ["windows", "linux"]
+    if (args.os):
+      args.os = args.os.lower()
+      if not args.os in args.oses:
+        six.print_("--os must be one of", args.oses, file=sys.stderr)
+        sys.exit(1)
+    args.oses = [args.os]
+
+  # discover all the tests
+  Test.discoverAllTests()
+
+  # execute the command
+  args.func(args)
 

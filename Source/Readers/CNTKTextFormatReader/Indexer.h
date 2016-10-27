@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <vector>
 #include "Descriptors.h"
+#include "CorpusDescriptor.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -23,10 +24,10 @@ public:
 
     // Reads the input file, building and index of chunks and corresponding
     // sequences.
-    void Build();
+    void Build(CorpusDescriptorPtr corpus);
 
     // Returns input data index (chunk and sequence metadata)
-    const Index& GetIndex() const { return m_chunks; }
+    const Index& GetIndex() const { return m_index; }
 
     // True, when input does not have the sequence id column
     // or when sequence id column was ignored during indexing
@@ -49,15 +50,11 @@ private:
     bool m_hasSequenceIds; // true, when input contains one sequence per line 
                            // or when sequence id column was ignored during indexing.
 
-    const size_t m_maxChunkSize; // maximum permitted chunk size;
+    // a collection of chunk descriptors and sequence keys.
+    Index m_index;
 
-    std::vector<ChunkDescriptor> m_chunks; // a collection of chunk descriptors
-
-    // Adds sequence (metadata) to the index. Additionally, it
-    // assigns an appropriate chunk id to the sequence descriptor,
-    // ensures that chunks do not exceed the maximum allowed size
-    // (except when a sequence size is greater than the maximum chunk size)
-    void AddSequence(SequenceDescriptor& sd);
+    // Same function as above but with check that the sequence is included in the corpus descriptor.
+    void AddSequenceIfIncluded(CorpusDescriptorPtr corpus, size_t sequenceKey, SequenceDescriptor& sd);
 
     // fills up the buffer with data from file, all previously buffered data
     // will be overwritten.
@@ -71,12 +68,12 @@ private:
     // EOF is reached without hitting the pipe character.
     // Returns false if no numerical characters are found preceding the pipe.
     // Otherwise, writes sequence id value to the provided reference, returns true.
-    bool GetNextSequenceId(size_t& id);
+    bool TryGetSequenceId(size_t& id);
 
     // Build a chunk/sequence index, treating each line as an individual sequence.
     // Does not do any sequence parsing, instead uses line number as 
     // the corresponding sequence id.
-    void BuildFromLines();
+    void BuildFromLines(CorpusDescriptorPtr corpus);
 
     // Returns current offset in the input file (in bytes). 
     int64_t GetFileOffset() const { return m_fileOffsetStart + (m_pos - m_bufferStart); }

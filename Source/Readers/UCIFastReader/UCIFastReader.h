@@ -36,7 +36,7 @@ enum LabelKind
 };
 
 template <class ElemType>
-class UCIFastReader : public IDataReader
+class UCIFastReader : public DataReaderBase
 {
     shared_ptr<UCIParser<ElemType, LabelType>> m_parser;
     size_t m_mbSize;                 // size of minibatch requested
@@ -131,10 +131,17 @@ public:
     {
         InitFromConfig(config);
     }
+
     virtual void Destroy();
     UCIFastReader()
     {
+        fprintf(stderr, "********** DEPRECATED **********\n" 
+            "UCIFastReader is no longer actively maintained.\n"
+            "It is known to have defects, proceed with caution (better yet, switch to CNTKTextFormatReader)!\n"
+            "For more details please see https://github.com/Microsoft/CNTK/wiki \n");
+
         m_pMBLayout = make_shared<MBLayout>();
+        m_pMBLayout->SetUniqueAxisName(L"UCIFastReader");
     }
     virtual ~UCIFastReader();
 
@@ -150,11 +157,11 @@ public:
 
     virtual void StartDistributedMinibatchLoop(size_t mbSize, size_t epoch, size_t subsetNum, size_t numSubsets, size_t requestedEpochSamples = requestDataSize) override;
 
-    virtual bool GetMinibatch(StreamMinibatchInputs& matrices);
+    virtual bool TryGetMinibatch(StreamMinibatchInputs& matrices);
 
     bool GetMinibatchImpl(StreamMinibatchInputs& matrices);
 
-    size_t GetNumParallelSequences()
+    size_t GetNumParallelSequencesForFixingBPTTMode()
     {
         return m_pMBLayout->GetNumParallelSequences();
     }
@@ -174,6 +181,11 @@ public:
     void SetRandomSeed(int)
     {
         NOT_IMPLEMENTED;
+    }
+
+    size_t GetCurrentSamplePosition() override
+    {
+        return m_mbStartSample;
     }
 };
 } } }

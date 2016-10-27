@@ -27,10 +27,23 @@ enum class NetworkOperationMode
 // or what the seq-2-seq decoder feedback signal is.
 struct ComputationEnvironment
 {
+    // TODO: change the data member names back to m_ syntax, or get team consensus to not do that
     // networkOperationMode tells whether we are training or inferring, which affects some nodes' behavior
-    NetworkOperationMode m_networkOperationMode = NetworkOperationMode::inferring; // by default, a network is always able to infer
-    bool IsTraining()     const { return m_networkOperationMode == NetworkOperationMode::training; }
-    bool IsPreComputing() const { return m_networkOperationMode == NetworkOperationMode::preComputing; }
+    NetworkOperationMode networkOperationMode = NetworkOperationMode::inferring; // by default, a network is always able to infer
+    bool IsInferring()     const { return networkOperationMode == NetworkOperationMode::inferring; }
+    bool IsTraining()      const { return networkOperationMode == NetworkOperationMode::training; }
+    bool IsPreComputing()  const { return networkOperationMode == NetworkOperationMode::preComputing; }
+
+    // helper to set new value and return old one
+    NetworkOperationMode SetOperationMode(NetworkOperationMode mode)
+    {
+        NetworkOperationMode oldMode = networkOperationMode;
+        networkOperationMode = mode;
+        return oldMode;
+    }
+
+    // traceLevel
+    int traceLevel = 0;
     // more properties should be added here as needed
 };
 typedef std::shared_ptr<ComputationEnvironment> ComputationEnvironmentPtr;
@@ -48,12 +61,11 @@ public:
     ScopedNetworkOperationMode(const std::shared_ptr<ComputationNetwork>& net, NetworkOperationMode networkOperationMode) :
         m_environment(net->Environment())
     {
-        m_previousNetworkOperationMode = m_environment.m_networkOperationMode;
-        m_environment.m_networkOperationMode = networkOperationMode;
+        m_previousNetworkOperationMode = m_environment.SetOperationMode(networkOperationMode);
     }
     ~ScopedNetworkOperationMode() // destructor restores the previous mode
     {
-        m_environment.m_networkOperationMode = m_previousNetworkOperationMode;
+        m_environment.SetOperationMode(m_previousNetworkOperationMode);
     }
 };
 

@@ -106,13 +106,13 @@ void ComputationNetwork::FormRecurrentLoops(const ComputationNodeBasePtr& rootNo
                 assert(node->m_numNonDelayedParentsInLoop == 0); // (in PurgeStateForFormingRecurrentLoops())
         }
         for (let& node : nestedNodes)
-            {
+        {
             for (auto& input : node->GetInputs())
-                {
+            {
                 if (input->m_loopId == node->m_loopId && GetRecurrenceSteppingDirection(node) == 0/*not a Delay node*/)
                     input->m_numNonDelayedParentsInLoop++; // cound #parents of 'input' that are not delay nodes
-                }
             }
+        }
 
         // re-traverse the graph for all nestedNodes, starting with the first
         // Then update m_nestedNodes with the re-traversed order.
@@ -166,17 +166,20 @@ void ComputationNetwork::FormRecurrentLoops(const ComputationNodeBasePtr& rootNo
     // --- END reorder process   --TODO: eliminate this process
 
     // log the loops
-    for (auto& iter : m_allSEQNodes)
+    if (TraceLevel() > 0)
     {
-        fprintf(stderr, "\nLoop[%d] --> %ls -> %d nodes\n", (int) iter->m_loopId, iter->NodeName().c_str(), (int) iter->m_nestedNodes.size());
-        size_t n = 0;
-        for (auto itr = iter->m_nestedNodes.begin(); itr != iter->m_nestedNodes.end(); itr++)
+        for (auto& iter : m_allSEQNodes)
         {
-            if (n++ % 3 == 0)
-                fprintf(stderr, "\n");
-            fprintf(stderr, "\t%ls", (*itr)->NodeName().c_str());
+            fprintf(stderr, "\nLoop[%d] --> %ls -> %d nodes\n", (int)iter->m_loopId, iter->NodeName().c_str(), (int)iter->m_nestedNodes.size());
+            size_t n = 0;
+            for (auto itr = iter->m_nestedNodes.begin(); itr != iter->m_nestedNodes.end(); itr++)
+            {
+                if (n++ % 3 == 0)
+                    fprintf(stderr, "\n");
+                fprintf(stderr, "\t%ls", (*itr)->NodeName().c_str());
+            }
+            fprintf(stderr, "\n");
         }
-        fprintf(stderr, "\n");
     }
 
 #if 0

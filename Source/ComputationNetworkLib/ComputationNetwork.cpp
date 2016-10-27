@@ -12,12 +12,14 @@
 #include "LinearAlgebraNodes.h"
 #include "NonlinearityNodes.h"
 #include "ConvolutionalNodes.h"
+#include "RNNNodes.h"
 #include "RecurrentNodes.h"
 #include "ReshapingNodes.h"
 #include "TrainingNodes.h"
 #include "PreComputeNodes.h"
 #include "EvaluationNodes.h"
 #include "SpecialPurposeNodes.h"
+#include "DeprecatedNodes.h" // (for SaveToDbnFile(), which is also deprecated)
 #include "MPIWrapper.h" // TODO: does not belong here
 #include <string>
 #include <vector>
@@ -119,7 +121,7 @@ void ComputationNetwork::SaveToFileImpl(const wstring& fileName, const FileOptio
     {
         ComputationNodeBasePtr nodePtr = nodeIter->second;
         // type
-#if CURRENT_CNTK_MODEL_VERSION >= CNTK_MODEL_VERSION_5
+#if CURRENT_CNTK_MODEL_VERSION >= CNTK_MODEL_VERSION_7
         wstring precision;
         if (nodePtr->Is<ComputationNode<float>>())
             precision = ElemTypeName<float>();
@@ -195,7 +197,7 @@ void ComputationNetwork::SaveToFileImpl(const wstring& fileName, const FileOptio
 // load the section of nodes that contain persistable parameters
 // This is also used for reloading a model without recreating it, e.g. during training.
 // TODO: Why not just reload it? Because SGD::Train() holds pointers to the parameters directly? That should be fixed.
-template <class ElemType> // ElemType is the default for models prior to CNTK_MODEL_VERSION_5; after that, it is serialized, and ElemType is ignored
+template <class ElemType> // ElemType is the default for models prior to CNTK_MODEL_VERSION_7; after that, it is serialized, and ElemType is ignored
 void ComputationNetwork::ReadPersistableParameters(File& fstream, bool create)
 {
     fstream.GetMarker(FileMarker::fileMarkerBeginSection, L"BCN");
@@ -218,7 +220,7 @@ void ComputationNetwork::ReadPersistableParameters(File& fstream, bool create)
     for (size_t i = 0; i < numNodes; i++)
     {
         wstring precision;
-        if (modelVersion >= CNTK_MODEL_VERSION_5)
+        if (modelVersion >= CNTK_MODEL_VERSION_7)
             fstream >> precision; // "float" or "double"; default is "" meaning <ElemType> as passed in from outside
 
         wstring opName, nodeName;
@@ -391,13 +393,45 @@ void ComputationNetwork::Read(const wstring& fileName)
 // node construction
 // -----------------------------------------------------------------------
 
-// non-static version needed because it accesses m_randomSeedOffset
-// Excessively used by SimpleNetworkBuilder, but always after CreateLearnableParameter(), so we should really absorb it there
-template <class ElemType>
-void ComputationNetwork::InitLearnableParameters(const ComputationNodeBasePtr& node, const bool uniformInit, const unsigned long randomSeed, const ElemType initValueScale, bool initOnCPUOnly)
+// helper of InitLearnableParameters()
+// Note: This should really be done through an interface without <ElemType> that LearnableParameter would derive from.
+// However, this is only for NDL (which is deprecated), so I rather not pollute the code with more interfaces just for a deprecated cause.
+template<class ElemType>
+static bool TryPostInitParameters(const ComputationNodeBasePtr& node, const wchar_t* initString, double initValue, unsigned long randomSeed, bool initOnCPUOnly)
 {
     auto learnableParameterNode = dynamic_pointer_cast<LearnableParameter<ElemType>>(node);
-    learnableParameterNode->InitRandom(uniformInit, randomSeed + GetRandomSeedOffset(), initValueScale, initOnCPUOnly);
+    if (!learnableParameterNode)
+        return false;
+    learnableParameterNode->PostInitParameters(initString, (ElemType) initValue, randomSeed, initOnCPUOnly);
+    return true;
+}
+
+// non-static version needed because it accesses m_randomSeedOffset
+void ComputationNetwork::InitLearnableParameters(const ComputationNodeBasePtr& node,
+                                                 const wchar_t* initString, // "uniform"|"gaussian"|"fixedValue"
+                                                 double initValue,        //  scale   | scale    | value
+                                                 unsigned long randomSeed /*= 0*/,
+                                                 bool initOnCPUOnly /*= false*/) const
+{
+    randomSeed += GetRandomSeedOffset();
+    if (TryPostInitParameters<float> (node, initString, initValue, randomSeed, initOnCPUOnly) ||
+        TryPostInitParameters<double>(node, initString, initValue, randomSeed, initOnCPUOnly))
+        return;
+    LogicError("InitLearnableParameters: Input node is not a LearnableParameter<float or double>");
+}
+
+// non-static version needed because it accesses m_randomSeedOffset
+// Legacy version that is for random only.
+void ComputationNetwork::RandomInitLearnableParameters(const ComputationNodeBasePtr& node, const bool uniformInit, const unsigned long randomSeed, const double initValueScale, bool initOnCPUOnly) const
+{
+    InitLearnableParameters(node, uniformInit ? L"uniform" : L"gaussian", initValueScale, randomSeed, initOnCPUOnly);
+}
+
+template <class ElemType>
+void ComputationNetwork::InitLearnableParametersWithBilinearFill(const ComputationNodeBasePtr& node, size_t kernelWidth, size_t kernelHeight)
+{
+    auto learnableParameterNode = dynamic_pointer_cast<LearnableParameter<ElemType>>(node);
+    learnableParameterNode->InitBilinear(kernelWidth, kernelHeight);
 }
 
 bool ComputationNetwork::IsTypicalCriterionNode(ComputationNodeBasePtr nodePtr)
@@ -409,7 +443,7 @@ bool ComputationNetwork::IsTypicalCriterionNode(ComputationNodeBasePtr nodePtr)
         nodePtr->OperationName() == OperationNameOf(SequenceWithSoftmaxNode) ||
         nodePtr->OperationName() == OperationNameOf(CrossEntropyNode) ||
         nodePtr->OperationName() == OperationNameOf(ClassBasedCrossEntropyWithSoftmaxNode) ||
-        nodePtr->OperationName() == OperationNameOf(ErrorPredictionNode) ||
+        nodePtr->OperationName() == OperationNameOf(ClassificationErrorNode) ||
 #ifdef COMING_SOON
         nodePtr->OperationName() == OperationNameOf(CRFNode) ||
 #endif
@@ -490,26 +524,43 @@ void ComputationNetwork::CollectInputAndLearnableParametersRec(const Computation
 }
 
 template <class ElemType>
-/*static*/ void ComputationNetwork::SetDropoutRate(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, unsigned long& dropOutSeed)
+/*static*/ void ComputationNetwork::SetDropoutRate(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate)
 {
+    list<ComputationNodeBasePtr> dropoutNodes = net->GetNodesWithType(OperationNameOf(DropoutNode), criterionNode);
     if (dropoutRate != prevDropoutRate)
     {
         fprintf(stderr, "Setting dropout rate to %.8g.\n", dropoutRate);
         // TODO: Change this to use an interface that is independent of <ElemType>.
-        list<ComputationNodeBasePtr> dropoutNodes = net->GetNodesWithType(OperationNameOf(DropoutNode), criterionNode);
         if (dropoutNodes.size() == 0 && dropoutRate > 0)
-            fprintf(stderr, "WARNING: there is no dropout node.\n");
-        else
-        {
-            for (auto& nodeIter: dropoutNodes)
-            {
-                auto node = dynamic_pointer_cast<DropoutNode<ElemType>>(nodeIter);
-                node->SetDropoutRate(dropoutRate);
-                node->SetRandomSeed(dropOutSeed++);
-            }
-        }
+            fprintf(stderr, "WARNING: Attempting to set dropout rate, but there is no dropout node in the network.\n");
+    }
 
-        prevDropoutRate = dropoutRate;
+    for (auto& nodeIter : dropoutNodes)
+    {
+        auto node = dynamic_pointer_cast<DropoutNode<ElemType>>(nodeIter);
+        if (dropoutRate != prevDropoutRate)
+            node->SetDropoutRate(dropoutRate);
+    }
+
+    prevDropoutRate = dropoutRate;
+}
+
+template <class ElemType>
+/* static */ void ComputationNetwork::SetIRngUserSeed(ComputationNetworkPtr net, const ComputationNodeBasePtr& node, size_t randSeedBase)
+{
+    // Predicate checking if the node is derived from IRngUser
+    function<bool(const ComputationNodeBasePtr&)> nodeIsIRngUser = [](const ComputationNodeBasePtr& p) { return dynamic_pointer_cast<IRngUser>(p) != nullptr; };
+
+    list<ComputationNodeBasePtr> rngUserNodes = net->GetNodesWhere(nodeIsIRngUser, node);
+
+    // Each IRngUser gets a distinct seed. This seed is computed as follows:
+    // seed = (((parallelWorkerIdx * maxEpochs) + currentEpochNum) /*i.e. randSeedBase*/ * rngUserNodes.size()) + dropoutNodeIdx.
+    size_t randSeed = randSeedBase * rngUserNodes.size();
+    for (auto& nodeIter : rngUserNodes)
+    {
+        auto rngUser = dynamic_pointer_cast<IRngUser>(nodeIter);
+        rngUser->SetRandomSeed(randSeed);
+        randSeed++;
     }
 }
 
@@ -711,44 +762,22 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
 
     File fstream(outFile, FileOptions::fileOptionsText | FileOptions::fileOptionsWrite);
 
-    // get precompute node
-    vector<ComputationNodeBasePtr> PreComputedNodes;
+    vector<ComputationNodeBasePtr> preComputedNodes;
+    vector<ComputationNodeBasePtr> pastValueNodes;
+    vector<ComputationNodeBasePtr> futureValueNodes;
+    vector<ComputationNodeBasePtr> learnableParameters;
     vector<ComputationNodeBasePtr> allnodes = GetAllNodes();
     for (const auto& n : allnodes)
     {
         if (n->RequiresPreCompute())
-            PreComputedNodes.push_back(n);
-    }
+            preComputedNodes.push_back(n);
 
-    // get PastValue node
-    vector<ComputationNodeBasePtr> pastValueNodes;
-    for (const auto& n : allnodes)
-    {
-        if (n->OperationName() == OperationNameOf(PastValueNode) || n->OperationName() == L"Delay")
+        const auto operationName = n->OperationName();
+        if (operationName == OperationNameOf(LCPastValueNode) || operationName == OperationNameOf(PastValueNode) || operationName == L"Delay"/*legacy*/) 
             pastValueNodes.push_back(n);
-    }
-
-    // get LCPastValue node
-    vector<ComputationNodeBasePtr> lcpastValueNodes;
-    for (const auto& n : allnodes)
-    {
-        if (n->OperationName() == OperationNameOf(LCPastValueNode))
-            lcpastValueNodes.push_back(n);
-    }
-
-
-    // get FuturetValue node
-    vector<ComputationNodeBasePtr> futureValueNodes;
-    for (const auto& n : allnodes)
-    {
-        if (n->OperationName() == OperationNameOf(FutureValueNode))
+        else if (operationName == OperationNameOf(FutureValueNode))
             futureValueNodes.push_back(n);
-    }
-    // get learnableParameters
-    vector<ComputationNodeBasePtr> learnableParameters;
-    for (const auto& n : allnodes)
-    {
-        if (n->OperationName() == OperationNameOf(LearnableParameter))
+        else if (operationName == OperationNameOf(LearnableParameter))
             learnableParameters.push_back(n);
     }
 
@@ -769,11 +798,9 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
     // critera
     fstream << FormSpecialNodes(dotcfg.m_CriteriaStyle, m_criterionNodes);
     // pre-compute nodes
-    fstream << FormSpecialNodes(dotcfg.m_PrecomputingNodeStyle, PreComputedNodes);
+    fstream << FormSpecialNodes(dotcfg.m_PrecomputingNodeStyle, preComputedNodes);
     // PastValue nodes
     fstream << FormSpecialNodes(dotcfg.m_pastValueNodeStyle, pastValueNodes);    
-    // LCPastValue nodes
-    fstream << FormSpecialNodes(dotcfg.m_pastValueNodeStyle, lcpastValueNodes);
     // FutureValue nodes
     fstream << FormSpecialNodes(dotcfg.m_futureValueNodeStyle, futureValueNodes);
     // normal nodes
@@ -787,8 +814,8 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
     for (const auto& x : allnodes)
     {
         line.clear();
-        line = msra::strfun::wstrprintf(L" \"%ls\" [ label = \"%ls [%s%s]\\n%ls\" ] ;\n",
-                                        x->GetName().c_str(), x->GetName().c_str(), string(x->GetSampleLayout()).c_str(), x->HasMBLayout() ? " x *" : "",
+        line = msra::strfun::wstrprintf(L" \"%ls\" [ label = \"%ls [%ls%ls]\\n%ls\" ] ;\n",
+                                        x->GetName().c_str(), x->GetName().c_str(), wstring(x->GetSampleLayout()).c_str(), x->HasMBLayout() ? L" x *" : L"",
                                         x->OperationName().c_str());
         fstream << line;
     }
@@ -874,7 +901,7 @@ void ComputationNetwork::DescribeNetworkUsingDot(list<ComputationArc>& arcs,
     fstream << L"\n}\n";
 }
 
-void ComputationNetwork::PlotNetworkTopology(const wstring outputFile) //  [1/13/2015 erw] plot network topology using dot language
+void ComputationNetwork::PlotNetworkTopology(const wstring& outputFile) 
 {
     VerifyIsCompiled("PlotNetworkTopology");
     // ValidateNetwork(false, true);
@@ -945,24 +972,27 @@ void ComputationNodeBase::EnumerateArcs(std::unordered_set<ComputationNodeBasePt
 // ========================================
 // BUGBUG: this only currently works for one ElemType, not both
 template <class ElemType>
-void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDConfig, size_t AlignedSize)
+void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDConfig, size_t alignedSize)
 {
     vector<pair<vector<wstring>, float>> nodeGroups;
-    wregex NameFilter;
+    wregex nameFilter;
 
     for (const auto& e : SVDConfig)
     {
         wstring regexStr = e.first;
-        float keepRatio = e.second;
-        vector<wstring> NamesInGroup;
+        if (regexStr.empty())
+            continue;
 
-        NameFilter.assign(regexStr);
+        float keepRatio = e.second;
+        vector<wstring> namesInGroup;
+
+        nameFilter.assign(regexStr);
 
         for (auto n = m_nameToNodeMap.begin(); n != m_nameToNodeMap.end(); n++)
         {
-            if (!regexStr.empty() && !regex_match(n->first, NameFilter))
+            if (!regex_match(n->first, nameFilter))
             {
-                // if regexStr is not empty and the the node node does not match with the regexStr
+                // if regexStr is not empty and the the node does not match with the regexStr
                 continue;
             }
 
@@ -974,20 +1004,20 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
                 continue;
 
             // still here ?
-            NamesInGroup.push_back(n->first);
+            namesInGroup.push_back(n->first);
         }
-        nodeGroups.push_back(make_pair(NamesInGroup, keepRatio));
+        nodeGroups.push_back(make_pair(namesInGroup, keepRatio));
     }
 
     size_t groupID = 0;
     for (auto& group : nodeGroups)
     {
-        float keepratio = group.second;
+        float keepRatio = group.second;
         fprintf(stderr,
                 "--------------------------------------------------------------------------------------------\n");
         fprintf(stderr,
                 "ParameterSVD: start to process group %d with KeepRatio=%.2f\n",
-                (int) groupID++, keepratio);
+                (int) groupID++, keepRatio);
         fprintf(stderr,
                 "--------------------------------------------------------------------------------------------\n");
 
@@ -1022,17 +1052,17 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
             // S \in R^{min(m,n),1}
             // S is in descending order
 
-            ElemType totalenergy = 0.0f;
+            ElemType totalEnergy = 0.0f;
             for (size_t i = 0; i < S.GetNumRows(); i++)
-                totalenergy += S(i, 0);
-            ElemType keepenergy = totalenergy * keepratio;
-            ElemType runenergy = 0.0f;
+                totalEnergy += S(i, 0);
+            ElemType keepEnergy = totalEnergy * keepRatio;
+            ElemType runEnergy = 0.0f;
 
             size_t r = 0;
             for (size_t indx = 0; indx < S.GetNumRows(); indx++)
             {
-                runenergy += S(indx, 0);
-                if (runenergy > keepenergy)
+                runEnergy += S(indx, 0);
+                if (runEnergy > keepEnergy)
                 {
                     r = indx + 1;
                     break;
@@ -1041,10 +1071,10 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
 
             r = r > S.GetNumRows() ? S.GetNumRows() : r;
 
-            if (r % AlignedSize != 0)
+            if (r % alignedSize != 0)
             {
-                r -= r % AlignedSize;
-                r = r + AlignedSize > S.GetNumRows() ? S.GetNumRows() : r + AlignedSize;
+                r -= r % alignedSize;
+                r = r + alignedSize > S.GetNumRows() ? S.GetNumRows() : r + alignedSize;
             }
             // r = (r + 7) & (~7); //  to keep the number of rows/cols of resultant matrix a multipier of 8
             //  which can be helpful at runtime
@@ -1053,7 +1083,7 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
             fprintf(stderr,
                     "Performing SVD for a %5d-by-%-5d matrix (node name: %-20ls) ---  computation time %5.2f secs ;  keep %4.1f%% energy ===> keep %5d svd values (reduce to %4.1f%% parameters) \n",
                     (int) m, (int) n, name.c_str(), elapsedtime.count(),
-                    keepratio * 100, (int) r,
+                    keepRatio * 100, (int) r,
                     ((m + n) * r + 0.0f) / m / n * 100);
 
             // redU in R^ {mXr}
@@ -1067,28 +1097,51 @@ void ComputationNetwork::PerformSVDecomposition(const map<wstring, float>& SVDCo
             Matrix<ElemType> redS(r, (size_t)1, A.GetDeviceId());
             for (size_t i = 0; i < r; i++)
             {
-                ElemType sqrtsigma = (ElemType) sqrt((double) S(i, 0));
-                redS(i, 0) = sqrtsigma;
+                ElemType sqrtSigma = (ElemType) sqrt((double) S(i, 0));
+                redS(i, 0) = sqrtSigma;
             }
 
             redU.RowElementMultiplyWith(redS.Transpose());
             redVT.ColumnElementMultiplyWith(redS);
 
             // Step 2. create two new Parameter nodes and one Times node
-            wstring leftChildName = name + L"-U";  // BUGBUG: With BrainScript, node names must be proper identifiers/variable expressions. We can't have '-' in node names.
-            wstring rightChildName = name + L"-V";
+            wstring leftChildName = name + L"_U";
+            wstring rightChildName = name + L"_V";
             shared_ptr<ComputationNode<ElemType>> pLeft = AddNodeToNetWithElemType(New<LearnableParameter<ElemType>>(m_deviceId, leftChildName, m, r));
             shared_ptr<ComputationNode<ElemType>> pRight = AddNodeToNetWithElemType(New<LearnableParameter<ElemType>>(m_deviceId, rightChildName, r, n));
+            InitLearnableParameters(pLeft,  L"fixedValue", 0); // follow the protocol; otherwise deferred initialization will overwrite the SVD values in validation
+            InitLearnableParameters(pRight, L"fixedValue", 0);
 
-            // TODO: We should be able to move instead of copy but it currently isn't strightforward
+            // TODO: We should be able to move instead of copy but it currently isn't straightforward
             // due to redU and redVT being slices
-            pLeft->ValueAsMatrix() = redU.DeepClone();
+            pLeft->ValueAsMatrix()  = redU.DeepClone();
             pRight->ValueAsMatrix() = redVT.DeepClone();
 
-            shared_ptr<ComputationNode<ElemType>> pTimes = AddNodeToNetAndAttachInputs(New<TimesNode<ElemType>>(m_deviceId, name + L"-SVD"), { pLeft, pRight });
+            // Step 3. Change the network hierachy to include the SVD nodes
+            auto parentNodes = GetParentNodes(name);
 
-            // Step 3. remove old node
-            ReplaceLeafNode(name, pTimes);
+            for (auto& pParentNode : parentNodes)
+            {
+                // Change the hierarchy of the network if the node is immediately used in a product
+                auto pParentTimesNode = dynamic_pointer_cast<TimesNode<ElemType>>(pParentNode);
+                if (pParentTimesNode)
+                {
+                    // Change the hierarchy to ensure multiplication order
+                    // U*(V*X)
+                    shared_ptr<ComputationNode<ElemType>> pTimes = New<TimesNode<ElemType>>(m_deviceId, name + L"_SVD");
+                    pTimes->AttachInputs({ pLeft, pParentNode });
+                    
+                    InsertNode(pParentNode->GetName(), pTimes, pParentNode->GetTags());
+                    ReplaceLeafNode(name, pRight);
+                }
+                else
+                {
+                    // Default multiplication order
+                    shared_ptr<ComputationNode<ElemType>> pTimes = AddNodeToNetAndAttachInputs(New<TimesNode<ElemType>>(m_deviceId, name + L"_SVD"), { pLeft, pRight });
+
+                    ReplaceLeafNode(name, pTimes);
+                }
+            }
         }
     }
 
@@ -1107,7 +1160,7 @@ public:
     ~DbnLayer() {};
 };
 
-// Save network in the format of the Microsoft-internal legacy "DBN.exe" tool (this function is not useful outside of Microsoft)
+// Save network in the format of the Microsoft-internal legacy "DBN.exe" tool (this function is not useful outside of Microsoft).
 template <class ElemType>
 void ComputationNetwork::SaveToDbnFile(ComputationNetworkPtr net, const std::wstring& fileName) const 
 {
@@ -1209,7 +1262,7 @@ void ComputationNetwork::SaveToDbnFile(ComputationNetworkPtr net, const std::wst
     };
 
     // Get output node
-    std::list<ComputationNodeBasePtr> outputNodes = net->GetNodesWithType(OperationNameOf(ErrorPredictionNode));
+    std::list<ComputationNodeBasePtr> outputNodes = net->GetNodesWithType(OperationNameOf(ClassificationErrorNode));
     ComputationNodeBasePtr outputNode = GetFirstNodeWithDifferentType(outputNodes.front()->GetInputs(), OperationNameOf(InputValue));
 
     if (outputNode == nullptr)
@@ -1459,21 +1512,23 @@ void ComputationNetwork::SaveToDbnFile(ComputationNetworkPtr net, const std::wst
     PutTag("EDBN");
 }
 
-template void ComputationNetwork::InitLearnableParameters<float>(const ComputationNodeBasePtr& node, const bool uniformInit, const unsigned long randomSeed, const float initValueScale, bool initOnCPUOnly);
+template void ComputationNetwork::InitLearnableParametersWithBilinearFill<float>(const ComputationNodeBasePtr& node, size_t kernelWidth, size_t kernelHeight);
 template void ComputationNetwork::Read<float>(const wstring& fileName);
 template void ComputationNetwork::ReadPersistableParameters<float>(File& fstream, bool create);
 template void ComputationNetwork::PerformSVDecomposition<float>(const map<wstring, float>& SVDConfig, size_t alignedsize);
-template /*static*/ void ComputationNetwork::SetDropoutRate<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, unsigned long& dropOutSeed);
+template /*static*/ void ComputationNetwork::SetDropoutRate<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate);
+template /*static*/ void ComputationNetwork::SetIRngUserSeed<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, size_t randSeedBase);
 template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
 template void ComputationNetwork::SetSeqParam<float>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
                                                      const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
 template void ComputationNetwork::SaveToDbnFile<float>(ComputationNetworkPtr net, const std::wstring& fileName) const;
 
-template void ComputationNetwork::InitLearnableParameters<double>(const ComputationNodeBasePtr& node, const bool uniformInit, const unsigned long randomSeed, const double initValueScale, bool initOnCPUOnly);
+template void ComputationNetwork::InitLearnableParametersWithBilinearFill<double>(const ComputationNodeBasePtr& node, size_t kernelWidth, size_t kernelHeight);
 template void ComputationNetwork::Read<double>(const wstring& fileName);
 template void ComputationNetwork::ReadPersistableParameters<double>(File& fstream, bool create);
 template void ComputationNetwork::PerformSVDecomposition<double>(const map<wstring, float>& SVDConfig, size_t alignedsize);
-template /*static*/ void ComputationNetwork::SetDropoutRate<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate, unsigned long& dropOutSeed);
+template /*static*/ void ComputationNetwork::SetDropoutRate<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double dropoutRate, double& prevDropoutRate);
+template /*static*/ void ComputationNetwork::SetIRngUserSeed<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, size_t randSeedBase);
 template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
 template void ComputationNetwork::SetSeqParam<double>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
                                                       const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);

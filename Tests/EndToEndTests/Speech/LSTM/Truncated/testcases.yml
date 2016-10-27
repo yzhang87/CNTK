@@ -19,14 +19,21 @@ testCases:
   Epochs must be finished with expected results:
     patterns:
       - Finished Epoch[{{integer}} of {{integer}}]
-      - TrainLossPerSample = {{float,tolerance=.1%}}
-      - EvalErrPerSample = {{float,tolerance=.1%}}
-      - AvgLearningRatePerSample = {{float,tolerance=0.001%}}
+      - ce = {{float,tolerance=.1%}}
+      - err = {{float,tolerance=.1%}}
+      - learningRatePerSample = {{float,tolerance=0.001%}}
 
   Per-minibatch training results must match:
     patterns:
       - Epoch[{{integer}} of {{integer}}]-Minibatch[{{integer}}-{{integer}}
-      - SamplesSeen = {{integer}}
-      - TrainLossPerSample = {{float,tolerance=.1%}}
-      - EvalErr[0]PerSample = {{float,tolerance=.1%}}
+      - " * {{integer}}; "
+      - ce = {{float,tolerance=.1%}}
+      - err = {{float,tolerance=.46%}}
 
+# notes on accuracy:
+#  - per-MB err tolerance was raised to 0.46% from 0.1% due to different momentum spec (time const),
+#    which causes a MBs 41-50, which only consist of 238 samples, to deviate more.
+#    The different momentum spec changes momentum from 0.9 to a reported 0.899991.
+#    It was verified that changing it back brings it back in range.
+#  - per-MB ce tolerance was raised to 0.13% from 0.1% for the same reason
+# Once baselines are recreated, these should both be changed back to 0.1%.

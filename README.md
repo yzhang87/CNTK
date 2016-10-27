@@ -1,14 +1,43 @@
 # CNTK
 
 ## Latest news
-*2016-04-05.* CUDA7.5 support for Windows Build: Windows project files have been updated to automatically utilize CUDA 7.5 if present
+*2016-10-03.* V 1.7.2 Binary release  
+**This is a Hot Fix Release. It affects all users of Model Evaluation Library**
 
-*2016-03-24.* New Text Reader (CNTKTextFormatReader) is available
-Read description here https://github.com/Microsoft/CNTK/wiki/CNTKTextFormat-Reader
+If you are NOT using Model Evaluation Library you may skip this release.  
+If you ARE using Model Evaluation Library we **strongly recommend** installing version 1.7.2 instead of **any** previous version you might be using.
 
-*2016-02-29.* Added ZIP files support to the ImageReader
-Examples: https://github.com/Microsoft/CNTK/wiki/Image-reader
-Updated build steps at https://github.com/Microsoft/CNTK/wiki/Setup-CNTK-on-your-machine
+See [Release Notes](https://github.com/Microsoft/CNTk/wiki/CNTK_1_7_2_Release_Notes) for details.
+
+*2016-09-28.* V 1.7.1 Binary release  
+Highlights of this Release:
+* Two Breaking Changes related to Layers library default initialization and ```fsAdagrad``` gradient-normalization scheme
+* Improvements in BrainScript
+* Enabling of Deterministic Algorithm enforcement
+* Improvements in Model Evaluation including the support of Evaluation for Azure Applications
+* Different Performance improvements
+* Multiple bug fixes
+
+See more in the [Release Notes](https://github.com/Microsoft/CNTK/wiki/CNTK_1_7_1_Release_Notes) (including the full list of bugs fixed)  
+Get the Release from the [CNTK Releases page](https://github.com/Microsoft/CNTK/releases)
+
+*2016-08-31.* V 1.7 Binary release  
+Highlights of this Release:
+* Improvements in BrainScript (New library of predefined common layer types, Support of cuDNN5 RNN and Common random-initialization types, improved handling of GRUs)
+* Support of NVIDIA cuDNN 5.1
+* Improvements in Readers and Deserializers
+* Additions to Evaluator Library (Eval Client Sample, Strong Name for EvalWrapper)
+* New in Unit Tests (Linux support, Randomization engines)
+* Python API Preview (since V.1.5)
+* Multiple bug fixes
+
+See more in the [Release Notes](https://github.com/Microsoft/CNTK/wiki/CNTK_1_7_Release_Notes)  
+Get the Release from the [CNTK Releases page](https://github.com/Microsoft/CNTK/releases)
+
+*2016-08-29.* Two new Tutorials are available:  
+[Image recognition](https://github.com/Microsoft/CNTK/wiki/Hands-On-Labs-Image-Recognition) (CIFAR-10) and [Language understanding](https://github.com/Microsoft/CNTK/wiki/Hands-On-Labs-Image-Recognition) (ATIS).
+
+*2016-08-10.* We have significantly simplified handling of **Gated Recurrent Units (GRU)**. Read more in the [corresponding article](https://github.com/Microsoft/CNTK/wiki/GRUs-on-CNTK-with-BrainScript).
 
 See [all news](https://github.com/Microsoft/CNTK/wiki/News).
 
@@ -41,3 +70,8 @@ Amit Agarwal, Eldar Akchurin, Chris Basoglu, Guoguo Chen, Scott Cyphers, Jasha D
 ## Disclaimer 
 
 CNTK is in active use at Microsoft and constantly evolving. There will be bugs.
+
+
+## Microsoft Open Source Code of Conduct
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.

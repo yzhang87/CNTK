@@ -40,6 +40,9 @@ typedef unsigned char byte;
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+MATH_API void SetMathLibTraceLevel(int traceLevel);
+int GetMathLibTraceLevel();
+
 class MATH_API TracingGPUMemoryAllocator
 {
 private:
@@ -73,29 +76,31 @@ private:
 enum ElementWiseOperator
 {
     // nullary
-    opConstOne,
+    opConstOne, opNone,
     // unary (or binary with constant parameter)
     opCopy,
-    opNegate, opNot, opAbs, opReciprocal,
+    opNegate, opNot, opAbs, opFloor, opReciprocal,
     opSigmoid, opTanh, opSqr, opSqrt, opExp, opLog, opLinearRectifier, opCosine, opSin,
     // unary ops for use by Matrix class only (there is no TensorView implementation)
     opSigmoidDerivative, opLinearRectifierDerivative, opNegativeSine,
     // binary
-    opSum, opDifference, opElementwiseProduct, opElementwiseQuotient, opLogSum,
+    opCopyIf, opCopyIfNot, opSum, opDifference, opElementwiseProduct, opElementwiseQuotient, opLogSum,
     opMax, opMin,
-    opLT, opEQ, opGT, opGE, opNE, opLE, // Note: must obey this order: (sgn(a-b) == -1, 0, +1), (sgn(a-b) != -1, 0, +1)
+    opLess, opEqual, opGreater, opGreaterEqual, opNotEqual, opLessEqual, // Note: must obey this order: (sgn(a-b) == -1, 0, +1), (sgn(a-b) != -1, 0, +1)
     opAnd, opOr, opXor, opMaskNegative,
     opElementwiseProductWithSigmoidDerivativeFromOutput, opElementwiseProductWithTanhDerivativeFromOutput,
     opElementwiseProductWithLinearRectifierDerivativeFromOutput, opElementwiseProductWithLogDerivativeFromOutput,
     opElementwiseProductWithCosDerivative, opElementwiseProductWithSinDerivative,
-    opElementwiseProductWithAbsDerivative, opElementwiseProductWithSqrtDerivative, 
+    opElementwiseProductWithAbsDerivative, opElementwiseProductWithSqrtDerivative,
     opElementwiseProductWithReciprocalDerivative, opSqrOfDifference,
     // binary ops for indexing
     // opIndex,
     // ternary
     opCond /*a ? b : c*/,
     opClip, /*clip a within interval b..c*/
-    opElementwiseProductWithLogSumDerivative
+    opElementwiseProductWithLogSumDerivative,
+    opCopyIfEqual,
+    opElementwiseProductWithExpOfDiff, /* a * exp(b - c) */
     // Note: not all that's implemented in CNTK ComputationNodes has an opcode yet.
 };
 
@@ -108,6 +113,7 @@ enum ElementWiseOperator
     Macro(Negate);            \
     Macro(Not);               \
     Macro(Abs);               \
+    Macro(Floor);             \
     Macro(Reciprocal);        \
     Macro(Sigmoid);           \
     Macro(Tanh);              \
@@ -120,6 +126,8 @@ enum ElementWiseOperator
     Macro(Sin);
 
 #define ForAllBinaryOps(Macro)                                        \
+    Macro(CopyIf);                                                    \
+    Macro(CopyIfNot);                                                 \
     Macro(Sum);                                                       \
     Macro(Difference);                                                \
     Macro(ElementwiseProduct);                                        \
@@ -127,12 +135,12 @@ enum ElementWiseOperator
     Macro(LogSum);                                                    \
     Macro(Max);                                                       \
     Macro(Min);                                                       \
-    Macro(EQ);                                                        \
-    Macro(NE);                                                        \
-    Macro(GT);                                                        \
-    Macro(LT);                                                        \
-    Macro(GE);                                                        \
-    Macro(LE);                                                        \
+    Macro(Equal);                                                     \
+    Macro(NotEqual);                                                  \
+    Macro(Greater);                                                   \
+    Macro(Less);                                                      \
+    Macro(GreaterEqual);                                              \
+    Macro(LessEqual);                                                 \
     Macro(And);                                                       \
     Macro(Or);                                                        \
     Macro(Xor);                                                       \
@@ -149,10 +157,12 @@ enum ElementWiseOperator
     Macro(SqrOfDifference);                                           \
     //Macro(Index);
 
-#define ForAllTernaryOps(Macro)                    \
-    Macro(Cond);                                   \
-    Macro(Clip);                                   \
-    Macro(ElementwiseProductWithLogSumDerivative);
+#define ForAllTernaryOps(Macro)                         \
+    Macro(Cond);                                        \
+    Macro(CopyIfEqual);                                 \
+    Macro(Clip);                                        \
+    Macro(ElementwiseProductWithLogSumDerivative);      \
+    Macro(ElementwiseProductWithExpOfDiff);
 
 // -----------------------------------------------------------------------
 // various enums to describe
@@ -324,46 +334,46 @@ protected:
     CPUSPARSE_INDEX_TYPE* GetCompIndex() const { return m_compIndex; }
     void SetCompIndex(CPUSPARSE_INDEX_TYPE* parray) { m_compIndex = parray; }
 
-	void ZeroInit(const MatrixFormat matrixFormat = matrixFormatDense, const DEVICEID_TYPE computeDevice = -1)
+    void ZeroInit(const MatrixFormat matrixFormat = matrixFormatDense, const DEVICEID_TYPE computeDevice = -1)
     {
         m_externalBuffer           = false;
         m_format                   = matrixFormat;
         m_computeDevice            = computeDevice;
-		m_numRows                  = 0;
-		m_numCols                  = 0;
-		m_pArray                   = nullptr;
-		m_elemSizeAllocated        = 0;
-		m_totalBufferSizeAllocated = 0;
-		m_blockSize                = 0; // block size
-		m_rowToId                  = nullptr; // the id showing the order row number is observed in the nnz values.
-		m_tempHostBuffer           = nullptr; // used to copy values.
-		m_tempHostBufferSize       = 0;
-		m_colIdx                   = 0; // used to SetValue()
-		m_compIndexSize            = 0;
-		m_nzValues                 = nullptr;
-		m_unCompIndex              = nullptr; // row/col ids in CSC/CSR format
-		m_compIndex                = nullptr; // begin ids of col/row in CSC/CSR format
-		m_blockIds                 = nullptr; // block ids
-		m_blockIdShift             = 0; // used to get efficient slice, actual col = blockIds[j] - m_blockIdShift
+        m_numRows                  = 0;
+        m_numCols                  = 0;
+        m_pArray                   = nullptr;
+        m_elemSizeAllocated        = 0;
+        m_totalBufferSizeAllocated = 0;
+        m_blockSize                = 0; // block size
+        m_rowToId                  = nullptr; // the id showing the order row number is observed in the nnz values.
+        m_tempHostBuffer           = nullptr; // used to copy values.
+        m_tempHostBufferSize       = 0;
+        m_colIdx                   = 0; // used to SetValue()
+        m_compIndexSize            = 0;
+        m_nzValues                 = nullptr;
+        m_unCompIndex              = nullptr; // row/col ids in CSC/CSR format
+        m_compIndex                = nullptr; // begin ids of col/row in CSC/CSR format
+        m_blockIds                 = nullptr; // block ids
+        m_blockIdShift             = 0; // used to get efficient slice, actual col = blockIds[j] - m_blockIdShift
     }
 
 protected:
-	// **************************
-	// Variables requried by all matrices
-	// **************************
+    // **************************
+    // Variables requried by all matrices
+    // **************************
     MatrixFormat m_format;
     mutable DEVICEID_TYPE m_computeDevice; // current GPU device Id or CPUDEVICE
     bool m_externalBuffer; // is the buffer used by this matrix,
 
-	// m_numRows and m_numCols should be removed
+    // m_numRows and m_numCols should be removed
     size_t m_numRows;
     size_t m_numCols;
     size_t m_elemSizeAllocated;
     ElemType* m_pArray;
 
-	// **************************
-	// GPUSparseMatrix variables
-	// **************************
+    // **************************
+    // GPUSparseMatrix variables
+    // **************************
 
     size_t m_totalBufferSizeAllocated;
 
@@ -374,9 +384,9 @@ protected:
     mutable void* m_tempHostBuffer; // used to copy values.
     mutable size_t m_tempHostBufferSize;
 
-	// **************************
-	// CPUSparseMatrix variables
-	// **************************
+    // **************************
+    // CPUSparseMatrix variables
+    // **************************
 
     int m_colIdx; // used to SetValue()
     size_t m_compIndexSize;
@@ -398,25 +408,37 @@ protected:
 template <class ElemType>
 class MATH_API BaseMatrix
 {
-public:
-    
-    BaseMatrix()
+protected:    
+    // Default constructor. Copy/Move constructors might set doNotInitialize to true to avoid double initialization.
+    BaseMatrix(bool doNotInitializeFields = false)
     {
-        ZeroInit();
+        if (!doNotInitializeFields)
+            ZeroInit();
     }
+
     virtual ~BaseMatrix()
     {
         ZeroValues();
     }
-
+public:
     void VerifyResizable(const char* function) const 
     { 
         if (!m_sob.unique())
             LogicError("%s: Cannot resize the matrix because it is a view.", function);
-        if (m_sob->HasExternalBuffer())
+        else if (m_sob->HasExternalBuffer())
             LogicError("%s: Cannot resize the matrix because it is externally owned.", function);
     }
-	// This is needed for Sparse Matrices to ensure they can write to the matrix. Note: writing to slices is not currently supported
+
+    // same as VerifyResizable() except for the error message. Could be folded into one.
+    void VerifyMigratable(const char* function) const
+    {
+        if (!m_sob.unique())
+            LogicError("%s: Cannot migrate the matrix between devices because it is a view.", function);
+        else if (m_sob->HasExternalBuffer())
+            LogicError("%s: Cannot migrate the matrix between devices because it is externally owned.", function);
+    }
+
+    // This is needed for Sparse Matrices to ensure they can write to the matrix. Note: writing to slices is not currently supported
     void VerifyWritable(const char* function) const 
     {
         if (!(m_sob->GetNumStorageRows() == m_numRows && m_sob->GetNumStorageCols() == m_numCols))
@@ -528,10 +550,10 @@ protected:
         m_sliceViewOffset   = 0;
         m_sob               = nullptr;
     }
-	void ZeroInit(const MatrixFormat matrixFormat, const DEVICEID_TYPE computeDevice )
+    void ZeroInit(const MatrixFormat matrixFormat, const DEVICEID_TYPE computeDevice )
     {
         ZeroValues();
-		m_sob = make_shared<BaseMatrixStorage<ElemType>>(matrixFormat, computeDevice);
+        m_sob = make_shared<BaseMatrixStorage<ElemType>>(matrixFormat, computeDevice);
     }
 
 protected:
@@ -555,7 +577,7 @@ protected:
     // TODO: implement m_colStride
     size_t m_colStride;
 
-	// Storage OBject containing the underlying data used by this matrix
+    // Storage OBject containing the underlying data used by this matrix
     shared_ptr<BaseMatrixStorage<ElemType>> m_sob;
 };
 

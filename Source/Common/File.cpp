@@ -26,6 +26,8 @@
 #include <linux/limits.h> // for PATH_MAX
 #endif
 
+#define PCLOSE_ERROR -1
+
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 // File creation
@@ -148,47 +150,40 @@ void File::Init(const wchar_t* filename, int fileOptions)
 // (wstring only for now; feel free to make this a template if needed)
 /*static*/ wstring File::DirectoryPathOf(wstring path)
 {
-#if WIN32
-    if (IsWindows8OrGreater())
+#ifdef _WIN32
+    // Win32 accepts forward slashes, but it seems that PathRemoveFileSpec() does not
+    // TODO:
+    // "PathCchCanonicalize does the / to \ conversion as a part of the canonicalization, it's
+    // probably a good idea to do that anyway since I suspect that the '..' characters might
+    // confuse the other PathCch functions" [Larry Osterman]
+    // "Consider GetFullPathName both for canonicalization and last element finding." [Jay Krell]
+    path = msra::strfun::ReplaceAll<wstring>(path, L"/", L"\\");
+
+    HRESULT hr;
+    if (IsWindows8OrGreater()) // PathCchRemoveFileSpec() only available on Windows 8+
     {
         typedef HRESULT(*PathCchRemoveFileSpecProc)(_Inout_updates_(_Inexpressible_(cchPath)) PWSTR, _In_ size_t);
+        HINSTANCE hinstLib = LoadLibrary(TEXT("api-ms-win-core-path-l1-1-0.dll"));
+        if (hinstLib == nullptr)
+            RuntimeError("DirectoryPathOf: LoadLibrary() unexpectedly failed.");
+        PathCchRemoveFileSpecProc PathCchRemoveFileSpec = reinterpret_cast<PathCchRemoveFileSpecProc>(GetProcAddress(hinstLib, "PathCchRemoveFileSpec"));
+        if (!PathCchRemoveFileSpec)
+            RuntimeError("DirectoryPathOf: GetProcAddress() unexpectedly failed.");
 
-        HINSTANCE hinstLib;
-        PathCchRemoveFileSpecProc ProcAdd;
-        BOOL fFreeResult = FALSE;
+        // this is the actual function call we care about
+        hr = PathCchRemoveFileSpec(&path[0], path.size());
 
-        hinstLib = LoadLibrary(TEXT("api-ms-win-core-path-l1-1-0.dll"));
-        if (hinstLib != nullptr)
-        {
-            ProcAdd = reinterpret_cast<PathCchRemoveFileSpecProc>(GetProcAddress(hinstLib, "PathCchRemoveFileSpec"));
-            if (NULL != ProcAdd)
-            {
-                auto hr = (ProcAdd)(&path[0], path.size());
-                if (hr == S_OK) // done
-                    path.resize(wcslen(&path[0]));
-                else if (hr == S_FALSE) // nothing to remove: use .
-                    path = L".";
-            }
-            else
-            {
-                LogicError("DirectoryPathOf: GetProcAddress() unexpectedly failed.");
-            }
-
-            fFreeResult = FreeLibrary(hinstLib);
-        }
-        else
-        {
-            LogicError("DirectoryPathOf: LoadLibrary() unexpectedly failed.");
-        }
+        FreeLibrary(hinstLib);
     }
+    else // on Windows 7-, use older PathRemoveFileSpec() instead
+        hr = PathRemoveFileSpec(&path[0]) ? S_OK : S_FALSE;
+
+    if (hr == S_OK) // done
+        path.resize(wcslen(&path[0]));
+    else if (hr == S_FALSE) // nothing to remove: use .
+        path = L".";
     else
-    {
-        auto hr = PathRemoveFileSpec(&path[0]);
-        if (hr != 0) // done
-            path.resize(wcslen(&path[0]));
-        else
-            path = L".";
-    }
+        RuntimeError("DirectoryPathOf: Path(Cch)RemoveFileSpec() unexpectedly failed with 0x%08x.", (unsigned int)hr);
 #else
     auto pos = path.find_last_of(L"/");
     if (pos != path.npos)
@@ -203,7 +198,7 @@ void File::Init(const wchar_t* filename, int fileOptions)
 // (wstring only for now; feel free to make this a template if needed)
 /*static*/ wstring File::FileNameOf(wstring path)
 {
-#if WIN32
+#ifdef WIN32
     static const wstring delim = L"\\:/";
 #else
     static const wstring delim = L"/";
@@ -218,7 +213,7 @@ void File::Init(const wchar_t* filename, int fileOptions)
 // get path of current executable
 /*static*/ wstring File::GetExecutablePath()
 {
-#if WIN32
+#ifdef WIN32
     wchar_t path[33000];
     if (GetModuleFileNameW(NULL, path, _countof(path)) == 0)
         LogicError("GetExecutablePath: GetModuleFileNameW() unexpectedly failed.");
@@ -262,16 +257,22 @@ bool File::IsTextBased()
 // Note: this does not check for errors when the File corresponds to pipe stream. In this case, use Flush() before closing a file you are writing.
 File::~File(void)
 {
+    int rc = 0;
     if (m_pcloseNeeded)
     {
-        // TODO: Check for error code and throw if !std::uncaught_exception()     
-        _pclose(m_file);
+        rc = _pclose(m_file);
+        if ((rc == PCLOSE_ERROR) && !std::uncaught_exception())
+        {
+            RuntimeError("File: failed to close file at %S", m_filename.c_str());
+        }
     }
     else if (m_file != stdin && m_file != stdout && m_file != stderr)
     {
-        int rc = fclose(m_file);
-        if ((rc != 0) && !std::uncaught_exception())
+        rc = fclose(m_file);
+        if ((rc != FCLOSE_SUCCESS) && !std::uncaught_exception())
+        {
             RuntimeError("File: failed to close file at %S", m_filename.c_str());
+        }
     }
 }
 
