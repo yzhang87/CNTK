@@ -74,6 +74,8 @@ void HTKMLFReader<ElemType>::InitFromConfig(const ConfigRecordType& readerConfig
     
     // Checks if we use context-sensitive-chunk BPTT
     m_CSCtruncated = readerConfig(L"CSCTruncated", false);
+    m_rightContext = readerConfig(L"rightContext", 0);
+    m_getPast = readerConfig(L"getPast", false);
     if (m_CSCtruncated)
     {
         m_leftContext = readerConfig(L"leftContext", 0);
@@ -1224,7 +1226,7 @@ void HTKMLFReader<ElemType>::FormulateOneMinibatchWithContextToTrainOrTestDataBu
     const StreamMinibatchInputs& matrices, bool& skip)
 {
     // Context only been supportted by sequence version
-    assert(frameMode == false);
+    assert(m_frameMode == false);
     
     // We initialize the sentence boundary information before we process
     // the utterances.
@@ -1458,9 +1460,20 @@ bool HTKMLFReader<ElemType>::GetOneMinibatchToTrainOrTestDataBuffer(
             m_currentMBSize = 0;
             for (size_t i = 0; i < m_numSeqsPerMB; i++)
             {
-                if (m_currentBufferFrames[i] > m_currentMBSize)
+                if (m_doMinibatchBufferTruncation)
                 {
-                    m_currentMBSize = m_currentBufferFrames[i];
+                    size_t numMinibatches = 1;
+                    numMinibatches = (ElemType) m_currentBufferFrames[i] / (ElemType) m_mbSize;
+                    numMinibatches += (m_currentBufferFrames[i] % m_mbSize == 0) ? 0 : 1;
+                    if (numMinibatches * m_mbSize > m_currentMBSize)
+                    {
+                        m_currentMBSize = numMinibatches * m_mbSize ;
+                    }
+                }
+                else 
+                {
+                    if (m_currentBufferFrames[i] > m_currentMBSize)
+                        m_currentMBSize = m_currentBufferFrames[i];
                 }
             }
         }
@@ -1527,7 +1540,8 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
         {
             assert(m_rightContext == 0);
         }
-        currentMinibatch.pMBLayout->Init(m_pMBLayout->GetNumParallelSequences(), numFrames + m_rightContext);
+
+        currentMinibatch.pMBLayout->Init(m_pMBLayout->GetNumParallelSequences(), m_mbSize + m_rightContext);
         const auto& sequences = m_pMBLayout->GetAllSequences();
         for (const auto& seq : sequences)
         {
@@ -1561,22 +1575,21 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
                 }
             }
         }
-        if (m_CSCtruncated && i == (numMinibatches -1))
+        if (i == (numMinibatches -1))
         {
             // fill the gaps for the last minibatch. Note that for the frames before rightContext, we already have the gap sequence filled previous stage.
             for (size_t j = 0; j < m_numSeqsPerMB; j++)
             {
-                currentMinibatch.pMBLayout->AddGap(j, numFrames, numFrames + m_rightContext);
+                currentMinibatch.pMBLayout->AddGap(j, numFrames, m_mbSize + m_rightContext);
             }
         }
-        //fprintf (stderr, "hahah num of samples %zu\n", currentMinibatch.pMBLayout->GetActualNumSamples());
         // Sets the minibatch size for the current minibatch.
         if (!m_CSCtruncated)
-            currentMinibatch.currentMBSize = numFrames;
+            currentMinibatch.currentMBSize = m_mbSize;
         else
         {
             // latency control case, add the context for each minibatch.
-            currentMinibatch.currentMBSize = numFrames + m_rightContext;
+            currentMinibatch.currentMBSize = m_mbSize + m_rightContext;
         }
 
         // Sets the utterance information for the current minibatch.
@@ -1603,11 +1616,11 @@ void HTKMLFReader<ElemType>::CopyMinibatchToBuffer()
         }
 
         size_t startDataCopy = startIndex * m_numSeqsPerMB;
-        size_t endDataCopy = (startIndex + numFrames) * m_numSeqsPerMB;
+        size_t endDataCopy = (startIndex + m_mbSize) * m_numSeqsPerMB;
         if (m_CSCtruncated)
         {
             // for latency control case, reserve the space for the latency
-            endDataCopy = (startIndex + numFrames + m_rightContext) * m_numSeqsPerMB;
+            endDataCopy = (startIndex + m_mbSize + m_rightContext) * m_numSeqsPerMB;
         }
 
         // Copies features.
