@@ -141,7 +141,10 @@ public:
             }
             else
             {
-                m_start[i] = extra / 2;
+                if (extra > 2)
+                    m_start[i] = extra / 2;
+                else
+                    m_start[i] = 0;
 #ifdef _DEBUG
                 // If we're padding then extra should be covered.
                 bool padded = GetAutoPad(i);

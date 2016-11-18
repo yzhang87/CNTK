@@ -29,7 +29,9 @@ protected: // fix this later
     void check(size_t t) const
     {
         if (t >= n)
-            throw std::logic_error("growablevectorbase: out of bounds");
+        {
+            LogicError("growablevectorbase: out of bounds");
+        }
     } // bounds check helper
 
     // resize intermediate level, but do not allocate blocks
@@ -71,7 +73,7 @@ protected: // fix this later
     {
         // BUGBUG: last block may be shorter than elementsperblock
         if (end - begin != elementsperblock || getblockt(begin) != 0)
-            throw std::logic_error("growablevectorbase: non-block boundaries passed to block-level function");
+            LogicError("growablevectorbase: non-block boundaries passed to block-level function");
         return getblockptr(begin);
     }
 
@@ -108,7 +110,7 @@ public:
 // ---------------------------------------------------------------------------
 // biggrowablevector -- big vector we can push_back to
 // ---------------------------------------------------------------------------
-template <typename ELEMTYPE>
+template <class ELEMTYPE>
 class biggrowablevector : public growablevectorbase<std::vector<ELEMTYPE>>
 {
 public:
